@@ -130,16 +130,16 @@ export default async function IntegrationsPage() {
   // Filter sites with WordPress enabled
   const wordpressSites: SiteWithWordPress[] = (sites || [])
     .filter((site) => {
-      const integrations = site.integrations as { wordpress?: WordPressConfig } | null
+      const integrations = site.integrations as unknown as { wordpress?: WordPressConfig } | null
       return integrations?.wordpress?.enabled
     })
     .map((site) => {
-      const integrations = site.integrations as { wordpress: WordPressConfig }
+      const integrations = site.integrations as unknown as { wordpress: WordPressConfig }
       return {
         id: site.id,
         name: site.name,
         wordpress: integrations.wordpress,
-        last_pushed_at: (site as { last_pushed_to_wordpress_at?: string | null }).last_pushed_to_wordpress_at || null,
+        last_pushed_at: (site as unknown as { last_pushed_to_wordpress_at?: string | null }).last_pushed_to_wordpress_at || null,
         updated_at: site.updated_at,
       }
     })

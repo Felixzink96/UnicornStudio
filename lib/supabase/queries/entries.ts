@@ -176,7 +176,7 @@ export async function getEntry(id: string): Promise<EntryWithRelations> {
     .eq('entry_id', id)
 
   const entry = data as EntryWithRelations
-  entry.terms = entryTerms?.map((et) => et.term).filter(Boolean) || []
+  entry.terms = (entryTerms?.map((et) => et.term).filter(Boolean) || []) as unknown as EntryWithRelations['terms']
 
   return entry
 }
@@ -215,7 +215,7 @@ export async function getEntryBySlug(
     .eq('entry_id', data.id)
 
   const entry = data as EntryWithRelations
-  entry.terms = entryTerms?.map((et) => et.term).filter(Boolean) || []
+  entry.terms = (entryTerms?.map((et) => et.term).filter(Boolean) || []) as unknown as EntryWithRelations['terms']
 
   return entry
 }

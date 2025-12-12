@@ -170,119 +170,38 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Skip content types and entries when pushing single page
-    if (!pushSinglePage) {
-      // Push Content Types
+    // Use simplified sync approach - tell WordPress to fetch from API
+    // This ensures WordPress gets the exact same data as when clicking "Sync"
+    if (pushSinglePage) {
+      // Single page: sync pages and CSS only
       try {
-        const { data: contentTypes } = await supabase
-          .from('content_types')
-          .select('*')
-          .eq('site_id', siteId)
-
-        if (contentTypes && contentTypes.length > 0) {
-          for (const ct of contentTypes) {
-            await sendWebhook('content_type.updated', ct)
-          }
-          result.results.content_types = { count: contentTypes.length, success: true }
-        }
+        await sendWebhook('sync.pages', { pageId })
+        result.results.pages = { count: 1, success: true }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Content Types sync failed'
+        const msg = err instanceof Error ? err.message : 'Pages sync failed'
         result.errors.push(msg)
-        result.results.content_types = { count: 0, success: false, error: msg }
+        result.results.pages = { count: 0, success: false, error: msg }
       }
 
-      // Push Entries (only published)
       try {
-        const { data: entries } = await supabase
-          .from('entries')
-          .select('*, content_type:content_types(name, slug)')
-          .eq('site_id', siteId)
-          .eq('status', 'published')
-
-        if (entries && entries.length > 0) {
-          for (const entry of entries) {
-            await sendWebhook('entry.published', entry)
-          }
-          result.results.entries = { count: entries.length, success: true }
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Entries sync failed'
-        result.errors.push(msg)
-        result.results.entries = { count: 0, success: false, error: msg }
-      }
-    }
-
-    // Push Pages (single page if pageId provided, otherwise all pages)
-    try {
-      let pagesQuery = supabase
-        .from('pages')
-        .select('*')
-        .eq('site_id', siteId)
-
-      if (pushSinglePage) {
-        pagesQuery = pagesQuery.eq('id', pageId)
-      }
-
-      const { data: pages } = await pagesQuery
-
-      if (pages && pages.length > 0) {
-        for (const page of pages) {
-          // Map fields for WordPress compatibility
-          const wpPage = {
-            ...page,
-            html: page.html_content, // WordPress expects 'html', DB has 'html_content'
-            title: page.name,        // WordPress can use 'title' or 'name'
-          }
-          await sendWebhook('page.updated', wpPage)
-        }
-        result.results.pages = { count: pages.length, success: true }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Pages sync failed'
-      result.errors.push(msg)
-      result.results.pages = { count: 0, success: false, error: msg }
-    }
-
-    // Skip taxonomies and CSS when pushing single page
-    if (!pushSinglePage) {
-      // Push Taxonomies and Terms
-      try {
-        const { data: taxonomies } = await supabase
-          .from('taxonomies')
-          .select('*, terms(*)')
-          .eq('site_id', siteId)
-
-        if (taxonomies && taxonomies.length > 0) {
-          for (const tax of taxonomies) {
-            await sendWebhook('taxonomy.updated', tax)
-          }
-          result.results.taxonomies = { count: taxonomies.length, success: true }
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Taxonomies sync failed'
-        result.errors.push(msg)
-        result.results.taxonomies = { count: 0, success: false, error: msg }
-      }
-
-      // Push CSS/Design Variables
-      try {
-        const { data: designVars } = await supabase
-          .from('design_variables')
-          .select('*')
-          .eq('site_id', siteId)
-          .single()
-
-        if (designVars) {
-          await sendWebhook('css.updated', {
-            variables: designVars,
-            settings: site.settings,
-          })
-          result.results.css = { success: true }
-        }
+        await sendWebhook('sync.css', {})
+        result.results.css = { success: true }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'CSS sync failed'
         result.errors.push(msg)
         result.results.css = { success: false, error: msg }
+      }
+    } else {
+      // Full sync: tell WordPress to do a complete sync
+      try {
+        await sendWebhook('sync.full', {})
+        result.results.pages = { count: 0, success: true } // WordPress handles counting
+        result.results.entries = { count: 0, success: true }
+        result.results.content_types = { count: 0, success: true }
+        result.results.css = { success: true }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Full sync failed'
+        result.errors.push(msg)
       }
     }
 

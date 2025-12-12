@@ -196,6 +196,21 @@ class Unicorn_Studio_Webhook_Handler {
                 return true;
 
             // ========================================
+            // Full Sync Event
+            // ========================================
+            case 'sync.full':
+                // Trigger a full sync just like clicking "Sync" button
+                return unicorn_studio()->sync->sync_all();
+
+            case 'sync.pages':
+                // Sync only pages
+                return unicorn_studio()->pages->sync_pages();
+
+            case 'sync.css':
+                // Sync only CSS
+                return unicorn_studio()->css->sync_css();
+
+            // ========================================
             // Unknown Event
             // ========================================
             default:

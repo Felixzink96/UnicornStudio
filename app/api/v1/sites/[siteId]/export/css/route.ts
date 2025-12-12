@@ -55,8 +55,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // 5. Collect all HTML content for Tailwind class extraction
     let allHtml = ''
 
-    // Pages
-    pagesRes.data?.forEach((page) => {
+    // Pages - include both html_content and content JSON
+    const { data: pagesWithHtml } = await supabase
+      .from('pages')
+      .select('html_content, content')
+      .eq('site_id', siteId)
+
+    pagesWithHtml?.forEach((page) => {
+      // Add actual HTML content
+      if (page.html_content) {
+        allHtml += page.html_content
+      }
+      // Also add JSON content for backwards compatibility
       allHtml += JSON.stringify(page.content || {})
     })
 

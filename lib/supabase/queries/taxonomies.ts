@@ -107,7 +107,7 @@ export async function updateTaxonomy(
   const supabase = createClient()
   const { data, error } = await supabase
     .from('taxonomies')
-    .update(updates)
+    .update(updates as unknown as Database['public']['Tables']['taxonomies']['Update'])
     .eq('id', id)
     .select()
     .single()
@@ -322,7 +322,7 @@ export async function updateTerm(
   const supabase = createClient()
   const { data, error } = await supabase
     .from('terms')
-    .update(updates)
+    .update(updates as unknown as Database['public']['Tables']['terms']['Update'])
     .eq('id', id)
     .select()
     .single()

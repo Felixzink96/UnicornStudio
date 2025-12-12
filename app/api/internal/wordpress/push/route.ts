@@ -173,24 +173,16 @@ export async function POST(request: NextRequest) {
     // Use simplified sync approach - tell WordPress to fetch from API
     // This ensures WordPress gets the exact same data as when clicking "Sync"
     if (pushSinglePage) {
-      // Single page: sync pages and CSS only
+      // Single page: ONLY sync this one page, nothing else
       try {
         await sendWebhook('sync.pages', { pageId })
         result.results.pages = { count: 1, success: true }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Pages sync failed'
+        const msg = err instanceof Error ? err.message : 'Page sync failed'
         result.errors.push(msg)
         result.results.pages = { count: 0, success: false, error: msg }
       }
-
-      try {
-        await sendWebhook('sync.css', {})
-        result.results.css = { success: true }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'CSS sync failed'
-        result.errors.push(msg)
-        result.results.css = { success: false, error: msg }
-      }
+      // No CSS sync for single page - only the page content
     } else {
       // Full sync: tell WordPress to do a complete sync
       try {

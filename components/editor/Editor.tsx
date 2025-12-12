@@ -7,6 +7,7 @@ import { ChatPanel } from './chat/ChatPanel'
 import { LivePreview } from './preview/LivePreview'
 import { CodeEditor } from './code-view/CodeEditor'
 import { ElementPanel } from './element-panel/ElementPanel'
+import { LayersPanel } from './layers/LayersPanel'
 
 interface EditorProps {
   siteId: string
@@ -16,6 +17,7 @@ interface EditorProps {
 export function Editor({ siteId, pageId }: EditorProps) {
   const viewMode = useEditorStore((s) => s.viewMode)
   const selectedElement = useEditorStore((s) => s.selectedElement)
+  const showLayersPanel = useEditorStore((s) => s.showLayersPanel)
   const initialize = useEditorStore((s) => s.initialize)
   const reset = useEditorStore((s) => s.reset)
   const save = useEditorStore((s) => s.save)
@@ -86,6 +88,11 @@ export function Editor({ siteId, pageId }: EditorProps) {
             <ElementPanel />
           )}
         </div>
+
+        {/* Right Panel - Layers (when active) */}
+        {showLayersPanel && (
+          <LayersPanel />
+        )}
       </div>
     </div>
   )

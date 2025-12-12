@@ -41,7 +41,7 @@ export function LivePreview() {
         cursor: text !important;
       }
       .unicorn-badge {
-        position: fixed;
+        position: absolute;
         display: flex;
         align-items: center;
         gap: 2px;
@@ -55,8 +55,8 @@ export function LivePreview() {
         z-index: 99999;
         pointer-events: auto;
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        will-change: transform;
         overflow: hidden;
+        -webkit-font-smoothing: subpixel-antialiased;
       }
       .unicorn-badge-label {
         padding: 5px 10px;
@@ -86,7 +86,7 @@ export function LivePreview() {
         height: 14px;
       }
       .unicorn-margin-box {
-        position: fixed;
+        position: absolute;
         background: rgba(251, 146, 60, 0.3);
         pointer-events: none;
         z-index: 99990;
@@ -104,7 +104,7 @@ export function LivePreview() {
         font-weight: 500;
       }
       .unicorn-padding-box {
-        position: fixed;
+        position: absolute;
         background: rgba(34, 197, 94, 0.3);
         pointer-events: none;
         z-index: 99991;
@@ -123,7 +123,7 @@ export function LivePreview() {
       }
       /* Grid/Flex Overlay */
       .unicorn-layout-overlay {
-        position: fixed;
+        position: absolute;
         pointer-events: none;
         z-index: 99985;
         border: 1px dashed #a855f7;
@@ -230,9 +230,11 @@ export function LivePreview() {
             }
 
             var rect = el.getBoundingClientRect();
+            var scrollY = window.scrollY || document.documentElement.scrollTop;
+            var scrollX = window.scrollX || document.documentElement.scrollLeft;
             layoutOverlay.style.display = 'block';
-            layoutOverlay.style.left = rect.left + 'px';
-            layoutOverlay.style.top = rect.top + 'px';
+            layoutOverlay.style.left = (rect.left + scrollX) + 'px';
+            layoutOverlay.style.top = (rect.top + scrollY) + 'px';
             layoutOverlay.style.width = rect.width + 'px';
             layoutOverlay.style.height = rect.height + 'px';
 
@@ -330,12 +332,13 @@ export function LivePreview() {
           function showBadge(el) {
             if (!el) return;
             var rect = el.getBoundingClientRect();
+            var scrollY = window.scrollY || document.documentElement.scrollTop;
+            var scrollX = window.scrollX || document.documentElement.scrollLeft;
             badgeLabel.textContent = el.tagName;
             badge.style.display = 'flex';
-            // Use transform for GPU-accelerated positioning
-            badge.style.transform = 'translate(' + rect.left + 'px, ' + Math.max(0, rect.top - 32) + 'px)';
-            badge.style.left = '0';
-            badge.style.top = '0';
+            // Document-relative positioning - scrolls with content, no lag
+            badge.style.left = (rect.left + scrollX) + 'px';
+            badge.style.top = Math.max(0, rect.top + scrollY - 32) + 'px';
           }
 
           function hideBadge() { badge.style.display = 'none'; }
@@ -371,25 +374,36 @@ export function LivePreview() {
               selectedElement = null;
               hideBadge();
               hideSpacing();
+              hideLayoutOverlay();
             }
           });
 
           function showSpacing(el) {
             if (!el) return;
             var rect = el.getBoundingClientRect();
+            var scrollY = window.scrollY || document.documentElement.scrollTop;
+            var scrollX = window.scrollX || document.documentElement.scrollLeft;
             var cs = window.getComputedStyle(el);
             var m = { top: parseInt(cs.marginTop)||0, right: parseInt(cs.marginRight)||0, bottom: parseInt(cs.marginBottom)||0, left: parseInt(cs.marginLeft)||0 };
             var p = { top: parseInt(cs.paddingTop)||0, right: parseInt(cs.paddingRight)||0, bottom: parseInt(cs.paddingBottom)||0, left: parseInt(cs.paddingLeft)||0 };
 
-            if (m.top > 0) { marginBoxes.top.style.cssText = 'display:flex;position:fixed;left:'+rect.left+'px;top:'+(rect.top-m.top)+'px;width:'+rect.width+'px;height:'+m.top+'px;background:rgba(251,146,60,0.3);align-items:center;justify-content:center;z-index:99990;pointer-events:none;'; marginBoxes.top.querySelector('.unicorn-margin-label').textContent = m.top; } else { marginBoxes.top.style.display = 'none'; }
-            if (m.right > 0) { marginBoxes.right.style.cssText = 'display:flex;position:fixed;left:'+rect.right+'px;top:'+rect.top+'px;width:'+m.right+'px;height:'+rect.height+'px;background:rgba(251,146,60,0.3);align-items:center;justify-content:center;z-index:99990;pointer-events:none;'; marginBoxes.right.querySelector('.unicorn-margin-label').textContent = m.right; } else { marginBoxes.right.style.display = 'none'; }
-            if (m.bottom > 0) { marginBoxes.bottom.style.cssText = 'display:flex;position:fixed;left:'+rect.left+'px;top:'+rect.bottom+'px;width:'+rect.width+'px;height:'+m.bottom+'px;background:rgba(251,146,60,0.3);align-items:center;justify-content:center;z-index:99990;pointer-events:none;'; marginBoxes.bottom.querySelector('.unicorn-margin-label').textContent = m.bottom; } else { marginBoxes.bottom.style.display = 'none'; }
-            if (m.left > 0) { marginBoxes.left.style.cssText = 'display:flex;position:fixed;left:'+(rect.left-m.left)+'px;top:'+rect.top+'px;width:'+m.left+'px;height:'+rect.height+'px;background:rgba(251,146,60,0.3);align-items:center;justify-content:center;z-index:99990;pointer-events:none;'; marginBoxes.left.querySelector('.unicorn-margin-label').textContent = m.left; } else { marginBoxes.left.style.display = 'none'; }
+            // Document-relative left/top values
+            var docLeft = rect.left + scrollX;
+            var docTop = rect.top + scrollY;
+            var docRight = rect.right + scrollX;
+            var docBottom = rect.bottom + scrollY;
 
-            if (p.top > 0) { paddingBoxes.top.style.cssText = 'display:flex;position:fixed;left:'+rect.left+'px;top:'+rect.top+'px;width:'+rect.width+'px;height:'+p.top+'px;background:rgba(34,197,94,0.3);align-items:center;justify-content:center;z-index:99991;pointer-events:none;'; paddingBoxes.top.querySelector('.unicorn-padding-label').textContent = p.top; } else { paddingBoxes.top.style.display = 'none'; }
-            if (p.right > 0) { paddingBoxes.right.style.cssText = 'display:flex;position:fixed;left:'+(rect.right-p.right)+'px;top:'+rect.top+'px;width:'+p.right+'px;height:'+rect.height+'px;background:rgba(34,197,94,0.3);align-items:center;justify-content:center;z-index:99991;pointer-events:none;'; paddingBoxes.right.querySelector('.unicorn-padding-label').textContent = p.right; } else { paddingBoxes.right.style.display = 'none'; }
-            if (p.bottom > 0) { paddingBoxes.bottom.style.cssText = 'display:flex;position:fixed;left:'+rect.left+'px;top:'+(rect.bottom-p.bottom)+'px;width:'+rect.width+'px;height:'+p.bottom+'px;background:rgba(34,197,94,0.3);align-items:center;justify-content:center;z-index:99991;pointer-events:none;'; paddingBoxes.bottom.querySelector('.unicorn-padding-label').textContent = p.bottom; } else { paddingBoxes.bottom.style.display = 'none'; }
-            if (p.left > 0) { paddingBoxes.left.style.cssText = 'display:flex;position:fixed;left:'+rect.left+'px;top:'+rect.top+'px;width:'+p.left+'px;height:'+rect.height+'px;background:rgba(34,197,94,0.3);align-items:center;justify-content:center;z-index:99991;pointer-events:none;'; paddingBoxes.left.querySelector('.unicorn-padding-label').textContent = p.left; } else { paddingBoxes.left.style.display = 'none'; }
+            // Margin boxes - document-relative positioning
+            if (m.top > 0) { marginBoxes.top.style.display = 'flex'; marginBoxes.top.style.left = docLeft+'px'; marginBoxes.top.style.top = (docTop-m.top)+'px'; marginBoxes.top.style.width = rect.width+'px'; marginBoxes.top.style.height = m.top+'px'; marginBoxes.top.querySelector('.unicorn-margin-label').textContent = m.top; } else { marginBoxes.top.style.display = 'none'; }
+            if (m.right > 0) { marginBoxes.right.style.display = 'flex'; marginBoxes.right.style.left = docRight+'px'; marginBoxes.right.style.top = docTop+'px'; marginBoxes.right.style.width = m.right+'px'; marginBoxes.right.style.height = rect.height+'px'; marginBoxes.right.querySelector('.unicorn-margin-label').textContent = m.right; } else { marginBoxes.right.style.display = 'none'; }
+            if (m.bottom > 0) { marginBoxes.bottom.style.display = 'flex'; marginBoxes.bottom.style.left = docLeft+'px'; marginBoxes.bottom.style.top = docBottom+'px'; marginBoxes.bottom.style.width = rect.width+'px'; marginBoxes.bottom.style.height = m.bottom+'px'; marginBoxes.bottom.querySelector('.unicorn-margin-label').textContent = m.bottom; } else { marginBoxes.bottom.style.display = 'none'; }
+            if (m.left > 0) { marginBoxes.left.style.display = 'flex'; marginBoxes.left.style.left = (docLeft-m.left)+'px'; marginBoxes.left.style.top = docTop+'px'; marginBoxes.left.style.width = m.left+'px'; marginBoxes.left.style.height = rect.height+'px'; marginBoxes.left.querySelector('.unicorn-margin-label').textContent = m.left; } else { marginBoxes.left.style.display = 'none'; }
+
+            // Padding boxes - document-relative positioning
+            if (p.top > 0) { paddingBoxes.top.style.display = 'flex'; paddingBoxes.top.style.left = docLeft+'px'; paddingBoxes.top.style.top = docTop+'px'; paddingBoxes.top.style.width = rect.width+'px'; paddingBoxes.top.style.height = p.top+'px'; paddingBoxes.top.querySelector('.unicorn-padding-label').textContent = p.top; } else { paddingBoxes.top.style.display = 'none'; }
+            if (p.right > 0) { paddingBoxes.right.style.display = 'flex'; paddingBoxes.right.style.left = (docRight-p.right)+'px'; paddingBoxes.right.style.top = docTop+'px'; paddingBoxes.right.style.width = p.right+'px'; paddingBoxes.right.style.height = rect.height+'px'; paddingBoxes.right.querySelector('.unicorn-padding-label').textContent = p.right; } else { paddingBoxes.right.style.display = 'none'; }
+            if (p.bottom > 0) { paddingBoxes.bottom.style.display = 'flex'; paddingBoxes.bottom.style.left = docLeft+'px'; paddingBoxes.bottom.style.top = (docBottom-p.bottom)+'px'; paddingBoxes.bottom.style.width = rect.width+'px'; paddingBoxes.bottom.style.height = p.bottom+'px'; paddingBoxes.bottom.querySelector('.unicorn-padding-label').textContent = p.bottom; } else { paddingBoxes.bottom.style.display = 'none'; }
+            if (p.left > 0) { paddingBoxes.left.style.display = 'flex'; paddingBoxes.left.style.left = docLeft+'px'; paddingBoxes.left.style.top = docTop+'px'; paddingBoxes.left.style.width = p.left+'px'; paddingBoxes.left.style.height = rect.height+'px'; paddingBoxes.left.querySelector('.unicorn-padding-label').textContent = p.left; } else { paddingBoxes.left.style.display = 'none'; }
           }
 
           function hideSpacing() {
@@ -560,21 +574,20 @@ export function LivePreview() {
               if (selectedElement) { selectedElement.classList.remove('unicorn-selected'); selectedElement = null; }
               hideBadge();
               hideSpacing();
+              hideLayoutOverlay();
+            }
+            // Select element from Layers panel
+            if (e.data && e.data.type === 'select-element' && e.data.selector) {
+              stopEdit();
+              var el = document.querySelector(e.data.selector);
+              if (el) {
+                // Select it first (shows overlays at current position)
+                selectEl(el);
+                // Then scroll - overlays will be at correct position since they use document-relative coords
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
             }
           });
-
-          // Scroll
-          document.addEventListener('scroll', function() {
-            // Update positions for the current element (editing or selected)
-            var targetEl = editingElement || selectedElement;
-            if (targetEl) {
-              if (!editingElement) {
-                showBadge(targetEl);
-              }
-              showSpacing(targetEl);
-              showLayoutOverlay(targetEl);
-            }
-          }, true);
 
         }
       })();

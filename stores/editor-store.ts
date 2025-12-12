@@ -37,6 +37,7 @@ const initialState: EditorState = {
   currentPage: null,
   showElementPanel: false,
   elementPanelTab: 'edit',
+  showLayersPanel: false,
 }
 
 export const useEditorStore = create<EditorState & EditorActions>()(
@@ -487,6 +488,83 @@ export const useEditorStore = create<EditorState & EditorActions>()(
       set((state) => {
         state.elementPanelTab = tab
       })
+    },
+
+    // ============================================
+    // LAYERS PANEL
+    // ============================================
+
+    toggleLayersPanel: () => {
+      set((state) => {
+        state.showLayersPanel = !state.showLayersPanel
+      })
+    },
+
+    setShowLayersPanel: (show: boolean) => {
+      set((state) => {
+        state.showLayersPanel = show
+      })
+    },
+
+    // Move element within the DOM structure
+    moveElement: (selector: string, newParentSelector: string, position: number) => {
+      const state = get()
+      const doc = new DOMParser().parseFromString(state.html, 'text/html')
+
+      const element = doc.querySelector(selector)
+      const newParent = doc.querySelector(newParentSelector)
+
+      if (!element || !newParent) return
+
+      // Remove from current position
+      element.parentNode?.removeChild(element)
+
+      // Insert at new position
+      const children = Array.from(newParent.children)
+      if (position >= children.length) {
+        newParent.appendChild(element)
+      } else {
+        newParent.insertBefore(element, children[position])
+      }
+
+      // Reconstruct HTML
+      let newHtml = '<!DOCTYPE html>\n<html'
+      Array.from(doc.documentElement.attributes).forEach(attr => {
+        newHtml += ` ${attr.name}="${attr.value}"`
+      })
+      newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+
+      get().updateHtml(newHtml, true)
+    },
+
+    // Reorder siblings
+    reorderSiblings: (parentSelector: string, fromIndex: number, toIndex: number) => {
+      const state = get()
+      const doc = new DOMParser().parseFromString(state.html, 'text/html')
+
+      const parent = doc.querySelector(parentSelector)
+      if (!parent) return
+
+      const children = Array.from(parent.children)
+      if (fromIndex < 0 || fromIndex >= children.length || toIndex < 0 || toIndex >= children.length) return
+
+      const element = children[fromIndex]
+      parent.removeChild(element)
+
+      if (toIndex >= parent.children.length) {
+        parent.appendChild(element)
+      } else {
+        parent.insertBefore(element, parent.children[toIndex])
+      }
+
+      // Reconstruct HTML
+      let newHtml = '<!DOCTYPE html>\n<html'
+      Array.from(doc.documentElement.attributes).forEach(attr => {
+        newHtml += ` ${attr.name}="${attr.value}"`
+      })
+      newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+
+      get().updateHtml(newHtml, true)
     },
   }))
 )

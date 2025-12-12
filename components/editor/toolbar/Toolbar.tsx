@@ -41,6 +41,7 @@ import {
   ChevronDown,
   MessageSquare,
   FileText,
+  Layers,
 } from 'lucide-react'
 import type { ViewMode, Breakpoint } from '@/types/editor'
 
@@ -64,6 +65,8 @@ export function Toolbar({ siteId }: ToolbarProps) {
   const redo = useEditorStore((s) => s.redo)
   const canUndo = useEditorStore((s) => s.canUndo)
   const canRedo = useEditorStore((s) => s.canRedo)
+  const showLayersPanel = useEditorStore((s) => s.showLayersPanel)
+  const toggleLayersPanel = useEditorStore((s) => s.toggleLayersPanel)
 
   const handleSave = async () => {
     try {
@@ -240,6 +243,22 @@ export function Toolbar({ siteId }: ToolbarProps) {
           </Tabs>
 
           <Separator orientation="vertical" className="h-5 mx-1" />
+
+          {/* Layers Toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={showLayersPanel ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={toggleLayersPanel}
+                className={`gap-1.5 ${showLayersPanel ? 'bg-zinc-200 text-zinc-900' : 'text-zinc-600'}`}
+              >
+                <Layers className="h-4 w-4" />
+                Layers
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Toggle Layers Panel</TooltipContent>
+          </Tooltip>
 
           {/* Export */}
           <Button variant="ghost" size="sm" className="gap-1.5 text-zinc-600">

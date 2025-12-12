@@ -127,6 +127,7 @@ export interface EditorState {
   // Panels
   showElementPanel: boolean
   elementPanelTab: 'edit' | 'prompt' | 'code'
+  showLayersPanel: boolean
 }
 
 // ============================================
@@ -176,6 +177,12 @@ export interface EditorActions {
   // Panels
   toggleElementPanel: () => void
   setElementPanelTab: (tab: 'edit' | 'prompt' | 'code') => void
+
+  // Layers Panel
+  toggleLayersPanel: () => void
+  setShowLayersPanel: (show: boolean) => void
+  moveElement: (selector: string, newParentSelector: string, position: number) => void
+  reorderSiblings: (parentSelector: string, fromIndex: number, toIndex: number) => void
 }
 
 // ============================================

@@ -54,14 +54,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       id: page.id,
       name: page.name,
       slug: page.slug,
-      path: page.path,
-      title: page.title,
-      description: page.description,
-      html: page.html,
-      css: page.css,
+      path: `/${page.slug}`, // Generate path from slug
+      title: page.name, // Use name as title
+      html: page.html_content || '',
+      content: page.content,
       is_home: page.is_home,
       is_published: page.is_published,
       seo: page.seo,
+      settings: page.settings,
+      sort_order: page.sort_order,
       created_at: page.created_at,
       updated_at: page.updated_at,
     }))

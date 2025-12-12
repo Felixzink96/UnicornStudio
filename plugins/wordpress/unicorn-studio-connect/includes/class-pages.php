@@ -91,15 +91,15 @@ class Unicorn_Studio_Pages {
             'post_title'   => $page['title'] ?? $page['name'],
             'post_name'    => $page['slug'],
             'post_content' => $this->prepare_content($page),
-            'post_status'  => $page['is_published'] ? 'publish' : 'draft',
+            'post_status'  => !empty($page['is_published']) ? 'publish' : 'draft',
             'post_type'    => 'page',
             'meta_input'   => [
-                '_unicorn_studio_id'   => $page['id'],
-                '_unicorn_studio_path' => $page['path'] ?? '',
-                '_unicorn_studio_html' => $page['html'] ?? '',
-                '_unicorn_studio_css'  => $page['css'] ?? '',
-                '_unicorn_studio_seo'  => maybe_serialize($page['seo'] ?? []),
-                '_unicorn_studio_sync' => current_time('mysql'),
+                '_unicorn_studio_id'      => $page['id'],
+                '_unicorn_studio_path'    => $page['path'] ?? '',
+                '_unicorn_studio_html'    => $page['html'] ?? '',
+                '_unicorn_studio_content' => maybe_serialize($page['content'] ?? []),
+                '_unicorn_studio_seo'     => maybe_serialize($page['seo'] ?? []),
+                '_unicorn_studio_sync'    => current_time('mysql'),
             ],
         ];
 
@@ -187,15 +187,6 @@ class Unicorn_Studio_Pages {
         $content .= $html . "\n";
         $content .= '</div>' . "\n";
         $content .= '<!-- /wp:html -->';
-
-        // Add CSS if present
-        if (!empty($page['css'])) {
-            $content .= "\n" . '<!-- wp:html -->' . "\n";
-            $content .= '<style class="unicorn-studio-page-css">' . "\n";
-            $content .= $page['css'] . "\n";
-            $content .= '</style>' . "\n";
-            $content .= '<!-- /wp:html -->';
-        }
 
         return $content;
     }

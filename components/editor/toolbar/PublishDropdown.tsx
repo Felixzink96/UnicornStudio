@@ -46,7 +46,8 @@ export function PublishDropdown({
 }: PublishDropdownProps) {
   const [open, setOpen] = useState(false)
 
-  const hasWordPress = wordPressConfig?.enabled && wordPressConfig?.api_url && wordPressConfig?.api_key
+  // WordPress connection can be via api_key OR via webhook (no api_key needed)
+  const hasWordPress = wordPressConfig?.enabled && wordPressConfig?.api_url
 
   // If no WordPress connection, show simple button (just a static label since Save = Published in Unicorn Studio)
   if (!hasWordPress) {

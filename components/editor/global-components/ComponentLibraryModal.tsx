@@ -90,20 +90,23 @@ export function ComponentLibraryModal({
     }
   }
 
+  // Helper to get position (handles both component_position from RPC and position from direct query)
+  const getPosition = (c: ComponentLibraryItem) => c.component_position || c.position
+
   const filteredComponents = components.filter((c) => {
     const matchesSearch =
       !search ||
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.description?.toLowerCase().includes(search.toLowerCase())
 
-    const matchesTab = activeTab === 'all' || c.position === activeTab
+    const matchesTab = activeTab === 'all' || getPosition(c) === activeTab
 
     return matchesSearch && matchesTab
   })
 
-  const headers = components.filter((c) => c.position === 'header')
-  const footers = components.filter((c) => c.position === 'footer')
-  const sections = components.filter((c) => c.position === 'content')
+  const headers = components.filter((c) => getPosition(c) === 'header')
+  const footers = components.filter((c) => getPosition(c) === 'footer')
+  const sections = components.filter((c) => getPosition(c) === 'content')
 
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>

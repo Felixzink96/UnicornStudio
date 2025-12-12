@@ -38,6 +38,7 @@ class Unicorn_Studio_Sync_Manager {
             'content_types' => null,
             'taxonomies'    => null,
             'entries'       => null,
+            'pages'         => null,
             'css'           => null,
             'started_at'    => current_time('mysql'),
             'errors'        => [],
@@ -58,7 +59,12 @@ class Unicorn_Studio_Sync_Manager {
             $results['entries'] = $this->sync_entries();
         }
 
-        // 4. Sync CSS
+        // 4. Sync Pages
+        if (Unicorn_Studio::get_option('sync_pages', true)) {
+            $results['pages'] = $this->sync_pages();
+        }
+
+        // 5. Sync CSS
         if (Unicorn_Studio::get_option('sync_css', true)) {
             $results['css'] = $this->sync_css();
         }
@@ -191,6 +197,17 @@ class Unicorn_Studio_Sync_Manager {
     }
 
     /**
+     * Sync pages
+     *
+     * @return array|WP_Error
+     */
+    public function sync_pages() {
+        $result = unicorn_studio()->pages->sync_pages();
+
+        return $result;
+    }
+
+    /**
      * Sync CSS
      *
      * @return array|WP_Error
@@ -231,6 +248,10 @@ class Unicorn_Studio_Sync_Manager {
 
             case 'entries':
                 $result = $this->sync_entries();
+                break;
+
+            case 'pages':
+                $result = $this->sync_pages();
                 break;
 
             case 'css':

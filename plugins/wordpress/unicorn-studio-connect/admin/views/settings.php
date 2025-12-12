@@ -162,6 +162,13 @@ $webhook_secret = Unicorn_Studio_Webhook_Handler::get_webhook_secret();
                                 </label><br>
                                 <label>
                                     <input type="checkbox"
+                                           name="unicorn_studio_settings[sync_pages]"
+                                           value="1"
+                                           <?php checked($settings['sync_pages'] ?? true); ?>>
+                                    <?php esc_html_e('Seiten (HTML-Seiten aus dem Page Builder)', 'unicorn-studio'); ?>
+                                </label><br>
+                                <label>
+                                    <input type="checkbox"
                                            name="unicorn_studio_settings[sync_media]"
                                            value="1"
                                            <?php checked($settings['sync_media'] ?? true); ?>>

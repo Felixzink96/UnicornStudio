@@ -318,4 +318,23 @@ class Unicorn_Studio_API_Client {
     public function delete_webhook($webhook_id) {
         return $this->request('/webhooks?id=' . $webhook_id, 'DELETE');
     }
+
+    /**
+     * Get all pages
+     *
+     * @return array|WP_Error
+     */
+    public function get_pages() {
+        return $this->request('/pages');
+    }
+
+    /**
+     * Get single page
+     *
+     * @param string $page_id Page ID
+     * @return array|WP_Error
+     */
+    public function get_page($page_id) {
+        return $this->request('/pages/' . $page_id);
+    }
 }

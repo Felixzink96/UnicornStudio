@@ -69,6 +69,7 @@ final class Unicorn_Studio {
     public $fields;
     public $entries;
     public $taxonomies;
+    public $pages;
     public $css;
     public $webhooks;
 
@@ -116,6 +117,7 @@ final class Unicorn_Studio {
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-fields.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-entries.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-taxonomies.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-pages.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-css-manager.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-webhook-handler.php';
 
@@ -126,6 +128,7 @@ final class Unicorn_Studio {
         $this->fields = new Unicorn_Studio_Fields();
         $this->entries = new Unicorn_Studio_Entries($this->api);
         $this->taxonomies = new Unicorn_Studio_Taxonomies();
+        $this->pages = new Unicorn_Studio_Pages($this->api);
         $this->css = new Unicorn_Studio_CSS_Manager($this->api);
         $this->webhooks = new Unicorn_Studio_Webhook_Handler();
 
@@ -241,6 +244,7 @@ register_activation_hook(__FILE__, function() {
         'sync_content_types' => true,
         'sync_entries' => true,
         'sync_taxonomies' => true,
+        'sync_pages' => true,
         'sync_media' => true,
         'sync_css' => true,
         'field_backend' => 'acf',

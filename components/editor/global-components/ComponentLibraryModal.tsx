@@ -60,16 +60,20 @@ export function ComponentLibraryModal({
 
       if (error) {
         console.error('Error loading components:', error)
-        // Fallback to direct query
+        // Fallback to direct query - map position to component_position
         const { data: fallbackData } = await supabase
           .from('components')
           .select('*')
           .eq('site_id', siteId)
           .order('name')
 
-        setComponents((fallbackData as ComponentLibraryItem[]) || [])
+        const mapped = (fallbackData || []).map((c) => ({
+          ...c,
+          component_position: c.position || 'content',
+        })) as unknown as ComponentLibraryItem[]
+        setComponents(mapped)
       } else {
-        setComponents(data || [])
+        setComponents((data || []) as ComponentLibraryItem[])
       }
     } catch (err) {
       console.error('Load components error:', err)

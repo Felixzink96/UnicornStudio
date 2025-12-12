@@ -129,12 +129,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         p_site_id: siteId,
         p_name: body.name,
         p_html: body.html,
-        p_css: body.css || null,
-        p_js: body.js || null,
-        p_position: body.position || 'content',
-        p_description: body.description || null,
-        p_category: body.category || null,
-        p_set_as_site_default: body.set_as_site_default || false,
+        p_css: body.css ?? undefined,
+        p_js: body.js ?? undefined,
+        p_position: body.position ?? 'content',
+        p_description: body.description ?? undefined,
+        p_category: body.category ?? undefined,
+        p_set_as_site_default: body.set_as_site_default ?? false,
       }
     )
 

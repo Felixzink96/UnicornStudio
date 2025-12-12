@@ -1,9 +1,17 @@
 import { createClient } from '@/lib/supabase/client'
+import type { Database } from '@/types/database'
 import type {
   Template,
   TemplateInsert,
   TemplateType,
 } from '@/types/cms'
+
+// Type for template conditions
+interface TemplateConditions {
+  content_type_id?: string
+  taxonomy_id?: string
+  slugs?: string[]
+}
 
 // ============================================
 // TEMPLATES QUERIES
@@ -93,7 +101,7 @@ export async function getMatchingTemplate(
 
   // Find the best match
   for (const template of templates) {
-    const conditions = template.conditions || {}
+    const conditions = (template.conditions || {}) as TemplateConditions
 
     // Check content type match
     if (conditions.content_type_id && contentTypeId) {
@@ -149,7 +157,7 @@ export async function createTemplate(
 
   const { data, error } = await supabase
     .from('templates')
-    .insert(template)
+    .insert(template as unknown as Database['public']['Tables']['templates']['Insert'])
     .select()
     .single()
 
@@ -186,7 +194,7 @@ export async function updateTemplate(
 
   const { data, error } = await supabase
     .from('templates')
-    .update(updates)
+    .update(updates as unknown as Database['public']['Tables']['templates']['Update'])
     .eq('id', id)
     .select()
     .single()
@@ -231,7 +239,7 @@ export async function duplicateTemplate(
       ...templateData,
       name: newName || `${original.name} (Kopie)`,
       is_default: false,
-    })
+    } as unknown as Database['public']['Tables']['templates']['Insert'])
     .select()
     .single()
 

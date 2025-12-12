@@ -14,6 +14,19 @@ export interface WordPressConfig {
 
 export type WordPressStatus = 'current' | 'outdated' | 'error' | 'not_configured'
 
+export interface PushResult {
+  success: boolean
+  message: string
+  details?: {
+    content_types?: { count: number; success: boolean; error?: string }
+    entries?: { count: number; success: boolean; error?: string }
+    pages?: { count: number; success: boolean; error?: string }
+    taxonomies?: { count: number; success: boolean; error?: string }
+    css?: { success: boolean; error?: string }
+  }
+  errors?: string[]
+}
+
 interface SiteIntegrations {
   wordpress?: WordPressConfig
 }
@@ -33,7 +46,7 @@ interface UseWordPressReturn {
   status: WordPressStatus
   lastPushedAt: string | null
   isPublishing: boolean
-  publishToWordPress: () => Promise<void>
+  publishToWordPress: () => Promise<PushResult>
   refresh: () => Promise<void>
 }
 
@@ -132,8 +145,13 @@ export function useWordPress(siteId: string | null): UseWordPressReturn {
   }, [refresh])
 
   // Publish to WordPress
-  const publishToWordPress = useCallback(async () => {
-    if (!siteId || !config?.enabled) return
+  const publishToWordPress = useCallback(async (): Promise<PushResult> => {
+    if (!siteId || !config?.enabled) {
+      return {
+        success: false,
+        message: 'Keine WordPress-Verbindung konfiguriert',
+      }
+    }
 
     setIsPublishing(true)
     try {
@@ -145,15 +163,38 @@ export function useWordPress(siteId: string | null): UseWordPressReturn {
 
       const data = await response.json()
 
-      if (data.success) {
+      if (data.success && data.data) {
         // Refresh to get updated timestamps
         await refresh()
+
+        const results = data.data.results || {}
+        const pageCount = results.pages?.count || 0
+        const entryCount = results.entries?.count || 0
+        const errors = data.data.errors || []
+
+        return {
+          success: errors.length === 0,
+          message: errors.length === 0
+            ? `Erfolgreich gepusht: ${pageCount} Seiten, ${entryCount} Einträge`
+            : `Push mit Fehlern: ${errors.join(', ')}`,
+          details: results,
+          errors: errors,
+        }
       } else {
+        const errorMsg = data.error?.message || 'Unbekannter Fehler'
         console.error('WordPress push failed:', data.error)
-        // Optionally show toast notification here
+        return {
+          success: false,
+          message: `Push fehlgeschlagen: ${errorMsg}`,
+        }
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Netzwerkfehler'
       console.error('WordPress push error:', error)
+      return {
+        success: false,
+        message: `Verbindungsfehler: ${errorMsg}`,
+      }
     } finally {
       setIsPublishing(false)
     }

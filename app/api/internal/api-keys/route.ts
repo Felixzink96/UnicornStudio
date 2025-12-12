@@ -23,8 +23,8 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    if (profileError || !profile) {
-      return Response.json({ success: false, error: { message: 'Profile not found' } }, { status: 404 })
+    if (profileError || !profile || !profile.organization_id) {
+      return Response.json({ success: false, error: { message: 'Profile or organization not found' } }, { status: 404 })
     }
 
     // Get API keys for the organization
@@ -67,12 +67,12 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (profileError || !profile) {
-      return Response.json({ success: false, error: { message: 'Profile not found' } }, { status: 404 })
+    if (profileError || !profile || !profile.organization_id) {
+      return Response.json({ success: false, error: { message: 'Profile or organization not found' } }, { status: 404 })
     }
 
     // Check permission (only owner and admin can create API keys)
-    if (!['owner', 'admin'].includes(profile.role)) {
+    if (!profile.role || !['owner', 'admin'].includes(profile.role)) {
       return Response.json({ success: false, error: { message: 'Permission denied' } }, { status: 403 })
     }
 
@@ -154,12 +154,12 @@ export async function DELETE(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (profileError || !profile) {
-      return Response.json({ success: false, error: { message: 'Profile not found' } }, { status: 404 })
+    if (profileError || !profile || !profile.organization_id) {
+      return Response.json({ success: false, error: { message: 'Profile or organization not found' } }, { status: 404 })
     }
 
     // Check permission
-    if (!['owner', 'admin'].includes(profile.role)) {
+    if (!profile.role || !['owner', 'admin'].includes(profile.role)) {
       return Response.json({ success: false, error: { message: 'Permission denied' } }, { status: 403 })
     }
 

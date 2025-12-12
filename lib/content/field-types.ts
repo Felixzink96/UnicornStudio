@@ -513,7 +513,7 @@ export function getFieldTypesByCategory(): Record<string, FieldType[]> {
   const result: Record<string, FieldType[]> = {}
 
   for (const [category, config] of Object.entries(FIELD_TYPE_CATEGORIES)) {
-    result[category] = config.types as FieldType[]
+    result[category] = [...config.types] as FieldType[]
   }
 
   return result

@@ -123,12 +123,12 @@ interface Term {
   slug: string
   description: string | null
   parent_id: string | null
-  position: number
-  data: Record<string, unknown> | null
-  image: { id: string; name: string; url: string; alt: string | null } | null
+  position: number | null
+  data: unknown
+  image: { id: unknown; name: unknown; url: unknown; alt: unknown } | null
   entries_count: number
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
 }
 
 interface TreeTerm extends Term {
@@ -159,7 +159,7 @@ function buildTree(terms: Term[]): TreeTerm[] {
 
   // Sort children by position
   const sortChildren = (nodes: TreeTerm[]) => {
-    nodes.sort((a, b) => a.position - b.position)
+    nodes.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
     nodes.forEach((node) => sortChildren(node.children))
   }
 

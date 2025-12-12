@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
   try {
     // 1. Authenticate
     const auth = await authenticateAPIRequest()
-    if (!auth.success) {
-      return unauthorizedResponse(auth.error)
+    if (!auth.success || !auth.organizationId) {
+      return unauthorizedResponse(auth.error || 'Missing organization')
     }
 
     // 2. Parse pagination

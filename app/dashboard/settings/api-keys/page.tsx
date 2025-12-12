@@ -21,7 +21,7 @@ export default async function APIKeysPage() {
     .eq('id', user.id)
     .single()
 
-  if (profileError || !profile) {
+  if (profileError || !profile || !profile.organization_id) {
     notFound()
   }
 

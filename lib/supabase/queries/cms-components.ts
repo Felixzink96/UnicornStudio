@@ -4,6 +4,7 @@ import type {
   CMSComponentInsert,
   CMSComponentType,
 } from '@/types/cms'
+import type { Database } from '@/types/database'
 
 // ============================================
 // CMS COMPONENTS QUERIES
@@ -144,7 +145,7 @@ export async function createComponent(
   const supabase = createClient()
   const { data, error } = await supabase
     .from('cms_components')
-    .insert(component)
+    .insert(component as unknown as Database['public']['Tables']['cms_components']['Insert'])
     .select()
     .single()
 
@@ -162,7 +163,7 @@ export async function updateComponent(
   const supabase = createClient()
   const { data, error } = await supabase
     .from('cms_components')
-    .update(updates)
+    .update(updates as unknown as Database['public']['Tables']['cms_components']['Update'])
     .eq('id', id)
     .select()
     .single()

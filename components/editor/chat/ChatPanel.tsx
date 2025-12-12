@@ -104,7 +104,7 @@ export function ChatPanel() {
 
     // Show referenced pages in user message
     const displayContent = referencedPagesData.length > 0
-      ? `${promptToSend}\n\n📎 Referenz: ${referencedPagesData.map(p => `@${p.name}`).join(', ')}`
+      ? `${promptToSend}\n\n[Style-Referenz: ${referencedPagesData.map(p => `@${p.name}`).join(', ')}]`
       : promptToSend
 
     addMessage({ role: 'user', content: displayContent })

@@ -66,11 +66,14 @@ export async function POST(request: NextRequest) {
 
     // Parse body
     const body = await request.json()
-    const { siteId } = body
+    const { siteId, pageId } = body
 
     if (!siteId) {
       return Response.json({ success: false, error: { message: 'Site ID is required' } }, { status: 400 })
     }
+
+    // If pageId is provided, only push that specific page
+    const pushSinglePage = !!pageId
 
     // Get site with integrations (RLS will handle access control)
     const { data: site, error: siteError } = await supabase
@@ -167,51 +170,60 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Push Content Types
-    try {
-      const { data: contentTypes } = await supabase
-        .from('content_types')
-        .select('*')
-        .eq('site_id', siteId)
+    // Skip content types and entries when pushing single page
+    if (!pushSinglePage) {
+      // Push Content Types
+      try {
+        const { data: contentTypes } = await supabase
+          .from('content_types')
+          .select('*')
+          .eq('site_id', siteId)
 
-      if (contentTypes && contentTypes.length > 0) {
-        for (const ct of contentTypes) {
-          await sendWebhook('content_type.updated', ct)
+        if (contentTypes && contentTypes.length > 0) {
+          for (const ct of contentTypes) {
+            await sendWebhook('content_type.updated', ct)
+          }
+          result.results.content_types = { count: contentTypes.length, success: true }
         }
-        result.results.content_types = { count: contentTypes.length, success: true }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Content Types sync failed'
+        result.errors.push(msg)
+        result.results.content_types = { count: 0, success: false, error: msg }
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Content Types sync failed'
-      result.errors.push(msg)
-      result.results.content_types = { count: 0, success: false, error: msg }
+
+      // Push Entries (only published)
+      try {
+        const { data: entries } = await supabase
+          .from('entries')
+          .select('*, content_type:content_types(name, slug)')
+          .eq('site_id', siteId)
+          .eq('status', 'published')
+
+        if (entries && entries.length > 0) {
+          for (const entry of entries) {
+            await sendWebhook('entry.published', entry)
+          }
+          result.results.entries = { count: entries.length, success: true }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Entries sync failed'
+        result.errors.push(msg)
+        result.results.entries = { count: 0, success: false, error: msg }
+      }
     }
 
-    // Push Entries (only published)
+    // Push Pages (single page if pageId provided, otherwise all pages)
     try {
-      const { data: entries } = await supabase
-        .from('entries')
-        .select('*, content_type:content_types(name, slug)')
-        .eq('site_id', siteId)
-        .eq('status', 'published')
-
-      if (entries && entries.length > 0) {
-        for (const entry of entries) {
-          await sendWebhook('entry.published', entry)
-        }
-        result.results.entries = { count: entries.length, success: true }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Entries sync failed'
-      result.errors.push(msg)
-      result.results.entries = { count: 0, success: false, error: msg }
-    }
-
-    // Push Pages (all pages - WordPress will set status based on is_published)
-    try {
-      const { data: pages } = await supabase
+      let pagesQuery = supabase
         .from('pages')
         .select('*')
         .eq('site_id', siteId)
+
+      if (pushSinglePage) {
+        pagesQuery = pagesQuery.eq('id', pageId)
+      }
+
+      const { data: pages } = await pagesQuery
 
       if (pages && pages.length > 0) {
         for (const page of pages) {
@@ -231,44 +243,47 @@ export async function POST(request: NextRequest) {
       result.results.pages = { count: 0, success: false, error: msg }
     }
 
-    // Push Taxonomies and Terms
-    try {
-      const { data: taxonomies } = await supabase
-        .from('taxonomies')
-        .select('*, terms(*)')
-        .eq('site_id', siteId)
+    // Skip taxonomies and CSS when pushing single page
+    if (!pushSinglePage) {
+      // Push Taxonomies and Terms
+      try {
+        const { data: taxonomies } = await supabase
+          .from('taxonomies')
+          .select('*, terms(*)')
+          .eq('site_id', siteId)
 
-      if (taxonomies && taxonomies.length > 0) {
-        for (const tax of taxonomies) {
-          await sendWebhook('taxonomy.updated', tax)
+        if (taxonomies && taxonomies.length > 0) {
+          for (const tax of taxonomies) {
+            await sendWebhook('taxonomy.updated', tax)
+          }
+          result.results.taxonomies = { count: taxonomies.length, success: true }
         }
-        result.results.taxonomies = { count: taxonomies.length, success: true }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Taxonomies sync failed'
+        result.errors.push(msg)
+        result.results.taxonomies = { count: 0, success: false, error: msg }
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Taxonomies sync failed'
-      result.errors.push(msg)
-      result.results.taxonomies = { count: 0, success: false, error: msg }
-    }
 
-    // Push CSS/Design Variables
-    try {
-      const { data: designVars } = await supabase
-        .from('design_variables')
-        .select('*')
-        .eq('site_id', siteId)
-        .single()
+      // Push CSS/Design Variables
+      try {
+        const { data: designVars } = await supabase
+          .from('design_variables')
+          .select('*')
+          .eq('site_id', siteId)
+          .single()
 
-      if (designVars) {
-        await sendWebhook('css.updated', {
-          variables: designVars,
-          settings: site.settings,
-        })
-        result.results.css = { success: true }
+        if (designVars) {
+          await sendWebhook('css.updated', {
+            variables: designVars,
+            settings: site.settings,
+          })
+          result.results.css = { success: true }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'CSS sync failed'
+        result.errors.push(msg)
+        result.results.css = { success: false, error: msg }
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'CSS sync failed'
-      result.errors.push(msg)
-      result.results.css = { success: false, error: msg }
     }
 
     // Update last_pushed_to_wordpress_at timestamp

@@ -46,7 +46,7 @@ interface UseWordPressReturn {
   status: WordPressStatus
   lastPushedAt: string | null
   isPublishing: boolean
-  publishToWordPress: () => Promise<PushResult>
+  publishToWordPress: (pageId?: string) => Promise<PushResult>
   refresh: () => Promise<void>
 }
 
@@ -145,7 +145,7 @@ export function useWordPress(siteId: string | null): UseWordPressReturn {
   }, [refresh])
 
   // Publish to WordPress
-  const publishToWordPress = useCallback(async (): Promise<PushResult> => {
+  const publishToWordPress = useCallback(async (pageId?: string): Promise<PushResult> => {
     if (!siteId || !config?.enabled) {
       return {
         success: false,
@@ -158,7 +158,7 @@ export function useWordPress(siteId: string | null): UseWordPressReturn {
       const response = await fetch('/api/internal/wordpress/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteId }),
+        body: JSON.stringify({ siteId, pageId }), // Optional: only push specific page
       })
 
       const data = await response.json()

@@ -30,15 +30,17 @@ interface WordPressConfig {
 
 interface PublishDropdownProps {
   siteId: string
+  pageId?: string | null
   wordPressConfig: WordPressConfig | null
   wordPressStatus: WordPressStatus
   lastPushedAt: string | null
   isPublishing: boolean
-  onPublishWordPress: () => Promise<PushResult>
+  onPublishWordPress: (pageId?: string) => Promise<PushResult>
 }
 
 export function PublishDropdown({
   siteId,
+  pageId,
   wordPressConfig,
   wordPressStatus,
   lastPushedAt,
@@ -63,10 +65,11 @@ export function PublishDropdown({
     )
   }
 
+  // Push only current page
   const handlePublishWordPress = async () => {
     setOpen(false)
     setShowResult(false)
-    const result = await onPublishWordPress()
+    const result = await onPublishWordPress(pageId || undefined)
     setLastResult(result)
     setShowResult(true)
 

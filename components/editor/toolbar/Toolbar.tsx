@@ -318,6 +318,7 @@ export function Toolbar({ siteId }: ToolbarProps) {
           {/* Publish */}
           <PublishDropdown
             siteId={siteId}
+            pageId={pageId}
             wordPressConfig={wordpress.config}
             wordPressStatus={wordpress.status}
             lastPushedAt={wordpress.lastPushedAt}

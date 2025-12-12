@@ -149,70 +149,55 @@ export function PluginCard({ plugin }: PluginCardProps) {
       </div>
 
       {/* Actions */}
-      <div className="space-y-3">
-        <div className="flex gap-3">
-          {isAvailable ? (
-            <>
-              <Button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="flex-1 bg-purple-600 hover:bg-purple-700"
-              >
-                {downloading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Lädt...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 mr-2" />
-                    Plugin Download
-                  </>
-                )}
-              </Button>
-              {plugin.documentationUrl && (
-                <Button
-                  variant="outline"
-                  className="border-slate-600"
-                  asChild
-                >
-                  <a href={plugin.documentationUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                </Button>
-              )}
-            </>
-          ) : (
-            <div className="w-full text-center py-2 px-4 bg-slate-700/50 rounded-lg text-slate-400 text-sm">
-              In Entwicklung
-            </div>
-          )}
-        </div>
-
-        {/* Theme Download - nur für WordPress */}
-        {plugin.themeDownloadUrl && isAvailable && (
-          <div className="pt-3 border-t border-slate-700">
-            <p className="text-xs text-slate-500 mb-2">
-              Optionales Blank Theme (0 CSS, perfekt für Tailwind)
-            </p>
+      <div className="flex flex-wrap gap-2">
+        {isAvailable ? (
+          <>
             <Button
-              onClick={handleThemeDownload}
-              disabled={downloadingTheme}
-              variant="outline"
-              className="w-full border-slate-600 text-slate-300 hover:text-white"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="flex-1 bg-purple-600 hover:bg-purple-700"
             >
-              {downloadingTheme ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Lädt...
-                </>
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <Palette className="h-4 w-4 mr-2" />
-                  Blank Theme Download
+                  <Download className="h-4 w-4 mr-2" />
+                  Plugin
                 </>
               )}
             </Button>
+            {plugin.themeDownloadUrl && (
+              <Button
+                onClick={handleThemeDownload}
+                disabled={downloadingTheme}
+                variant="outline"
+                className="flex-1 border-slate-700 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+              >
+                {downloadingTheme ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Palette className="h-4 w-4 mr-2" />
+                    Theme
+                  </>
+                )}
+              </Button>
+            )}
+            {plugin.documentationUrl && (
+              <Button
+                variant="outline"
+                className="border-slate-700 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+                asChild
+              >
+                <a href={plugin.documentationUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
+            )}
+          </>
+        ) : (
+          <div className="w-full text-center py-2 px-4 bg-slate-700/50 rounded-lg text-slate-400 text-sm">
+            In Entwicklung
           </div>
         )}
       </div>

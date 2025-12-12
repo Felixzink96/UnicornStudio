@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import type { Database } from '@/types/database'
 import type { Field, FieldInsert } from '@/types/cms'
 
 // ============================================
@@ -77,7 +78,7 @@ export async function createField(field: FieldInsert): Promise<Field> {
     .insert({
       ...field,
       position: field.position ?? nextPosition,
-    })
+    } as unknown as Database['public']['Tables']['fields']['Insert'])
     .select()
     .single()
 
@@ -99,7 +100,7 @@ export async function createFields(fields: FieldInsert[]): Promise<Field[]> {
 
   const { data, error } = await supabase
     .from('fields')
-    .insert(fieldsWithPositions)
+    .insert(fieldsWithPositions as unknown as Database['public']['Tables']['fields']['Insert'][])
     .select()
 
   if (error) throw error
@@ -116,7 +117,7 @@ export async function updateField(
   const supabase = createClient()
   const { data, error } = await supabase
     .from('fields')
-    .update(updates)
+    .update(updates as unknown as Database['public']['Tables']['fields']['Update'])
     .eq('id', id)
     .select()
     .single()

@@ -2,7 +2,23 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
 
+// Routes that require authentication
+const PROTECTED_PATHS = ['/dashboard', '/sites', '/editor', '/settings']
+// Auth pages where logged-in users should be redirected
+const AUTH_PATHS = ['/login', '/signup']
+
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  // Check if this route needs auth checking at all
+  const isProtectedPath = PROTECTED_PATHS.some(path => pathname.startsWith(path))
+  const isAuthPath = AUTH_PATHS.some(path => pathname === path)
+
+  // FAST PATH: If route doesn't need auth, skip the expensive getUser() call
+  if (!isProtectedPath && !isAuthPath) {
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -28,40 +44,25 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
+  // Only call getUser() when we actually need to check authentication
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  // Protected routes - require authentication
-  const protectedPaths = ['/dashboard', '/sites', '/editor', '/settings']
-  const isProtectedPath = protectedPaths.some(path =>
-    request.nextUrl.pathname.startsWith(path)
-  )
 
   if (isProtectedPath && !user) {
     // Redirect to login if not authenticated
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    url.searchParams.set('redirect', request.nextUrl.pathname)
+    url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)
   }
 
-  // Redirect logged-in users away from auth pages
-  const authPaths = ['/login', '/signup']
-  const isAuthPath = authPaths.some(path =>
-    request.nextUrl.pathname === path
-  )
-
   if (isAuthPath && user) {
+    // Redirect logged-in users away from auth pages
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
   return supabaseResponse
 }

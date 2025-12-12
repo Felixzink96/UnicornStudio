@@ -120,10 +120,12 @@ export default async function IntegrationsPage() {
     .single()
 
   // Get all sites with WordPress integration
-  const { data: sites } = await supabase
-    .from('sites')
-    .select('id, name, integrations, updated_at, last_pushed_to_wordpress_at')
-    .eq('organization_id', profile?.organization_id)
+  const { data: sites } = profile?.organization_id
+    ? await supabase
+        .from('sites')
+        .select('id, name, integrations, updated_at, last_pushed_to_wordpress_at')
+        .eq('organization_id', profile.organization_id)
+    : { data: [] }
 
   // Filter sites with WordPress enabled
   const wordpressSites: SiteWithWordPress[] = (sites || [])

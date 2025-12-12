@@ -118,6 +118,13 @@ export function validationErrorResponse(
 }
 
 /**
+ * Bad request response (400)
+ */
+export function badRequestResponse(message: string, details?: unknown): Response {
+  return errorResponse('BAD_REQUEST', message, 400, details)
+}
+
+/**
  * Rate limit exceeded response (429)
  */
 export function rateLimitResponse(): Response {

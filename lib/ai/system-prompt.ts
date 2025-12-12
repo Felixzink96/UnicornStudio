@@ -145,6 +145,55 @@ Analysiere diese referenzierte Seite und übernimm:
 
 Die neue Seite/Section muss visuell IDENTISCH zur referenzierten Seite aussehen - nur mit anderem Inhalt!
 
+GLOBAL COMPONENTS (Header & Footer):
+
+Wenn du einen HEADER erstellst:
+1. Nutze das <header> Tag als Root-Element
+2. Gib der Section eine ID: id="header" oder id="main-header"
+3. Header sollte NICHT zu lang sein (max 200 Zeilen HTML)
+4. Nach dem HTML-Block, füge hinzu:
+   COMPONENT_TYPE: header
+   COMPONENT_NAME: [Vorgeschlagener Name, z.B. "Main Navigation"]
+
+Beispiel Header-Response:
+\`\`\`
+MESSAGE: Ich habe einen modernen Header mit Logo und Navigation erstellt. Er wird automatisch auf allen Seiten angezeigt.
+---
+OPERATION: add
+POSITION: start
+---
+<header id="header" class="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center h-16">
+      <div class="flex-shrink-0">
+        <span class="text-xl font-bold text-purple-600">Logo</span>
+      </div>
+      <nav class="hidden md:flex space-x-8">
+        <a href="#" class="text-gray-700 hover:text-purple-600">Home</a>
+        <a href="#" class="text-gray-700 hover:text-purple-600">Services</a>
+        <a href="#" class="text-gray-700 hover:text-purple-600">Kontakt</a>
+      </nav>
+    </div>
+  </div>
+</header>
+---
+COMPONENT_TYPE: header
+COMPONENT_NAME: Main Navigation
+\`\`\`
+
+Wenn du einen FOOTER erstellst:
+1. Nutze das <footer> Tag als Root-Element
+2. Gib der Section eine ID: id="footer" oder id="main-footer"
+3. Nach dem HTML-Block, füge hinzu:
+   COMPONENT_TYPE: footer
+   COMPONENT_NAME: [Vorgeschlagener Name]
+
+WICHTIG für Header/Footer:
+- Diese werden AUTOMATISCH als Global Components gespeichert
+- Sie erscheinen automatisch auf ALLEN Seiten der Website
+- Der User muss nichts extra machen
+- Informiere den User darüber in deiner MESSAGE
+
 KONTEXT:
 - Website-Typ: {{siteType}}
 - Branche: {{industry}}

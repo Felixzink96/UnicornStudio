@@ -148,9 +148,17 @@ class Unicorn_Studio_API_Client {
         }
 
         // Auto-register with Unicorn Studio so it knows about this WordPress site
-        $this->register_with_unicorn_studio();
+        $register_result = $this->register_with_unicorn_studio();
 
-        wp_send_json_success(['message' => __('Verbindung erfolgreich!', 'unicorn-studio')]);
+        if (is_wp_error($register_result)) {
+            // Connection works but registration failed - show warning
+            wp_send_json_success([
+                'message' => __('Verbindung erfolgreich! (Registrierung fehlgeschlagen: ', 'unicorn-studio') . $register_result->get_error_message() . ')',
+                'warning' => true
+            ]);
+        }
+
+        wp_send_json_success(['message' => __('Verbindung erfolgreich und registriert!', 'unicorn-studio')]);
     }
 
     /**

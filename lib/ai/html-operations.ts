@@ -1,3 +1,5 @@
+import type { ComponentPosition } from '@/types/global-components'
+
 // Types for HTML operations
 export interface ParsedOperation {
   message: string
@@ -6,6 +8,9 @@ export interface ParsedOperation {
   target?: string
   selector?: string
   html: string
+  // Global Component Detection
+  componentType?: ComponentPosition
+  componentName?: string
 }
 
 // Parse the streamed text format into operation
@@ -50,6 +55,22 @@ export function parseOperationFormat(content: string): ParsedOperation | null {
     // Clean up any remaining markdown code blocks
     html = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim()
 
+    // Extract COMPONENT_TYPE (for global components)
+    const componentTypeMatch = content.match(/COMPONENT_TYPE:\s*(header|footer|content)/i)
+    const componentType = componentTypeMatch
+      ? componentTypeMatch[1].toLowerCase() as ComponentPosition
+      : undefined
+
+    // Extract COMPONENT_NAME (for global components)
+    const componentNameMatch = content.match(/COMPONENT_NAME:\s*([^\n]+)/i)
+    const componentName = componentNameMatch ? componentNameMatch[1].trim() : undefined
+
+    // Remove COMPONENT_TYPE and COMPONENT_NAME from html if they got included
+    html = html
+      .replace(/\n?---\n?COMPONENT_TYPE:[^\n]*/gi, '')
+      .replace(/COMPONENT_NAME:[^\n]*/gi, '')
+      .trim()
+
     if (!html) return null
 
     return {
@@ -59,6 +80,8 @@ export function parseOperationFormat(content: string): ParsedOperation | null {
       target,
       selector,
       html,
+      componentType,
+      componentName,
     }
   } catch (error) {
     console.error('Parse error:', error)

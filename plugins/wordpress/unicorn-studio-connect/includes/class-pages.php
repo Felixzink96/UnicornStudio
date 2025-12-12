@@ -29,6 +29,33 @@ class Unicorn_Studio_Pages {
     }
 
     /**
+     * Sync a single page by Unicorn Studio ID
+     *
+     * @param string $page_id Unicorn Studio page ID
+     * @return array Sync result
+     */
+    public function sync_page_by_id($page_id) {
+        $response = $this->api->get_page($page_id);
+
+        if (is_wp_error($response)) {
+            return [
+                'success' => false,
+                'error'   => $response->get_error_message(),
+            ];
+        }
+
+        $page = $response['data'] ?? null;
+        if (!$page) {
+            return [
+                'success' => false,
+                'error'   => 'Page not found',
+            ];
+        }
+
+        return $this->sync_single_page($page);
+    }
+
+    /**
      * Sync all pages from Unicorn Studio
      *
      * @return array Sync results

@@ -203,7 +203,10 @@ class Unicorn_Studio_Webhook_Handler {
                 return unicorn_studio()->sync->sync_all();
 
             case 'sync.pages':
-                // Sync only pages
+                // Sync pages - single page if pageId provided, otherwise all
+                if (!empty($data['pageId'])) {
+                    return unicorn_studio()->pages->sync_page_by_id($data['pageId']);
+                }
                 return unicorn_studio()->pages->sync_pages();
 
             case 'sync.css':

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import type { Database } from '@/types/database'
 import type {
   ContentType,
   ContentTypeInsert,
@@ -83,7 +84,7 @@ export async function createContentType(
   const supabase = createClient()
   const { data, error } = await supabase
     .from('content_types')
-    .insert(contentType)
+    .insert(contentType as unknown as Database['public']['Tables']['content_types']['Insert'])
     .select()
     .single()
 
@@ -101,7 +102,7 @@ export async function updateContentType(
   const supabase = createClient()
   const { data, error } = await supabase
     .from('content_types')
-    .update(updates)
+    .update(updates as unknown as Database['public']['Tables']['content_types']['Update'])
     .eq('id', id)
     .select()
     .single()

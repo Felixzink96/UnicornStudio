@@ -206,13 +206,12 @@ export async function POST(request: NextRequest) {
       result.results.entries = { count: 0, success: false, error: msg }
     }
 
-    // Push Pages (only published)
+    // Push Pages (all pages - WordPress will set status based on is_published)
     try {
       const { data: pages } = await supabase
         .from('pages')
         .select('*')
         .eq('site_id', siteId)
-        .eq('is_published', true)
 
       if (pages && pages.length > 0) {
         for (const page of pages) {

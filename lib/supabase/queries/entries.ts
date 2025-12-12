@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import type { Database } from '@/types/database'
 import type {
   Entry,
   EntryInsert,
@@ -227,7 +228,7 @@ export async function createEntry(entry: EntryInsert): Promise<Entry> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('entries')
-    .insert(entry)
+    .insert(entry as unknown as Database['public']['Tables']['entries']['Insert'])
     .select()
     .single()
 
@@ -245,7 +246,7 @@ export async function updateEntry(
   const supabase = createClient()
   const { data, error } = await supabase
     .from('entries')
-    .update(updates)
+    .update(updates as unknown as Database['public']['Tables']['entries']['Update'])
     .eq('id', id)
     .select()
     .single()

@@ -23,8 +23,8 @@ ALTER TABLE public.components ADD COLUMN IF NOT EXISTS is_global BOOLEAN DEFAULT
 ALTER TABLE public.components ADD COLUMN IF NOT EXISTS auto_include BOOLEAN DEFAULT false;
 
 -- Position der Component
-ALTER TABLE public.components ADD COLUMN IF NOT EXISTS position TEXT DEFAULT 'content'
-    CHECK (position IN ('header', 'footer', 'content'));
+ALTER TABLE public.components ADD COLUMN IF NOT EXISTS "position" TEXT DEFAULT 'content'
+    CHECK ("position" IN ('header', 'footer', 'content'));
 
 -- Usage Counter
 ALTER TABLE public.components ADD COLUMN IF NOT EXISTS usage_count INTEGER DEFAULT 0;
@@ -114,7 +114,7 @@ CREATE POLICY "Can delete component_usage of accessible sites"
 -- ============================================
 
 CREATE INDEX IF NOT EXISTS idx_components_is_global ON public.components(site_id, is_global);
-CREATE INDEX IF NOT EXISTS idx_components_position ON public.components(site_id, position);
+CREATE INDEX IF NOT EXISTS idx_components_position ON public.components(site_id, "position");
 CREATE INDEX IF NOT EXISTS idx_component_usage_component ON public.component_usage(component_id);
 CREATE INDEX IF NOT EXISTS idx_component_usage_page ON public.component_usage(page_id);
 CREATE INDEX IF NOT EXISTS idx_sites_global_header ON public.sites(global_header_id);
@@ -154,7 +154,7 @@ BEGIN
         html,
         css,
         js,
-        position,
+        "position",
         is_global,
         auto_include,
         description,
@@ -259,7 +259,7 @@ RETURNS TABLE (
     name TEXT,
     description TEXT,
     category TEXT,
-    position TEXT,
+    component_position TEXT,
     is_global BOOLEAN,
     auto_include BOOLEAN,
     usage_count INTEGER,
@@ -277,7 +277,7 @@ BEGIN
         c.name,
         c.description,
         c.category,
-        c.position,
+        c."position" AS component_position,
         c.is_global,
         c.auto_include,
         COALESCE(c.usage_count, 0) AS usage_count,
@@ -291,7 +291,7 @@ BEGIN
     WHERE c.site_id = p_site_id
     ORDER BY
         -- Header zuerst, dann Footer, dann Rest
-        CASE c.position
+        CASE c."position"
             WHEN 'header' THEN 1
             WHEN 'footer' THEN 2
             ELSE 3
@@ -325,15 +325,15 @@ BEGIN
     WHERE component_id = p_component_id;
 
     -- Wenn Global Header/Footer, zähle auch alle Seiten der Site
-    IF component_record.is_global AND component_record.position IN ('header', 'footer') THEN
+    IF component_record.is_global AND component_record."position" IN ('header', 'footer') THEN
         SELECT COUNT(*) INTO usage_count
         FROM public.pages p
         JOIN public.sites s ON s.id = p.site_id
         WHERE p.site_id = component_record.site_id
         AND (
-            (component_record.position = 'header' AND s.global_header_id = p_component_id AND COALESCE(p.hide_header, false) = false)
+            (component_record."position" = 'header' AND s.global_header_id = p_component_id AND COALESCE(p.hide_header, false) = false)
             OR
-            (component_record.position = 'footer' AND s.global_footer_id = p_component_id AND COALESCE(p.hide_footer, false) = false)
+            (component_record."position" = 'footer' AND s.global_footer_id = p_component_id AND COALESCE(p.hide_footer, false) = false)
         );
     END IF;
 
@@ -356,7 +356,7 @@ BEGIN
         SELECT 1 FROM public.components
         WHERE id = p_component_id
         AND site_id = p_site_id
-        AND position = 'header'
+        AND "position" = 'header'
     ) THEN
         RAISE EXCEPTION 'Component is not a valid header for this site';
     END IF;
@@ -382,7 +382,7 @@ BEGIN
         SELECT 1 FROM public.components
         WHERE id = p_component_id
         AND site_id = p_site_id
-        AND position = 'footer'
+        AND "position" = 'footer'
     ) THEN
         RAISE EXCEPTION 'Component is not a valid footer for this site';
     END IF;

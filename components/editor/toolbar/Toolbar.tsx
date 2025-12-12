@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useEditorStore } from '@/stores/editor-store'
 import { Button } from '@/components/ui/button'
@@ -42,10 +43,14 @@ import {
   MessageSquare,
   FileText,
   Layers,
+  LayoutTemplate,
+  Settings2,
 } from 'lucide-react'
 import type { ViewMode, Breakpoint } from '@/types/editor'
 import { PublishDropdown } from './PublishDropdown'
 import { useWordPress } from '@/hooks/useWordPress'
+import { ComponentLibraryModal } from '../global-components/ComponentLibraryModal'
+import { PageSettingsPanel } from '../global-components/PageSettingsPanel'
 
 interface ToolbarProps {
   siteId: string
@@ -56,6 +61,7 @@ export function Toolbar({ siteId }: ToolbarProps) {
   const breakpoint = useEditorStore((s) => s.breakpoint)
   const pages = useEditorStore((s) => s.pages)
   const currentPage = useEditorStore((s) => s.currentPage)
+  const pageId = useEditorStore((s) => s.pageId)
   const hasUnsavedChanges = useEditorStore((s) => s.hasUnsavedChanges)
   const isSaving = useEditorStore((s) => s.isSaving)
 
@@ -72,6 +78,10 @@ export function Toolbar({ siteId }: ToolbarProps) {
 
   // WordPress integration
   const wordpress = useWordPress(siteId)
+
+  // Global Components State
+  const [showComponentLibrary, setShowComponentLibrary] = useState(false)
+  const [showPageSettings, setShowPageSettings] = useState(false)
 
   const handleSave = async () => {
     try {
@@ -180,6 +190,40 @@ export function Toolbar({ siteId }: ToolbarProps) {
 
           <Separator orientation="vertical" className="h-5 mx-1" />
 
+          {/* Component Library */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowComponentLibrary(true)}
+                className="gap-1.5 text-zinc-600 text-xs"
+              >
+                <LayoutTemplate className="h-4 w-4" />
+                Components
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Component Library</TooltipContent>
+          </Tooltip>
+
+          {/* Page Settings */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPageSettings(true)}
+                className="gap-1.5 text-zinc-600 text-xs"
+              >
+                <Settings2 className="h-4 w-4" />
+                Settings
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Page Settings (Header/Footer)</TooltipContent>
+          </Tooltip>
+
+          <Separator orientation="vertical" className="h-5 mx-1" />
+
           {/* Save Button */}
           <Button
             variant={hasUnsavedChanges ? 'default' : 'outline'}
@@ -282,6 +326,37 @@ export function Toolbar({ siteId }: ToolbarProps) {
           />
         </div>
       </div>
+
+      {/* Component Library Modal */}
+      <ComponentLibraryModal
+        open={showComponentLibrary}
+        onClose={() => setShowComponentLibrary(false)}
+        siteId={siteId}
+        onInsert={(component) => {
+          // TODO: Insert component HTML into page
+          console.log('Insert component:', component.name)
+          setShowComponentLibrary(false)
+        }}
+        onEdit={(component) => {
+          // TODO: Open component for editing
+          console.log('Edit component:', component.name)
+          setShowComponentLibrary(false)
+        }}
+      />
+
+      {/* Page Settings Panel */}
+      {pageId && (
+        <PageSettingsPanel
+          open={showPageSettings}
+          onClose={() => setShowPageSettings(false)}
+          siteId={siteId}
+          pageId={pageId}
+          onUpdate={() => {
+            // Refresh page data
+            loadPage(pageId)
+          }}
+        />
+      )}
     </TooltipProvider>
   )
 }

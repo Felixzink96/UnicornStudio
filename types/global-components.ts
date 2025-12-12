@@ -112,7 +112,8 @@ export interface ComponentLibraryItem {
   name: string;
   description: string | null;
   category: string | null;
-  position: ComponentPosition;
+  component_position: ComponentPosition;  // Renamed from 'position' (reserved word in PostgreSQL)
+  position?: ComponentPosition;           // Alias for backwards compatibility
   is_global: boolean;
   auto_include: boolean;
   usage_count: number;

@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.0.0');
+define('UNICORN_STUDIO_VERSION', '1.1.0');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -76,6 +76,7 @@ final class Unicorn_Studio {
     public $theme_manager;
     public $template_converter;
     public $template_loader;
+    public $global_components;
 
     /**
      * Get single instance
@@ -130,6 +131,7 @@ final class Unicorn_Studio {
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-theme-manager.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-template-converter.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-template-loader.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-global-components.php';
 
         // Initialize components
         $this->api = new Unicorn_Studio_API_Client();
@@ -147,6 +149,8 @@ final class Unicorn_Studio {
         $this->theme_manager = new Unicorn_Studio_Theme_Manager();
         $this->template_converter = new Unicorn_Studio_Template_Converter();
         $this->template_loader = new Unicorn_Studio_Template_Loader();
+        $this->global_components = new Unicorn_Studio_Global_Components();
+        $this->global_components->init();
 
         // Admin classes
         if (is_admin()) {

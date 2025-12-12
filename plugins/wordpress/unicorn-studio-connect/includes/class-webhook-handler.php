@@ -154,13 +154,36 @@ class Unicorn_Studio_Webhook_Handler {
             // Design Events
             // ========================================
             case 'variables.updated':
-            case 'component.created':
-            case 'component.updated':
-            case 'component.deleted':
             case 'template.updated':
             case 'css.updated':
                 // Re-sync CSS
                 return unicorn_studio()->css->sync_css();
+
+            // ========================================
+            // Global Component Events
+            // ========================================
+            case 'component.created':
+            case 'component.updated':
+                // Sync component and CSS
+                if (isset($data['position']) && in_array($data['position'], ['header', 'footer'], true)) {
+                    // Save as global header/footer
+                    Unicorn_Studio_Global_Components::save_component($data['position'], $data);
+                }
+                return unicorn_studio()->css->sync_css();
+
+            case 'component.deleted':
+                // Remove if it was a global component
+                if (isset($data['position']) && in_array($data['position'], ['header', 'footer'], true)) {
+                    Unicorn_Studio_Global_Components::delete_component($data['position']);
+                }
+                return unicorn_studio()->css->sync_css();
+
+            case 'global_components.sync':
+                // Full sync of global components
+                if (isset($data['components']) && is_array($data['components'])) {
+                    return Unicorn_Studio_Global_Components::sync_from_api($data['components']);
+                }
+                return true;
 
             // ========================================
             // Unknown Event

@@ -1,25 +1,61 @@
 import { NextResponse } from 'next/server'
-import { readFile } from 'fs/promises'
+import { readdir, readFile, stat } from 'fs/promises'
 import path from 'path'
+import JSZip from 'jszip'
+
+// Recursively add directory to zip
+async function addDirectoryToZip(zip: JSZip, dirPath: string, zipPath: string) {
+  const entries = await readdir(dirPath, { withFileTypes: true })
+
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name)
+    const zipFilePath = path.join(zipPath, entry.name)
+
+    if (entry.isDirectory()) {
+      await addDirectoryToZip(zip, fullPath, zipFilePath)
+    } else {
+      const content = await readFile(fullPath)
+      zip.file(zipFilePath, content)
+    }
+  }
+}
 
 export async function GET() {
   try {
-    const pluginPath = path.join(process.cwd(), 'plugins/wordpress/unicorn-studio-connect.zip')
+    const pluginDir = path.join(process.cwd(), 'plugins/wordpress/unicorn-studio-connect')
 
-    const fileBuffer = await readFile(pluginPath)
+    // Check if directory exists
+    const dirStat = await stat(pluginDir)
+    if (!dirStat.isDirectory()) {
+      throw new Error('Plugin directory not found')
+    }
 
-    return new NextResponse(fileBuffer, {
+    // Create a new zip
+    const zip = new JSZip()
+
+    // Add the entire plugin directory
+    await addDirectoryToZip(zip, pluginDir, 'unicorn-studio-connect')
+
+    // Generate zip buffer
+    const zipBuffer = await zip.generateAsync({
+      type: 'nodebuffer',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 9 },
+    })
+
+    return new NextResponse(zipBuffer, {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': 'attachment; filename="unicorn-studio-connect.zip"',
-        'Content-Length': fileBuffer.length.toString(),
+        'Content-Length': zipBuffer.length.toString(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     })
   } catch (error) {
     console.error('Plugin download error:', error)
     return NextResponse.json(
-      { error: 'Plugin file not found' },
-      { status: 404 }
+      { error: 'Plugin konnte nicht erstellt werden' },
+      { status: 500 }
     )
   }
 }

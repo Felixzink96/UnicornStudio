@@ -50,15 +50,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return notFoundResponse('Component not found')
     }
 
-    // Get usage count via direct query
-    const { count: usageCount } = await supabase
-      .from('component_usage')
-      .select('*', { count: 'exact', head: true })
-      .eq('component_id', componentId)
-
+    // Return component (usage count not available yet - table not created)
     return successResponse({
       ...component,
-      usage_count: usageCount || 0,
+      usage_count: 0,
     })
   } catch (error) {
     console.error('Get global component API error:', error)

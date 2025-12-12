@@ -171,11 +171,13 @@ class Unicorn_Studio_API_Client {
         $webhook_url = rest_url('unicorn-studio/v1/webhook');
         $site_url = home_url();
         $plugin_version = defined('UNICORN_STUDIO_VERSION') ? UNICORN_STUDIO_VERSION : '1.0.0';
+        $webhook_secret = Unicorn_Studio_Webhook_Handler::get_webhook_secret();
 
         $response = $this->request('/wordpress/register', 'POST', [
             'webhook_url'    => $webhook_url,
             'site_url'       => $site_url,
             'plugin_version' => $plugin_version,
+            'webhook_secret' => $webhook_secret, // Send secret for HMAC verification
         ]);
 
         if (is_wp_error($response)) {

@@ -38,12 +38,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return forbiddenResponse(access.error)
     }
 
-    // 3. Parse body - WordPress sends its webhook URL
+    // 3. Parse body - WordPress sends its webhook URL and secret
     const body = await request.json()
-    const { webhook_url, site_url, plugin_version } = body
+    const { webhook_url, site_url, plugin_version, webhook_secret } = body
 
     if (!webhook_url || !site_url) {
       return serverErrorResponse('webhook_url and site_url are required')
+    }
+
+    if (!webhook_secret) {
+      return serverErrorResponse('webhook_secret is required for HMAC verification')
     }
 
     const supabase = createAPIClient()
@@ -99,13 +103,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .ilike('url', `%${domain}%`)
 
     if (!existingWebhooks || existingWebhooks.length === 0) {
-      // Create new webhook
-      const webhookSecret = crypto.randomUUID()
-
+      // Create new webhook using WordPress's secret for HMAC verification
       await supabase.from('webhooks').insert({
         site_id: siteId,
         url: webhook_url,
-        secret: webhookSecret,
+        secret: webhook_secret, // Use the secret from WordPress!
         events: [
           'entry.created',
           'entry.updated',
@@ -128,6 +130,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         ],
         is_active: true,
       })
+    } else {
+      // Update existing webhook with new secret and URL
+      await supabase
+        .from('webhooks')
+        .update({
+          url: webhook_url,
+          secret: webhook_secret,
+          is_active: true,
+        })
+        .eq('id', existingWebhooks[0].id)
     }
 
     // 8. Return success

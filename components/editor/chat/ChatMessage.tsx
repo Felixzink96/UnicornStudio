@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Code,
   Eye,
+  Layers,
 } from 'lucide-react'
 import type { ChatMessage as ChatMessageType } from '@/types/editor'
 
@@ -145,14 +146,34 @@ export function ChatMessage({ message }: ChatMessageProps) {
     }).format(new Date(date))
   }
 
+  // Parse style reference from user message
+  const { messageText, styleReferences } = useMemo(() => {
+    const refMatch = message.content.match(/\[Style-Referenz:\s*([^\]]+)\]/)
+    if (refMatch) {
+      const refs = refMatch[1].split(',').map(r => r.trim())
+      const text = message.content.replace(/\n*\[Style-Referenz:[^\]]+\]/, '').trim()
+      return { messageText: text, styleReferences: refs }
+    }
+    return { messageText: message.content, styleReferences: [] }
+  }, [message.content])
+
   // User Message
   if (message.role === 'user') {
     return (
       <div className="flex justify-end w-full">
         <div className="max-w-[85%] space-y-2">
+          {/* Style References Badge */}
+          {styleReferences.length > 0 && (
+            <div className="flex justify-end">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg text-xs font-medium">
+                <Layers className="h-3 w-3" />
+                <span>Style von {styleReferences.join(', ')}</span>
+              </div>
+            </div>
+          )}
           <div className="bg-blue-500 text-white rounded-2xl rounded-br-md px-4 py-3">
             <p className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word' }}>
-              {message.content}
+              {messageText}
             </p>
           </div>
           <div className="flex items-center justify-end gap-2">

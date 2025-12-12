@@ -44,6 +44,8 @@ import {
   Layers,
 } from 'lucide-react'
 import type { ViewMode, Breakpoint } from '@/types/editor'
+import { PublishDropdown } from './PublishDropdown'
+import { useWordPress } from '@/hooks/useWordPress'
 
 interface ToolbarProps {
   siteId: string
@@ -67,6 +69,9 @@ export function Toolbar({ siteId }: ToolbarProps) {
   const canRedo = useEditorStore((s) => s.canRedo)
   const showLayersPanel = useEditorStore((s) => s.showLayersPanel)
   const toggleLayersPanel = useEditorStore((s) => s.toggleLayersPanel)
+
+  // WordPress integration
+  const wordpress = useWordPress(siteId)
 
   const handleSave = async () => {
     try {
@@ -267,9 +272,14 @@ export function Toolbar({ siteId }: ToolbarProps) {
           </Button>
 
           {/* Publish */}
-          <button className="px-3 py-1.5 text-sm font-medium rounded-md bg-blue-500 hover:bg-blue-600 text-white cursor-pointer transition-colors">
-            Publish
-          </button>
+          <PublishDropdown
+            siteId={siteId}
+            wordPressConfig={wordpress.config}
+            wordPressStatus={wordpress.status}
+            lastPushedAt={wordpress.lastPushedAt}
+            isPublishing={wordpress.isPublishing}
+            onPublishWordPress={wordpress.publishToWordPress}
+          />
         </div>
       </div>
     </TooltipProvider>

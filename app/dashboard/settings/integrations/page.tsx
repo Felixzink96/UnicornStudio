@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { ArrowLeft, Puzzle, Download, ExternalLink, Clock, Check } from 'lucide-react'
+import { ArrowLeft, Puzzle, Download, ExternalLink, Clock, Check, Globe, CheckCircle, AlertCircle, XCircle } from 'lucide-react'
 import { PluginCard } from '@/components/integrations/PluginCard'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 // Available plugins data
 const PLUGINS = [
@@ -84,6 +86,22 @@ const PLUGINS = [
   },
 ]
 
+interface WordPressConfig {
+  enabled: boolean
+  domain: string
+  connection_status: 'connected' | 'error' | 'untested'
+  last_connection_test: string | null
+  registered_at?: string
+}
+
+interface SiteWithWordPress {
+  id: string
+  name: string
+  wordpress: WordPressConfig
+  last_pushed_at: string | null
+  updated_at: string | null
+}
+
 export default async function IntegrationsPage() {
   const supabase = await createClient()
 
@@ -93,6 +111,36 @@ export default async function IntegrationsPage() {
   if (authError || !user) {
     notFound()
   }
+
+  // Get user's profile to find organization
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single()
+
+  // Get all sites with WordPress integration
+  const { data: sites } = await supabase
+    .from('sites')
+    .select('id, name, integrations, updated_at, last_pushed_to_wordpress_at')
+    .eq('organization_id', profile?.organization_id)
+
+  // Filter sites with WordPress enabled
+  const wordpressSites: SiteWithWordPress[] = (sites || [])
+    .filter((site) => {
+      const integrations = site.integrations as { wordpress?: WordPressConfig } | null
+      return integrations?.wordpress?.enabled
+    })
+    .map((site) => {
+      const integrations = site.integrations as { wordpress: WordPressConfig }
+      return {
+        id: site.id,
+        name: site.name,
+        wordpress: integrations.wordpress,
+        last_pushed_at: (site as { last_pushed_to_wordpress_at?: string | null }).last_pushed_to_wordpress_at || null,
+        updated_at: site.updated_at,
+      }
+    })
 
   const stablePlugins = PLUGINS.filter(p => p.status === 'stable')
   const comingSoonPlugins = PLUGINS.filter(p => p.status === 'coming_soon')
@@ -119,11 +167,85 @@ export default async function IntegrationsPage() {
         </p>
       </div>
 
+      {/* Connected WordPress Sites */}
+      {wordpressSites.length > 0 && (
+        <div className="mb-12">
+          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <Globe className="h-5 w-5 text-blue-500" />
+            Verbundene WordPress Sites
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {wordpressSites.map((site) => {
+              const isOutdated = site.updated_at && site.last_pushed_at &&
+                new Date(site.updated_at) > new Date(site.last_pushed_at)
+              const neverPushed = !site.last_pushed_at
+
+              return (
+                <Card key={site.id} className="bg-slate-900 border-slate-800">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        {/* WordPress Icon */}
+                        <div className="p-2 rounded-lg bg-blue-500/10">
+                          <svg className="h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-white">{site.name}</h3>
+                          <p className="text-sm text-slate-400">{site.wordpress.domain}</p>
+                        </div>
+                      </div>
+                      {/* Status Badge */}
+                      <div className="flex items-center gap-2">
+                        {site.wordpress.connection_status === 'connected' ? (
+                          neverPushed ? (
+                            <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Nie gepusht
+                            </Badge>
+                          ) : isOutdated ? (
+                            <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Anderungen
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-green-500/10 text-green-400 border-green-500/20">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Aktuell
+                            </Badge>
+                          )
+                        ) : site.wordpress.connection_status === 'error' ? (
+                          <Badge className="bg-red-500/10 text-red-400 border-red-500/20">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Fehler
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-slate-500/10 text-slate-400 border-slate-500/20">
+                            Ungetestet
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    {/* Last Sync Info */}
+                    {site.last_pushed_at && (
+                      <p className="text-xs text-slate-500 mt-3">
+                        Letzter Push: {new Date(site.last_pushed_at).toLocaleString('de-DE')}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Available Plugins */}
       <div className="mb-12">
         <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
           <Check className="h-5 w-5 text-green-500" />
-          Verfügbar
+          Verfugbar
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {stablePlugins.map((plugin) => (

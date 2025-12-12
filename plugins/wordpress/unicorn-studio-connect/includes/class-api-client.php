@@ -147,7 +147,36 @@ class Unicorn_Studio_API_Client {
             wp_send_json_error(['message' => $result->get_error_message()]);
         }
 
+        // Auto-register with Unicorn Studio so it knows about this WordPress site
+        $this->register_with_unicorn_studio();
+
         wp_send_json_success(['message' => __('Verbindung erfolgreich!', 'unicorn-studio')]);
+    }
+
+    /**
+     * Register this WordPress site with Unicorn Studio
+     * This enables the publish dropdown in the Unicorn Studio editor
+     *
+     * @return bool|WP_Error
+     */
+    public function register_with_unicorn_studio() {
+        $webhook_url = rest_url('unicorn-studio/v1/webhook');
+        $site_url = home_url();
+        $plugin_version = defined('UNICORN_STUDIO_VERSION') ? UNICORN_STUDIO_VERSION : '1.0.0';
+
+        $response = $this->request('/wordpress/register', 'POST', [
+            'webhook_url'    => $webhook_url,
+            'site_url'       => $site_url,
+            'plugin_version' => $plugin_version,
+        ]);
+
+        if (is_wp_error($response)) {
+            // Log error but don't fail the connection test
+            error_log('Unicorn Studio: Failed to register with Unicorn Studio - ' . $response->get_error_message());
+            return $response;
+        }
+
+        return true;
     }
 
     /**

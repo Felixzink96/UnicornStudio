@@ -11,6 +11,7 @@ import {
   Eye,
   Globe,
   ExternalLink,
+  Puzzle,
 } from 'lucide-react'
 import { PagesList } from './PagesList'
 import type { Site, Page } from '@/types/database'
@@ -87,6 +88,12 @@ export default async function SitePage({ params }: SitePageProps) {
             <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
               <Eye className="h-4 w-4 mr-2" />
               Preview
+            </Button>
+          </Link>
+          <Link href="/dashboard/settings/integrations">
+            <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
+              <Puzzle className="h-4 w-4 mr-2" />
+              Integrationen
             </Button>
           </Link>
           <Link href={`/dashboard/sites/${siteId}/settings`}>

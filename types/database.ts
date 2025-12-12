@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       activity_log: {
@@ -1007,6 +1032,7 @@ export type Database = {
           description: string | null
           id: string
           integrations: Json | null
+          last_pushed_to_wordpress_at: string | null
           name: string
           organization_id: string
           published_at: string | null
@@ -1025,6 +1051,7 @@ export type Database = {
           description?: string | null
           id?: string
           integrations?: Json | null
+          last_pushed_to_wordpress_at?: string | null
           name: string
           organization_id: string
           published_at?: string | null
@@ -1043,6 +1070,7 @@ export type Database = {
           description?: string | null
           id?: string
           integrations?: Json | null
+          last_pushed_to_wordpress_at?: string | null
           name?: string
           organization_id?: string
           published_at?: string | null
@@ -1630,31 +1658,10 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
 } as const
-
-// Helper types for easier access
-export type Site = Database['public']['Tables']['sites']['Row']
-export type SiteInsert = Database['public']['Tables']['sites']['Insert']
-export type SiteUpdate = Database['public']['Tables']['sites']['Update']
-
-export type Page = Database['public']['Tables']['pages']['Row']
-export type PageInsert = Database['public']['Tables']['pages']['Insert']
-export type PageUpdate = Database['public']['Tables']['pages']['Update']
-
-export type ApiKey = Database['public']['Tables']['api_keys']['Row']
-export type ApiKeyInsert = Database['public']['Tables']['api_keys']['Insert']
-export type ApiKeyUpdate = Database['public']['Tables']['api_keys']['Update']
-
-export type Webhook = Database['public']['Tables']['webhooks']['Row']
-export type WebhookInsert = Database['public']['Tables']['webhooks']['Insert']
-export type WebhookUpdate = Database['public']['Tables']['webhooks']['Update']
-
-export type WebhookLog = Database['public']['Tables']['webhook_logs']['Row']
-export type ApiRequestLog = Database['public']['Tables']['api_request_logs']['Row']
-
-export type Asset = Database['public']['Tables']['assets']['Row']
-export type AssetInsert = Database['public']['Tables']['assets']['Insert']
-export type AssetUpdate = Database['public']['Tables']['assets']['Update']

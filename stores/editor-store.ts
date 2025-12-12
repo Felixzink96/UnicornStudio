@@ -16,6 +16,18 @@ import type {
 
 const MAX_HISTORY = 50
 
+// WordPress Types
+export interface WordPressConfig {
+  enabled: boolean
+  api_url: string
+  api_key: string
+  domain: string
+  connection_status: 'connected' | 'error' | 'untested'
+  last_connection_test: string | null
+}
+
+export type WordPressStatus = 'current' | 'outdated' | 'error' | 'not_configured'
+
 const initialState: EditorState = {
   siteId: null,
   pageId: null,

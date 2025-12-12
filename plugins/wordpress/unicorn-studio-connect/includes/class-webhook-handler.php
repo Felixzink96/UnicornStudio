@@ -151,6 +151,16 @@ class Unicorn_Studio_Webhook_Handler {
                 return unicorn_studio()->sync->sync_taxonomies();
 
             // ========================================
+            // Page Events
+            // ========================================
+            case 'page.created':
+            case 'page.updated':
+                return unicorn_studio()->pages->sync_single_page_from_webhook($data);
+
+            case 'page.deleted':
+                return unicorn_studio()->pages->delete_page_by_unicorn_id($data['id']);
+
+            // ========================================
             // Design Events
             // ========================================
             case 'variables.updated':

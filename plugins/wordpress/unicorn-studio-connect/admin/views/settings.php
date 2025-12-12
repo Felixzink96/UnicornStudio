@@ -318,6 +318,56 @@ $webhook_secret = Unicorn_Studio_Webhook_Handler::get_webhook_secret();
             </form>
         </div>
 
+        <!-- Admin Button Settings -->
+        <div class="unicorn-card">
+            <h2><?php esc_html_e('Edit Button', 'unicorn-studio'); ?></h2>
+            <p class="description">
+                <?php esc_html_e('Zeigt einen "Edit with Unicorn Studio" Button für Admins auf der Website.', 'unicorn-studio'); ?>
+            </p>
+
+            <form method="post" action="options.php">
+                <?php settings_fields('unicorn_studio_options'); ?>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Floating Button', 'unicorn-studio'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox"
+                                       name="unicorn_studio_settings[show_floating_button]"
+                                       value="1"
+                                       <?php checked($settings['show_floating_button'] ?? true); ?>>
+                                <?php esc_html_e('Floating "Unicorn Studio" Button anzeigen (nur für Admins)', 'unicorn-studio'); ?>
+                            </label>
+                            <p class="description">
+                                <?php esc_html_e('Ein Button unten rechts auf der Seite, der direkt zum Editor in Unicorn Studio führt.', 'unicorn-studio'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="unicorn_studio_app_url">
+                                <?php esc_html_e('App URL', 'unicorn-studio'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="url"
+                                   id="unicorn_studio_app_url"
+                                   name="unicorn_studio_app_url"
+                                   value="<?php echo esc_attr(get_option('unicorn_studio_app_url', 'http://localhost:3000')); ?>"
+                                   class="regular-text"
+                                   placeholder="http://localhost:3000">
+                            <p class="description">
+                                <?php esc_html_e('URL zu deiner Unicorn Studio App (für Edit-Links).', 'unicorn-studio'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+
+                <?php submit_button(__('Speichern', 'unicorn-studio')); ?>
+            </form>
+        </div>
+
         <!-- Blank Theme -->
         <div class="unicorn-card">
             <h2><?php esc_html_e('Blank Theme', 'unicorn-studio'); ?></h2>

@@ -216,7 +216,13 @@ export async function POST(request: NextRequest) {
 
       if (pages && pages.length > 0) {
         for (const page of pages) {
-          await sendWebhook('page.updated', page)
+          // Map fields for WordPress compatibility
+          const wpPage = {
+            ...page,
+            html: page.html_content, // WordPress expects 'html', DB has 'html_content'
+            title: page.name,        // WordPress can use 'title' or 'name'
+          }
+          await sendWebhook('page.updated', wpPage)
         }
         result.results.pages = { count: pages.length, success: true }
       }

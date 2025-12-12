@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.2.0
+ * Version:           1.3.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.2.0');
+define('UNICORN_STUDIO_VERSION', '1.3.0');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -77,6 +77,7 @@ final class Unicorn_Studio {
     public $template_converter;
     public $template_loader;
     public $global_components;
+    public $admin_bar;
 
     /**
      * Get single instance
@@ -132,6 +133,7 @@ final class Unicorn_Studio {
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-template-converter.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-template-loader.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-global-components.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-admin-bar.php';
 
         // Initialize components
         $this->api = new Unicorn_Studio_API_Client();
@@ -151,6 +153,12 @@ final class Unicorn_Studio {
         $this->template_loader = new Unicorn_Studio_Template_Loader();
         $this->global_components = new Unicorn_Studio_Global_Components();
         $this->global_components->init();
+
+        // Admin bar / floating button (frontend only)
+        if (!is_admin()) {
+            $this->admin_bar = new Unicorn_Studio_Admin_Bar();
+            $this->admin_bar->init();
+        }
 
         // Admin classes
         if (is_admin()) {

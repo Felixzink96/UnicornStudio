@@ -292,4 +292,48 @@ class Unicorn_Studio_Pages {
 
         return $result;
     }
+
+    /**
+     * Sync a single page from webhook data
+     * Called directly by webhook handler with page data from Unicorn Studio
+     *
+     * @param array $page Page data from webhook
+     * @return bool|WP_Error
+     */
+    public function sync_single_page_from_webhook($page) {
+        if (empty($page['id'])) {
+            return new WP_Error('missing_id', 'Page ID is required');
+        }
+
+        $result = $this->sync_single_page($page);
+
+        if ($result['success']) {
+            return true;
+        }
+
+        return new WP_Error('sync_failed', $result['error'] ?? 'Unknown error');
+    }
+
+    /**
+     * Delete a page by Unicorn Studio ID
+     *
+     * @param string $unicorn_id Unicorn Studio page ID
+     * @return bool|WP_Error
+     */
+    public function delete_page_by_unicorn_id($unicorn_id) {
+        $existing = $this->get_page_by_unicorn_id($unicorn_id);
+
+        if (!$existing) {
+            // Page doesn't exist, nothing to delete
+            return true;
+        }
+
+        $result = wp_trash_post($existing->ID);
+
+        if (!$result) {
+            return new WP_Error('delete_failed', 'Failed to delete page');
+        }
+
+        return true;
+    }
 }

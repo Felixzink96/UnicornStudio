@@ -100,7 +100,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { siteId } = await params
 
-    const access = await validateSiteAccess(auth, siteId, ['write'])
+    const access = await validateSiteAccess(auth, siteId)
     if (!access.valid) {
       return forbiddenResponse(access.error)
     }

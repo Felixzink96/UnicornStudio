@@ -15,7 +15,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { prompt, existingHtml, context, selectedElement, model: modelId } = body
+    const { prompt, existingHtml, context, selectedElement, model: modelId, referencedPages } = body as {
+      prompt: string
+      existingHtml?: string
+      context?: { siteType?: string; industry?: string; style?: string; colors?: Record<string, string>; fonts?: Record<string, string> }
+      selectedElement?: { outerHTML: string; selector?: string }
+      model?: string
+      referencedPages?: Array<{ name: string; html: string }>
+    }
 
     // Build the system prompt with context
     const systemPrompt = buildSystemPrompt({
@@ -31,6 +38,15 @@ export async function POST(request: Request) {
 
     // Build user message
     let userMessage = `ANFRAGE: ${prompt}\n\n`
+
+    // Add referenced pages as style guide
+    if (referencedPages && referencedPages.length > 0) {
+      userMessage += `REFERENZIERTE SEITEN (nutze diese als Style-Guide!):\n`
+      for (const page of referencedPages) {
+        userMessage += `\n--- @${page.name} ---\n\`\`\`html\n${page.html}\n\`\`\`\n`
+      }
+      userMessage += `\nÜBERNIMM DAS DESIGN DIESER SEITE(N) EXAKT für die neue Seite/Section!\n\n`
+    }
 
     if (hasExistingContent) {
       userMessage += `BESTEHENDE SEITE - ANALYSIERE SIE GENAU:

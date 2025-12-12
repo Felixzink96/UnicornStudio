@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useEditorStore } from '@/stores/editor-store'
 import { ChatMessage } from './ChatMessage'
 import { PromptBuilder } from './PromptBuilder'
@@ -16,6 +16,8 @@ import {
   Paperclip,
   ChevronDown,
   Wand2,
+  FileText,
+  X,
 } from 'lucide-react'
 
 export function ChatPanel() {
@@ -30,11 +32,34 @@ export function ChatPanel() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // @-Mention State
+  const [showPageSuggestions, setShowPageSuggestions] = useState(false)
+  const [mentionFilter, setMentionFilter] = useState('')
+  const [mentionStartPos, setMentionStartPos] = useState(-1)
+  const [suggestionIndex, setSuggestionIndex] = useState(0)
+  const [referencedPageIds, setReferencedPageIds] = useState<string[]>([])
+
   const messages = useEditorStore((s) => s.messages)
   const isGenerating = useEditorStore((s) => s.isGenerating)
   const html = useEditorStore((s) => s.html)
   const siteContext = useEditorStore((s) => s.siteContext)
   const selectedElement = useEditorStore((s) => s.selectedElement)
+  const pages = useEditorStore((s) => s.pages)
+  const currentPage = useEditorStore((s) => s.currentPage)
+
+  // Filter pages for suggestions (exclude current page)
+  const filteredPages = useMemo(() => {
+    const otherPages = pages.filter(p => p.id !== currentPage?.id)
+    if (!mentionFilter) return otherPages
+    return otherPages.filter(p =>
+      p.name.toLowerCase().includes(mentionFilter.toLowerCase())
+    )
+  }, [pages, currentPage, mentionFilter])
+
+  // Get referenced page objects
+  const referencedPages = useMemo(() => {
+    return pages.filter(p => referencedPageIds.includes(p.id))
+  }, [pages, referencedPageIds])
 
   const addMessage = useEditorStore((s) => s.addMessage)
   const updateMessage = useEditorStore((s) => s.updateMessage)
@@ -69,10 +94,22 @@ export function ChatPanel() {
     const promptToSend = promptOverride || input.trim()
     if (!promptToSend || isGenerating) return
 
+    // Prepare referenced pages data
+    const referencedPagesData = referencedPages.map(p => ({
+      name: p.name,
+      html: p.htmlContent || ''
+    }))
+
     setInput('')
+    setReferencedPageIds([]) // Clear references after sending
     setGenerating(true)
 
-    addMessage({ role: 'user', content: promptToSend })
+    // Show referenced pages in user message
+    const displayContent = referencedPagesData.length > 0
+      ? `${promptToSend}\n\n📎 Referenz: ${referencedPagesData.map(p => `@${p.name}`).join(', ')}`
+      : promptToSend
+
+    addMessage({ role: 'user', content: displayContent })
     addMessage({ role: 'assistant', content: '', isStreaming: true })
 
     try {
@@ -85,6 +122,7 @@ export function ChatPanel() {
           context: siteContext || {},
           selectedElement: selectedElement,
           model: selectedModel.id,
+          referencedPages: referencedPagesData.length > 0 ? referencedPagesData : undefined,
         }),
       })
 
@@ -188,7 +226,82 @@ export function ChatPanel() {
     }
   }
 
+  // Handle input changes and detect @-mentions
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value
+    const cursorPos = e.target.selectionStart || 0
+
+    setInput(value)
+
+    // Check for @-mention
+    const textBeforeCursor = value.slice(0, cursorPos)
+    const atMatch = textBeforeCursor.match(/@(\w*)$/)
+
+    if (atMatch) {
+      setShowPageSuggestions(true)
+      setMentionFilter(atMatch[1])
+      setMentionStartPos(cursorPos - atMatch[0].length)
+      setSuggestionIndex(0)
+    } else {
+      setShowPageSuggestions(false)
+      setMentionFilter('')
+      setMentionStartPos(-1)
+    }
+  }
+
+  // Insert selected page mention
+  const insertPageMention = (page: { id: string; name: string }) => {
+    if (mentionStartPos === -1) return
+
+    // Add page to references
+    if (!referencedPageIds.includes(page.id)) {
+      setReferencedPageIds([...referencedPageIds, page.id])
+    }
+
+    // Remove the @... from input and close suggestions
+    const beforeMention = input.slice(0, mentionStartPos)
+    const afterMention = input.slice(textareaRef.current?.selectionStart || mentionStartPos)
+    setInput(beforeMention + afterMention)
+
+    setShowPageSuggestions(false)
+    setMentionFilter('')
+    setMentionStartPos(-1)
+
+    // Focus back to textarea
+    textareaRef.current?.focus()
+  }
+
+  // Remove a referenced page
+  const removeReferencedPage = (pageId: string) => {
+    setReferencedPageIds(referencedPageIds.filter(id => id !== pageId))
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle suggestion navigation
+    if (showPageSuggestions && filteredPages.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSuggestionIndex((prev) => (prev + 1) % filteredPages.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSuggestionIndex((prev) => (prev - 1 + filteredPages.length) % filteredPages.length)
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        insertPageMention(filteredPages[suggestionIndex])
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setShowPageSuggestions(false)
+        return
+      }
+    }
+
+    // Normal Enter to send
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -255,18 +368,72 @@ export function ChatPanel() {
 
       {/* Input Area */}
       <div className="border-t border-zinc-100 p-4 bg-white">
+        {/* Referenced Pages Badges */}
+        {referencedPages.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            <span className="text-xs text-zinc-500">Referenz:</span>
+            {referencedPages.map((page) => (
+              <span
+                key={page.id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full"
+              >
+                <FileText className="h-3 w-3" />
+                @{page.name}
+                <button
+                  onClick={() => removeReferencedPage(page.id)}
+                  className="hover:bg-blue-200 rounded-full p-0.5 -mr-0.5 cursor-pointer"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Input Container */}
         <div className="relative mb-3">
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Beschreibe, was du erstellen möchtest..."
+            placeholder="Beschreibe, was du erstellen möchtest... (@ für Seiten-Referenz)"
             rows={1}
             disabled={isGenerating}
             className="w-full px-4 py-3 pr-24 text-sm bg-zinc-50 border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white placeholder:text-zinc-400 disabled:opacity-50 transition-colors"
           />
+
+          {/* Page Suggestions Dropdown */}
+          {showPageSuggestions && filteredPages.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-1 w-full max-h-48 overflow-y-auto bg-white border border-zinc-200 rounded-lg shadow-lg z-50">
+              <div className="p-1.5 border-b border-zinc-100">
+                <span className="text-xs text-zinc-500 px-2">Seite als Style-Referenz wählen:</span>
+              </div>
+              {filteredPages.map((page, index) => (
+                <button
+                  key={page.id}
+                  onClick={() => insertPageMention(page)}
+                  className={`w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-zinc-50 transition-colors cursor-pointer ${
+                    index === suggestionIndex ? 'bg-blue-50' : ''
+                  }`}
+                >
+                  <FileText className="h-4 w-4 text-zinc-400" />
+                  <div>
+                    <div className="text-sm font-medium text-zinc-800">@{page.name}</div>
+                    <div className="text-xs text-zinc-500">/{page.slug || 'home'}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* No pages message */}
+          {showPageSuggestions && filteredPages.length === 0 && (
+            <div className="absolute bottom-full left-0 mb-1 w-full bg-white border border-zinc-200 rounded-lg shadow-lg z-50 p-3">
+              <span className="text-sm text-zinc-500">Keine anderen Seiten vorhanden</span>
+            </div>
+          )}
+
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <button
               className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors cursor-pointer"
@@ -276,7 +443,7 @@ export function ChatPanel() {
             </button>
             <button
               onClick={() => handleSend()}
-              disabled={!input.trim() || isGenerating}
+              disabled={(!input.trim() && referencedPages.length === 0) || isGenerating}
               className="p-2 bg-blue-500 hover:bg-blue-600 disabled:bg-zinc-200 disabled:cursor-not-allowed text-white disabled:text-zinc-400 rounded-lg transition-colors cursor-pointer"
             >
               {isGenerating ? (

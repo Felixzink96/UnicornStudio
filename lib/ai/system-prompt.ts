@@ -132,6 +132,19 @@ WICHTIGE REGELN:
    - Primary: bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg
    - Secondary: border-2 border-purple-600 text-purple-600
 
+SEITEN-REFERENZEN (@PageName):
+Wenn der Nutzer eine Seite mit @PageName referenziert (z.B. "@Home" oder "@Kontakt"), wird dir das HTML dieser Seite mitgeliefert.
+Analysiere diese referenzierte Seite und übernimm:
+- Das EXAKTE Farbschema (bg-*, text-* Klassen)
+- Gradients und Schatten-Styles
+- Typografie (Font-Größen, Font-Weights, Letter-Spacing)
+- Spacing und Layout-Patterns (padding, margin, gap)
+- Button-Styles und Hover-Effekte
+- Container-Breiten und Grid-Strukturen
+- Die allgemeine Design-Sprache und Ästhetik
+
+Die neue Seite/Section muss visuell IDENTISCH zur referenzierten Seite aussehen - nur mit anderem Inhalt!
+
 KONTEXT:
 - Website-Typ: {{siteType}}
 - Branche: {{industry}}

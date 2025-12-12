@@ -45,16 +45,14 @@ export function ChatPanel() {
   const siteContext = useEditorStore((s) => s.siteContext)
   const selectedElement = useEditorStore((s) => s.selectedElement)
   const pages = useEditorStore((s) => s.pages)
-  const currentPage = useEditorStore((s) => s.currentPage)
 
-  // Filter pages for suggestions (exclude current page)
+  // Filter pages for suggestions (show all pages)
   const filteredPages = useMemo(() => {
-    const otherPages = pages.filter(p => p.id !== currentPage?.id)
-    if (!mentionFilter) return otherPages
-    return otherPages.filter(p =>
+    if (!mentionFilter) return pages
+    return pages.filter(p =>
       p.name.toLowerCase().includes(mentionFilter.toLowerCase())
     )
-  }, [pages, currentPage, mentionFilter])
+  }, [pages, mentionFilter])
 
   // Get referenced page objects
   const referencedPages = useMemo(() => {

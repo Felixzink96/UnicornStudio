@@ -63,7 +63,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     if (position) {
       filteredComponents = filteredComponents.filter(
-        (c: { position: string }) => c.position === position
+        (c: { component_position: string }) => c.component_position === position
       )
     }
 

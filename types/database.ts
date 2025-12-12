@@ -1665,3 +1665,14 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+// Type aliases for convenience
+export type Site = Database['public']['Tables']['sites']['Row']
+export type Page = Database['public']['Tables']['pages']['Row']
+export type Asset = Database['public']['Tables']['assets']['Row']
+export type Entry = Database['public']['Tables']['entries']['Row']
+export type ContentType = Database['public']['Tables']['content_types']['Row']
+export type Taxonomy = Database['public']['Tables']['taxonomies']['Row']
+export type Term = Database['public']['Tables']['terms']['Row']
+export type Webhook = Database['public']['Tables']['webhooks']['Row']
+export type ApiKey = Database['public']['Tables']['api_keys']['Row']

@@ -340,8 +340,8 @@ $webhook_secret = Unicorn_Studio_Webhook_Handler::get_webhook_secret();
                     <?php endif; ?>
                 </div>
                 <?php if (!$theme_status['active']) : ?>
-                    <p>
-                        <a href="<?php echo admin_url('themes.php'); ?>" class="button">
+                    <p style="margin-top: 15px;">
+                        <a href="<?php echo admin_url('themes.php'); ?>" class="button button-primary">
                             <?php esc_html_e('Theme aktivieren', 'unicorn-studio'); ?>
                         </a>
                     </p>
@@ -354,19 +354,28 @@ $webhook_secret = Unicorn_Studio_Webhook_Handler::get_webhook_secret();
                 <p class="description">
                     <?php esc_html_e('Das Plugin funktioniert auch mit anderen Themes - der Asset Optimizer entfernt störende Styles automatisch.', 'unicorn-studio'); ?>
                 </p>
-                <p style="margin-top: 15px;">
+            <?php endif; ?>
+
+            <!-- Download immer anzeigen -->
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                <p style="margin-bottom: 10px;">
+                    <strong><?php esc_html_e('Theme Download', 'unicorn-studio'); ?></strong>
+                </p>
+                <p>
                     <a href="<?php echo wp_nonce_url(admin_url('admin-post.php?action=unicorn_download_theme'), 'unicorn_download_theme'); ?>"
                        class="button button-secondary">
                         <span class="dashicons dashicons-download" style="margin-top: 4px;"></span>
                         <?php esc_html_e('Theme herunterladen (ZIP)', 'unicorn-studio'); ?>
                     </a>
-                    <button type="button" class="button" id="unicorn-install-theme">
-                        <span class="dashicons dashicons-admin-appearance" style="margin-top: 4px;"></span>
-                        <?php esc_html_e('Direkt installieren', 'unicorn-studio'); ?>
-                    </button>
+                    <?php if (!$theme_status['installed']) : ?>
+                        <button type="button" class="button" id="unicorn-install-theme">
+                            <span class="dashicons dashicons-admin-appearance" style="margin-top: 4px;"></span>
+                            <?php esc_html_e('Direkt installieren', 'unicorn-studio'); ?>
+                        </button>
+                    <?php endif; ?>
                 </p>
                 <div id="unicorn-theme-result" class="hidden" style="margin-top: 10px;"></div>
-            <?php endif; ?>
+            </div>
         </div>
     </div>
 </div>

@@ -124,7 +124,7 @@ export async function getEntries(options: GetEntriesOptions): Promise<{
       entries = entries.map((entry) => ({
         ...entry,
         terms: termsMap.get(entry.id) || [],
-      }))
+      })) as unknown as EntryWithRelations[]
     }
   }
 

@@ -187,11 +187,20 @@ async function updateWebhookStats(
 ): Promise<void> {
   const supabase = createServiceClient()
 
+  // Get current webhook stats
+  const { data: webhook } = await supabase
+    .from('webhooks')
+    .select('success_count, failure_count')
+    .eq('id', webhookId)
+    .single()
+
+  if (!webhook) return
+
   if (success) {
     await supabase
       .from('webhooks')
       .update({
-        success_count: supabase.rpc('increment_success_count', { webhook_id: webhookId }) as unknown as number,
+        success_count: (webhook.success_count || 0) + 1,
         last_triggered_at: new Date().toISOString(),
         last_status_code: statusCode,
         failure_count: 0, // Reset failure count on success
@@ -201,7 +210,7 @@ async function updateWebhookStats(
     await supabase
       .from('webhooks')
       .update({
-        failure_count: supabase.rpc('increment_failure_count', { webhook_id: webhookId }) as unknown as number,
+        failure_count: (webhook.failure_count || 0) + 1,
         last_triggered_at: new Date().toISOString(),
         last_status_code: statusCode,
       })

@@ -72,6 +72,10 @@ final class Unicorn_Studio {
     public $pages;
     public $css;
     public $webhooks;
+    public $asset_optimizer;
+    public $theme_manager;
+    public $template_converter;
+    public $template_loader;
 
     /**
      * Get single instance
@@ -121,6 +125,12 @@ final class Unicorn_Studio {
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-css-manager.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-webhook-handler.php';
 
+        // New feature classes
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-asset-optimizer.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-theme-manager.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-template-converter.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-template-loader.php';
+
         // Initialize components
         $this->api = new Unicorn_Studio_API_Client();
         $this->sync = new Unicorn_Studio_Sync_Manager($this->api);
@@ -131,6 +141,12 @@ final class Unicorn_Studio {
         $this->pages = new Unicorn_Studio_Pages($this->api);
         $this->css = new Unicorn_Studio_CSS_Manager($this->api);
         $this->webhooks = new Unicorn_Studio_Webhook_Handler();
+
+        // New feature components
+        $this->asset_optimizer = new Unicorn_Studio_Asset_Optimizer();
+        $this->theme_manager = new Unicorn_Studio_Theme_Manager();
+        $this->template_converter = new Unicorn_Studio_Template_Converter();
+        $this->template_loader = new Unicorn_Studio_Template_Loader();
 
         // Admin classes
         if (is_admin()) {

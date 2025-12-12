@@ -270,6 +270,104 @@ $webhook_secret = Unicorn_Studio_Webhook_Handler::get_webhook_secret();
                 </p>
             <?php endif; ?>
         </div>
+
+        <!-- Asset Optimizer -->
+        <div class="unicorn-card">
+            <h2><?php esc_html_e('Asset Optimizer', 'unicorn-studio'); ?></h2>
+            <p class="description">
+                <?php esc_html_e('Entfernt störende CSS/JS von anderen Plugins auf Unicorn Studio Seiten für optimale Performance.', 'unicorn-studio'); ?>
+            </p>
+
+            <form method="post" action="options.php">
+                <?php settings_fields('unicorn_studio_options'); ?>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Aktivieren', 'unicorn-studio'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox"
+                                       name="unicorn_studio_settings[asset_optimizer]"
+                                       value="1"
+                                       <?php checked($settings['asset_optimizer'] ?? false); ?>>
+                                <?php esc_html_e('Fremde CSS/JS auf Unicorn-Seiten entfernen', 'unicorn-studio'); ?>
+                            </label>
+                            <p class="description">
+                                <?php esc_html_e('Entfernt Elementor, Divi, WooCommerce, Theme-Styles etc. auf Unicorn Seiten.', 'unicorn-studio'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Aggressiver Modus', 'unicorn-studio'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox"
+                                       name="unicorn_studio_settings[aggressive_mode]"
+                                       value="1"
+                                       <?php checked($settings['aggressive_mode'] ?? false); ?>>
+                                <?php esc_html_e('ALLE Styles/Scripts entfernen außer Unicorn', 'unicorn-studio'); ?>
+                            </label>
+                            <p class="description">
+                                <?php esc_html_e('Maximale Performance, aber einige Funktionen könnten nicht mehr funktionieren.', 'unicorn-studio'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+
+                <?php submit_button(__('Speichern', 'unicorn-studio')); ?>
+            </form>
+        </div>
+
+        <!-- Blank Theme -->
+        <div class="unicorn-card">
+            <h2><?php esc_html_e('Blank Theme', 'unicorn-studio'); ?></h2>
+            <p class="description">
+                <?php esc_html_e('Minimales WordPress Theme ohne eigenes CSS - perfekt für Unicorn Studio & Tailwind.', 'unicorn-studio'); ?>
+            </p>
+
+            <?php
+            $theme_status = Unicorn_Studio_Theme_Manager::get_status();
+            ?>
+
+            <?php if ($theme_status['installed']) : ?>
+                <div class="unicorn-status-ok" style="margin: 15px 0;">
+                    <span class="dashicons dashicons-yes"></span>
+                    <?php esc_html_e('Unicorn Studio Blank Theme ist installiert', 'unicorn-studio'); ?>
+                    <?php if ($theme_status['active']) : ?>
+                        <span style="background: #0073aa; color: white; padding: 2px 8px; border-radius: 3px; margin-left: 10px; font-size: 11px;">
+                            <?php esc_html_e('Aktiv', 'unicorn-studio'); ?>
+                        </span>
+                    <?php endif; ?>
+                </div>
+                <?php if (!$theme_status['active']) : ?>
+                    <p>
+                        <a href="<?php echo admin_url('themes.php'); ?>" class="button">
+                            <?php esc_html_e('Theme aktivieren', 'unicorn-studio'); ?>
+                        </a>
+                    </p>
+                <?php endif; ?>
+            <?php else : ?>
+                <div class="unicorn-status-warning" style="margin: 15px 0;">
+                    <span class="dashicons dashicons-info"></span>
+                    <?php esc_html_e('Blank Theme nicht installiert (optional)', 'unicorn-studio'); ?>
+                </div>
+                <p class="description">
+                    <?php esc_html_e('Das Plugin funktioniert auch mit anderen Themes - der Asset Optimizer entfernt störende Styles automatisch.', 'unicorn-studio'); ?>
+                </p>
+                <p style="margin-top: 15px;">
+                    <a href="<?php echo wp_nonce_url(admin_url('admin-post.php?action=unicorn_download_theme'), 'unicorn_download_theme'); ?>"
+                       class="button button-secondary">
+                        <span class="dashicons dashicons-download" style="margin-top: 4px;"></span>
+                        <?php esc_html_e('Theme herunterladen (ZIP)', 'unicorn-studio'); ?>
+                    </a>
+                    <button type="button" class="button" id="unicorn-install-theme">
+                        <span class="dashicons dashicons-admin-appearance" style="margin-top: 4px;"></span>
+                        <?php esc_html_e('Direkt installieren', 'unicorn-studio'); ?>
+                    </button>
+                </p>
+                <div id="unicorn-theme-result" class="hidden" style="margin-top: 10px;"></div>
+            <?php endif; ?>
+        </div>
     </div>
 </div>
 

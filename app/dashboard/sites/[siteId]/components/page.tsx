@@ -1,0 +1,102 @@
+import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
+import { ArrowLeft, Puzzle, Plus } from 'lucide-react'
+import { ComponentLibrary } from '@/components/components-library/ComponentLibrary'
+import type { CMSComponent } from '@/types/cms'
+
+interface ComponentsPageProps {
+  params: Promise<{ siteId: string }>
+  searchParams: Promise<{ type?: string; category?: string; search?: string }>
+}
+
+export default async function ComponentsPage({ params, searchParams }: ComponentsPageProps) {
+  const { siteId } = await params
+  const { type, category, search } = await searchParams
+  const supabase = await createClient()
+
+  // Get site
+  const { data: site, error: siteError } = await supabase
+    .from('sites')
+    .select('id, name')
+    .eq('id', siteId)
+    .single()
+
+  if (siteError || !site) {
+    notFound()
+  }
+
+  // Build query
+  let query = supabase
+    .from('cms_components')
+    .select('*')
+    .eq('site_id', siteId)
+
+  if (type) {
+    query = query.eq('type', type)
+  }
+
+  if (category) {
+    query = query.eq('category', category)
+  }
+
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+  }
+
+  query = query.order('usage_count', { ascending: false }).order('name', { ascending: true })
+
+  const { data: componentsData } = await query
+  const components = (componentsData || []) as CMSComponent[]
+
+  // Get categories
+  const { data: categoriesData } = await supabase
+    .from('cms_components')
+    .select('category')
+    .eq('site_id', siteId)
+    .not('category', 'is', null)
+
+  const categories = [...new Set((categoriesData || []).map((c) => c.category).filter(Boolean))]
+
+  return (
+    <div className="p-8">
+      {/* Back Link */}
+      <Link
+        href={`/dashboard/sites/${siteId}`}
+        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Zurück zu {site.name}
+      </Link>
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <Puzzle className="h-8 w-8 text-purple-500" />
+            Component Library
+          </h1>
+          <p className="text-slate-400 mt-2">
+            Wiederverwendbare UI-Bausteine für deine Website
+          </p>
+        </div>
+        <Link href={`/dashboard/sites/${siteId}/components/new`}>
+          <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-purple-600 text-white hover:bg-purple-700 h-9 px-4 py-2">
+            <Plus className="h-4 w-4 mr-2" />
+            Neue Component
+          </button>
+        </Link>
+      </div>
+
+      {/* Component Library */}
+      <ComponentLibrary
+        siteId={siteId}
+        components={components}
+        categories={categories as string[]}
+        currentType={type}
+        currentCategory={category}
+        searchQuery={search}
+      />
+    </div>
+  )
+}

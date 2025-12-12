@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, ExternalLink, Check, Clock, Loader2 } from 'lucide-react'
+import { Download, ExternalLink, Check, Clock, Loader2, Palette } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
@@ -43,6 +43,7 @@ interface Plugin {
   requires: string
   features: string[]
   downloadUrl: string | null
+  themeDownloadUrl?: string | null
   documentationUrl: string | null
   icon: string
   status: 'stable' | 'coming_soon'
@@ -54,6 +55,7 @@ interface PluginCardProps {
 
 export function PluginCard({ plugin }: PluginCardProps) {
   const [downloading, setDownloading] = useState(false)
+  const [downloadingTheme, setDownloadingTheme] = useState(false)
 
   async function handleDownload() {
     if (!plugin.downloadUrl) return
@@ -70,6 +72,23 @@ export function PluginCard({ plugin }: PluginCardProps) {
       document.body.removeChild(link)
     } finally {
       setTimeout(() => setDownloading(false), 1000)
+    }
+  }
+
+  async function handleThemeDownload() {
+    if (!plugin.themeDownloadUrl) return
+
+    setDownloadingTheme(true)
+
+    try {
+      const link = document.createElement('a')
+      link.href = plugin.themeDownloadUrl
+      link.download = 'unicorn-studio-blank-theme.zip'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } finally {
+      setTimeout(() => setDownloadingTheme(false), 1000)
     }
   }
 
@@ -130,41 +149,70 @@ export function PluginCard({ plugin }: PluginCardProps) {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
-        {isAvailable ? (
-          <>
+      <div className="space-y-3">
+        <div className="flex gap-3">
+          {isAvailable ? (
+            <>
+              <Button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="flex-1 bg-purple-600 hover:bg-purple-700"
+              >
+                {downloading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Lädt...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Plugin Download
+                  </>
+                )}
+              </Button>
+              {plugin.documentationUrl && (
+                <Button
+                  variant="outline"
+                  className="border-slate-600"
+                  asChild
+                >
+                  <a href={plugin.documentationUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </Button>
+              )}
+            </>
+          ) : (
+            <div className="w-full text-center py-2 px-4 bg-slate-700/50 rounded-lg text-slate-400 text-sm">
+              In Entwicklung
+            </div>
+          )}
+        </div>
+
+        {/* Theme Download - nur für WordPress */}
+        {plugin.themeDownloadUrl && isAvailable && (
+          <div className="pt-3 border-t border-slate-700">
+            <p className="text-xs text-slate-500 mb-2">
+              Optionales Blank Theme (0 CSS, perfekt für Tailwind)
+            </p>
             <Button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="flex-1 bg-purple-600 hover:bg-purple-700"
+              onClick={handleThemeDownload}
+              disabled={downloadingTheme}
+              variant="outline"
+              className="w-full border-slate-600 text-slate-300 hover:text-white"
             >
-              {downloading ? (
+              {downloadingTheme ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Lädt...
                 </>
               ) : (
                 <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
+                  <Palette className="h-4 w-4 mr-2" />
+                  Blank Theme Download
                 </>
               )}
             </Button>
-            {plugin.documentationUrl && (
-              <Button
-                variant="outline"
-                className="border-slate-600"
-                asChild
-              >
-                <a href={plugin.documentationUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </Button>
-            )}
-          </>
-        ) : (
-          <div className="w-full text-center py-2 px-4 bg-slate-700/50 rounded-lg text-slate-400 text-sm">
-            In Entwicklung
           </div>
         )}
       </div>

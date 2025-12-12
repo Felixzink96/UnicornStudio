@@ -1453,6 +1453,10 @@ export type Database = {
         }[]
       }
       get_site_stats: { Args: { target_site_id: string }; Returns: Json }
+      increment_component_usage: {
+        Args: { component_id: string }
+        Returns: undefined
+      }
       log_activity: {
         Args: {
           p_action: string
@@ -1495,12 +1499,6 @@ export type Database = {
           http_status: number
           target_webhook_id: string
           was_success: boolean
-        }
-        Returns: undefined
-      }
-      increment_component_usage: {
-        Args: {
-          component_id: string
         }
         Returns: undefined
       }
@@ -1636,25 +1634,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
-// Helper types for convenience
-export type Site = Database['public']['Tables']['sites']['Row']
-export type SiteInsert = Database['public']['Tables']['sites']['Insert']
-export type SiteUpdate = Database['public']['Tables']['sites']['Update']
-
-export type Page = Database['public']['Tables']['pages']['Row']
-export type PageInsert = Database['public']['Tables']['pages']['Insert']
-export type PageUpdate = Database['public']['Tables']['pages']['Update']
-
-export type Profile = Database['public']['Tables']['profiles']['Row']
-export type Organization = Database['public']['Tables']['organizations']['Row']
-export type Asset = Database['public']['Tables']['assets']['Row']
-
-export type ContentType = Database['public']['Tables']['content_types']['Row']
-export type Field = Database['public']['Tables']['fields']['Row']
-export type Entry = Database['public']['Tables']['entries']['Row']
-export type Taxonomy = Database['public']['Tables']['taxonomies']['Row']
-export type Term = Database['public']['Tables']['terms']['Row']
-
-export type ApiKey = Database['public']['Tables']['api_keys']['Row']
-export type Webhook = Database['public']['Tables']['webhooks']['Row']

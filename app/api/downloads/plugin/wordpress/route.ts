@@ -36,14 +36,14 @@ export async function GET() {
     // Add the entire plugin directory
     await addDirectoryToZip(zip, pluginDir, 'unicorn-studio-connect')
 
-    // Generate zip buffer
+    // Generate zip as Uint8Array (compatible with NextResponse)
     const zipBuffer = await zip.generateAsync({
-      type: 'nodebuffer',
+      type: 'uint8array',
       compression: 'DEFLATE',
       compressionOptions: { level: 9 },
     })
 
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(zipBuffer as Uint8Array, {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': 'attachment; filename="unicorn-studio-connect.zip"',

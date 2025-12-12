@@ -257,15 +257,15 @@ function ComponentCard({ component, onInsert, onEdit, onDelete }: ComponentCardP
           </div>
           <Badge
             variant={
-              component.position === 'header'
+              (component.component_position || component.position) === 'header'
                 ? 'default'
-                : component.position === 'footer'
+                : (component.component_position || component.position) === 'footer'
                 ? 'secondary'
                 : 'outline'
             }
             className="text-xs"
           >
-            {component.position}
+            {component.component_position || component.position}
           </Badge>
         </div>
 

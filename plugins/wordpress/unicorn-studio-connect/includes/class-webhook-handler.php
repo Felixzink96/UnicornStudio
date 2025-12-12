@@ -204,9 +204,16 @@ class Unicorn_Studio_Webhook_Handler {
 
             case 'sync.pages':
                 // Sync pages - single page if pageId provided, otherwise all
+                error_log('[Unicorn Studio DEBUG] sync.pages event received');
+                error_log('[Unicorn Studio DEBUG] Data: ' . print_r($data, true));
+
                 if (!empty($data['pageId'])) {
-                    return unicorn_studio()->pages->sync_page_by_id($data['pageId']);
+                    error_log('[Unicorn Studio DEBUG] Syncing single page: ' . $data['pageId']);
+                    $result = unicorn_studio()->pages->sync_page_by_id($data['pageId']);
+                    error_log('[Unicorn Studio DEBUG] sync_page_by_id result: ' . print_r($result, true));
+                    return $result;
                 }
+                error_log('[Unicorn Studio DEBUG] Syncing all pages');
                 return unicorn_studio()->pages->sync_pages();
 
             case 'sync.css':

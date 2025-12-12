@@ -174,11 +174,15 @@ export async function POST(request: NextRequest) {
     // This ensures WordPress gets the exact same data as when clicking "Sync"
     if (pushSinglePage) {
       // Single page: ONLY sync this one page, nothing else
+      console.log('[WordPress Push] Single page mode, pageId:', pageId)
       try {
+        console.log('[WordPress Push] Sending sync.pages with pageId:', pageId)
         await sendWebhook('sync.pages', { pageId })
+        console.log('[WordPress Push] sync.pages sent successfully')
         result.results.pages = { count: 1, success: true }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Page sync failed'
+        console.error('[WordPress Push] sync.pages failed:', msg)
         result.errors.push(msg)
         result.results.pages = { count: 0, success: false, error: msg }
       }

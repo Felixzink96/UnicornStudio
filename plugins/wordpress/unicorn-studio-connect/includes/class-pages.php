@@ -35,9 +35,14 @@ class Unicorn_Studio_Pages {
      * @return array Sync result
      */
     public function sync_page_by_id($page_id) {
+        error_log('[Unicorn Studio DEBUG] sync_page_by_id called with: ' . $page_id);
+
         $response = $this->api->get_page($page_id);
 
+        error_log('[Unicorn Studio DEBUG] API response: ' . print_r($response, true));
+
         if (is_wp_error($response)) {
+            error_log('[Unicorn Studio DEBUG] API error: ' . $response->get_error_message());
             return [
                 'success' => false,
                 'error'   => $response->get_error_message(),
@@ -46,12 +51,14 @@ class Unicorn_Studio_Pages {
 
         $page = $response['data'] ?? null;
         if (!$page) {
+            error_log('[Unicorn Studio DEBUG] Page not found in response');
             return [
                 'success' => false,
                 'error'   => 'Page not found',
             ];
         }
 
+        error_log('[Unicorn Studio DEBUG] Page data received: ' . print_r($page, true));
         return $this->sync_single_page($page);
     }
 

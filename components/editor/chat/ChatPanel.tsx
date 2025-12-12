@@ -9,6 +9,8 @@ import {
   extractStreamingHtml,
   applyOperation,
 } from '@/lib/ai/html-operations'
+import { detectComponentType, detectPromptIntent } from '@/lib/ai/component-detection'
+import { createClient } from '@/lib/supabase/client'
 import {
   Send,
   Sparkles,
@@ -45,6 +47,7 @@ export function ChatPanel() {
   const siteContext = useEditorStore((s) => s.siteContext)
   const selectedElement = useEditorStore((s) => s.selectedElement)
   const pages = useEditorStore((s) => s.pages)
+  const siteId = useEditorStore((s) => s.siteId)
 
   // Filter pages for suggestions (show all pages)
   const filteredPages = useMemo(() => {
@@ -88,9 +91,15 @@ export function ChatPanel() {
     }
   }, [modelDropdownOpen])
 
+  // Store current prompt for component detection
+  const currentPromptRef = useRef('')
+
   const handleSend = async (promptOverride?: string) => {
     const promptToSend = promptOverride || input.trim()
     if (!promptToSend || isGenerating) return
+
+    // Store prompt for later use in component detection
+    currentPromptRef.current = promptToSend
 
     // Prepare referenced pages data
     const referencedPagesData = referencedPages.map(p => ({
@@ -179,6 +188,57 @@ export function ChatPanel() {
                   finalHtml = applyOperation(currentHtml, parsed)
                   displayMessage = parsed.message || fullContent
                   console.log('Applied operation, HTML changed:', finalHtml !== currentHtml)
+
+                  // AUTO-SAVE GLOBAL COMPONENT
+                  // First check if AI explicitly marked it, otherwise auto-detect
+                  let componentType = parsed.componentType
+                  let componentName = parsed.componentName
+
+                  // If AI didn't mark it, try to auto-detect based on HTML content
+                  if (!componentType && parsed.html) {
+                    const detectedType = detectComponentType(parsed.html)
+                    if (detectedType === 'header' || detectedType === 'footer') {
+                      // Also check if user asked for header/footer
+                      const intent = detectPromptIntent(currentPromptRef.current)
+                      if ((detectedType === 'header' && intent.wantsHeader) ||
+                          (detectedType === 'footer' && intent.wantsFooter)) {
+                        componentType = detectedType
+                        componentName = `Global ${detectedType === 'header' ? 'Header' : 'Footer'}`
+                        console.log('Auto-detected component type:', componentType)
+                      }
+                    }
+                  }
+
+                  // Save if it's a header or footer
+                  if (componentType && siteId && (componentType === 'header' || componentType === 'footer')) {
+                    console.log('Saving global component:', componentType, componentName)
+
+                    // Extract the component HTML from the generated content
+                    const componentHtml = parsed.html
+
+                    // Save to database
+                    saveGlobalComponent({
+                      siteId,
+                      name: componentName || `Global ${componentType === 'header' ? 'Header' : 'Footer'}`,
+                      html: componentHtml,
+                      position: componentType,
+                      setAsDefault: true,
+                    }).then((result) => {
+                      if (result.success) {
+                        console.log('Global component saved:', result.componentId)
+                        // Update display message to inform user
+                        const msgs = useEditorStore.getState().messages
+                        const lastMsg = msgs[msgs.length - 1]
+                        if (lastMsg?.role === 'assistant') {
+                          updateMessage(lastMsg.id, {
+                            content: displayMessage + `\n\n✅ **${componentType === 'header' ? 'Header' : 'Footer'} als Global Component gespeichert!** Er erscheint jetzt automatisch auf allen Seiten.`,
+                          })
+                        }
+                      }
+                    }).catch((err) => {
+                      console.error('Failed to save global component:', err)
+                    })
+                  }
                 } else {
                   console.log('Failed to parse operation format')
                 }
@@ -519,4 +579,48 @@ export function ChatPanel() {
       />
     </div>
   )
+}
+
+/**
+ * Save a header/footer as a global component
+ */
+async function saveGlobalComponent({
+  siteId,
+  name,
+  html,
+  position,
+  setAsDefault,
+}: {
+  siteId: string
+  name: string
+  html: string
+  position: 'header' | 'footer'
+  setAsDefault: boolean
+}): Promise<{ success: boolean; componentId?: string; error?: string }> {
+  try {
+    const supabase = createClient()
+
+    // Use the RPC function to create the component
+    const { data: componentId, error } = await supabase.rpc('create_global_component', {
+      p_site_id: siteId,
+      p_name: name,
+      p_html: html,
+      p_css: null,
+      p_js: null,
+      p_position: position,
+      p_description: `Automatisch erstellt von AI`,
+      p_category: position,
+      p_set_as_site_default: setAsDefault,
+    })
+
+    if (error) {
+      console.error('Error saving global component:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, componentId }
+  } catch (err) {
+    console.error('saveGlobalComponent error:', err)
+    return { success: false, error: String(err) }
+  }
 }

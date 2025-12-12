@@ -50,10 +50,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return notFoundResponse('Component not found')
     }
 
-    // Return component (usage count not available yet - table not created)
+    // Get usage count via RPC function
+    const { data: usageCount } = await supabase.rpc('get_component_usage_count', {
+      p_component_id: componentId,
+    })
+
     return successResponse({
       ...component,
-      usage_count: 0,
+      usage_count: usageCount || 0,
     })
   } catch (error) {
     console.error('Get global component API error:', error)
@@ -206,7 +210,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .eq('site_id', siteId)
       .eq('custom_footer_id', componentId)
 
-    // Delete the component (component_usage will be cascade deleted)
+    // Delete the component
     const { error } = await supabase
       .from('components')
       .delete()

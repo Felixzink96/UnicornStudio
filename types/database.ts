@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       activity_log: {
@@ -408,39 +383,99 @@ export type Database = {
           },
         ]
       }
+      component_usage: {
+        Row: {
+          component_id: string
+          created_at: string | null
+          id: string
+          page_id: string
+          position_index: number | null
+        }
+        Insert: {
+          component_id: string
+          created_at?: string | null
+          id?: string
+          page_id: string
+          position_index?: number | null
+        }
+        Update: {
+          component_id?: string
+          created_at?: string | null
+          id?: string
+          page_id?: string
+          position_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_usage_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "component_usage_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       components: {
         Row: {
+          auto_include: boolean | null
           category: string | null
           content: Json
           created_at: string | null
+          css: string | null
           description: string | null
+          html: string | null
           id: string
+          is_global: boolean | null
+          js: string | null
           name: string
+          position: string | null
           site_id: string
           thumbnail_url: string | null
           updated_at: string | null
+          usage_count: number | null
         }
         Insert: {
+          auto_include?: boolean | null
           category?: string | null
           content: Json
           created_at?: string | null
+          css?: string | null
           description?: string | null
+          html?: string | null
           id?: string
+          is_global?: boolean | null
+          js?: string | null
           name: string
+          position?: string | null
           site_id: string
           thumbnail_url?: string | null
           updated_at?: string | null
+          usage_count?: number | null
         }
         Update: {
+          auto_include?: boolean | null
           category?: string | null
           content?: Json
           created_at?: string | null
+          css?: string | null
           description?: string | null
+          html?: string | null
           id?: string
+          is_global?: boolean | null
+          js?: string | null
           name?: string
+          position?: string | null
           site_id?: string
           thumbnail_url?: string | null
           updated_at?: string | null
+          usage_count?: number | null
         }
         Relationships: [
           {
@@ -873,6 +908,10 @@ export type Database = {
         Row: {
           content: Json
           created_at: string | null
+          custom_footer_id: string | null
+          custom_header_id: string | null
+          hide_footer: boolean | null
+          hide_header: boolean | null
           html_content: string | null
           id: string
           is_home: boolean | null
@@ -889,6 +928,10 @@ export type Database = {
         Insert: {
           content?: Json
           created_at?: string | null
+          custom_footer_id?: string | null
+          custom_header_id?: string | null
+          hide_footer?: boolean | null
+          hide_header?: boolean | null
           html_content?: string | null
           id?: string
           is_home?: boolean | null
@@ -905,6 +948,10 @@ export type Database = {
         Update: {
           content?: Json
           created_at?: string | null
+          custom_footer_id?: string | null
+          custom_header_id?: string | null
+          hide_footer?: boolean | null
+          hide_header?: boolean | null
           html_content?: string | null
           id?: string
           is_home?: boolean | null
@@ -919,6 +966,20 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pages_custom_footer_id_fkey"
+            columns: ["custom_footer_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pages_custom_header_id_fkey"
+            columns: ["custom_header_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pages_site_id_fkey"
             columns: ["site_id"]
@@ -1030,6 +1091,8 @@ export type Database = {
           created_at: string | null
           custom_domain: string | null
           description: string | null
+          global_footer_id: string | null
+          global_header_id: string | null
           id: string
           integrations: Json | null
           last_pushed_to_wordpress_at: string | null
@@ -1049,6 +1112,8 @@ export type Database = {
           created_at?: string | null
           custom_domain?: string | null
           description?: string | null
+          global_footer_id?: string | null
+          global_header_id?: string | null
           id?: string
           integrations?: Json | null
           last_pushed_to_wordpress_at?: string | null
@@ -1068,6 +1133,8 @@ export type Database = {
           created_at?: string | null
           custom_domain?: string | null
           description?: string | null
+          global_footer_id?: string | null
+          global_header_id?: string | null
           id?: string
           integrations?: Json | null
           last_pushed_to_wordpress_at?: string | null
@@ -1084,6 +1151,20 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sites_global_footer_id_fkey"
+            columns: ["global_footer_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sites_global_header_id_fkey"
+            columns: ["global_header_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sites_organization_id_fkey"
             columns: ["organization_id"]
@@ -1390,6 +1471,20 @@ export type Database = {
         Args: { target_site_id: string }
         Returns: string
       }
+      create_global_component: {
+        Args: {
+          p_category?: string
+          p_css?: string
+          p_description?: string
+          p_html: string
+          p_js?: string
+          p_name: string
+          p_position?: string
+          p_set_as_site_default?: boolean
+          p_site_id: string
+        }
+        Returns: string
+      }
       delete_site_cascade: {
         Args: { target_site_id: string }
         Returns: undefined
@@ -1437,6 +1532,29 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_component_library: {
+        Args: { p_site_id: string }
+        Returns: {
+          auto_include: boolean
+          category: string
+          component_position: string
+          created_at: string
+          css: string
+          description: string
+          html: string
+          id: string
+          is_global: boolean
+          js: string
+          name: string
+          thumbnail_url: string
+          updated_at: string
+          usage_count: number
+        }[]
+      }
+      get_component_usage_count: {
+        Args: { p_component_id: string }
+        Returns: number
+      }
       get_content_type_fields: {
         Args: { target_content_type_id: string }
         Returns: {
@@ -1468,6 +1586,27 @@ export type Database = {
       get_entries_count: {
         Args: { target_content_type_id: string }
         Returns: number
+      }
+      get_page_with_globals: {
+        Args: { p_page_id: string }
+        Returns: {
+          footer_css: string
+          footer_html: string
+          footer_id: string
+          footer_js: string
+          header_css: string
+          header_html: string
+          header_id: string
+          header_js: string
+          hide_footer: boolean
+          hide_header: boolean
+          page_html: string
+          page_id: string
+          page_name: string
+          page_seo: Json
+          page_settings: Json
+          page_slug: string
+        }[]
       }
       get_recent_activity: {
         Args: { limit_count?: number; target_site_id: string }
@@ -1503,6 +1642,10 @@ export type Database = {
       publish_entry: { Args: { target_entry_id: string }; Returns: undefined }
       publish_page: { Args: { target_page_id: string }; Returns: undefined }
       publish_site: { Args: { target_site_id: string }; Returns: undefined }
+      render_page_with_components: {
+        Args: { p_page_id: string }
+        Returns: string
+      }
       reorder_fields: {
         Args: { field_order: string[]; target_content_type_id: string }
         Returns: undefined
@@ -1513,6 +1656,14 @@ export type Database = {
       }
       set_home_page: {
         Args: { target_page_id: string; target_site_id: string }
+        Returns: undefined
+      }
+      set_site_global_footer: {
+        Args: { p_component_id: string; p_site_id: string }
+        Returns: undefined
+      }
+      set_site_global_header: {
+        Args: { p_component_id: string; p_site_id: string }
         Returns: undefined
       }
       unpublish_entry: { Args: { target_entry_id: string }; Returns: undefined }
@@ -1658,9 +1809,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
@@ -1670,9 +1818,14 @@ export const Constants = {
 export type Site = Database['public']['Tables']['sites']['Row']
 export type Page = Database['public']['Tables']['pages']['Row']
 export type Asset = Database['public']['Tables']['assets']['Row']
-export type Entry = Database['public']['Tables']['entries']['Row']
+export type Component = Database['public']['Tables']['components']['Row']
 export type ContentType = Database['public']['Tables']['content_types']['Row']
+export type Entry = Database['public']['Tables']['entries']['Row']
 export type Taxonomy = Database['public']['Tables']['taxonomies']['Row']
 export type Term = Database['public']['Tables']['terms']['Row']
 export type Webhook = Database['public']['Tables']['webhooks']['Row']
+export type Profile = Database['public']['Tables']['profiles']['Row']
+export type Organization = Database['public']['Tables']['organizations']['Row']
 export type ApiKey = Database['public']['Tables']['api_keys']['Row']
+export type DesignVariable = Database['public']['Tables']['design_variables']['Row']
+export type ComponentUsage = Database['public']['Tables']['component_usage']['Row']

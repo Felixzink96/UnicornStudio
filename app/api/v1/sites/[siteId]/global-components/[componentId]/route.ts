@@ -50,10 +50,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return notFoundResponse('Component not found')
     }
 
-    // Get usage count
-    const { data: usageCount } = await supabase.rpc('get_component_usage_count', {
-      p_component_id: componentId,
-    })
+    // Get usage count via direct query
+    const { count: usageCount } = await supabase
+      .from('component_usage')
+      .select('*', { count: 'exact', head: true })
+      .eq('component_id', componentId)
 
     return successResponse({
       ...component,

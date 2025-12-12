@@ -1634,3 +1634,23 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+// Helper types for easier access
+export type Site = Database['public']['Tables']['sites']['Row']
+export type SiteInsert = Database['public']['Tables']['sites']['Insert']
+export type SiteUpdate = Database['public']['Tables']['sites']['Update']
+
+export type Page = Database['public']['Tables']['pages']['Row']
+export type PageInsert = Database['public']['Tables']['pages']['Insert']
+export type PageUpdate = Database['public']['Tables']['pages']['Update']
+
+export type ApiKey = Database['public']['Tables']['api_keys']['Row']
+export type ApiKeyInsert = Database['public']['Tables']['api_keys']['Insert']
+export type ApiKeyUpdate = Database['public']['Tables']['api_keys']['Update']
+
+export type Webhook = Database['public']['Tables']['webhooks']['Row']
+export type WebhookInsert = Database['public']['Tables']['webhooks']['Insert']
+export type WebhookUpdate = Database['public']['Tables']['webhooks']['Update']
+
+export type WebhookLog = Database['public']['Tables']['webhook_logs']['Row']
+export type ApiRequestLog = Database['public']['Tables']['api_request_logs']['Row']

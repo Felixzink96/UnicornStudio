@@ -1654,3 +1654,7 @@ export type WebhookUpdate = Database['public']['Tables']['webhooks']['Update']
 
 export type WebhookLog = Database['public']['Tables']['webhook_logs']['Row']
 export type ApiRequestLog = Database['public']['Tables']['api_request_logs']['Row']
+
+export type Asset = Database['public']['Tables']['assets']['Row']
+export type AssetInsert = Database['public']['Tables']['assets']['Insert']
+export type AssetUpdate = Database['public']['Tables']['assets']['Update']

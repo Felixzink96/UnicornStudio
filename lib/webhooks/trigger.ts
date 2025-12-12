@@ -143,7 +143,7 @@ async function sendWebhook(webhook: Webhook, payload: WebhookPayload): Promise<v
       response_time_ms: responseTime,
       success,
       attempt: 1,
-    })
+    } as unknown as Database['public']['Tables']['webhook_logs']['Insert'])
 
     // Update webhook stats
     await updateWebhookStats(webhook.id, success, response.status)
@@ -165,7 +165,7 @@ async function sendWebhook(webhook: Webhook, payload: WebhookPayload): Promise<v
       success: false,
       error_message: errorMessage,
       attempt: 1,
-    })
+    } as unknown as Database['public']['Tables']['webhook_logs']['Insert'])
 
     // Update webhook stats
     await updateWebhookStats(webhook.id, false, 0)
@@ -286,7 +286,7 @@ async function retryWebhook(
       response_time_ms: responseTime,
       success,
       attempt,
-    })
+    } as unknown as Database['public']['Tables']['webhook_logs']['Insert'])
 
     // Update stats
     await updateWebhookStats(webhook.id, success, response.status)
@@ -307,7 +307,7 @@ async function retryWebhook(
       success: false,
       error_message: errorMessage,
       attempt,
-    })
+    } as unknown as Database['public']['Tables']['webhook_logs']['Insert'])
 
     await updateWebhookStats(webhook.id, false, 0)
 

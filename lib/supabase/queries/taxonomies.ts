@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import type { Database } from '@/types/database'
 import type {
   Taxonomy,
   TaxonomyInsert,
@@ -88,7 +89,7 @@ export async function createTaxonomy(
   const supabase = createClient()
   const { data, error } = await supabase
     .from('taxonomies')
-    .insert(taxonomy)
+    .insert(taxonomy as unknown as Database['public']['Tables']['taxonomies']['Insert'])
     .select()
     .single()
 
@@ -279,11 +280,18 @@ export async function createTerm(term: TermInsert): Promise<Term> {
   const supabase = createClient()
 
   // Get the next position
-  const { data: existingTerms } = await supabase
+  let query = supabase
     .from('terms')
     .select('position')
     .eq('taxonomy_id', term.taxonomy_id)
-    .eq('parent_id', term.parent_id || null)
+
+  if (term.parent_id) {
+    query = query.eq('parent_id', term.parent_id)
+  } else {
+    query = query.is('parent_id', null)
+  }
+
+  const { data: existingTerms } = await query
     .order('position', { ascending: false })
     .limit(1)
 
@@ -296,7 +304,7 @@ export async function createTerm(term: TermInsert): Promise<Term> {
     .insert({
       ...term,
       position: term.position ?? nextPosition,
-    })
+    } as unknown as Database['public']['Tables']['terms']['Insert'])
     .select()
     .single()
 

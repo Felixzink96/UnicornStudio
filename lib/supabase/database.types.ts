@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -12,31 +11,6 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
   }
   public: {
     Tables: {
@@ -98,6 +72,131 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_keys: {
+        Row: {
+          allowed_sites: string[] | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          last_used_ip: unknown
+          name: string
+          organization_id: string
+          permissions: string[] | null
+          rate_limit: number | null
+          rate_limit_reset_at: string | null
+          requests_this_hour: number | null
+        }
+        Insert: {
+          allowed_sites?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          last_used_ip?: unknown
+          name: string
+          organization_id: string
+          permissions?: string[] | null
+          rate_limit?: number | null
+          rate_limit_reset_at?: string | null
+          requests_this_hour?: number | null
+        }
+        Update: {
+          allowed_sites?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          last_used_ip?: unknown
+          name?: string
+          organization_id?: string
+          permissions?: string[] | null
+          rate_limit?: number | null
+          rate_limit_reset_at?: string | null
+          requests_this_hour?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_request_logs: {
+        Row: {
+          api_key_id: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          ip_address: unknown
+          method: string
+          path: string
+          query_params: Json | null
+          response_time_ms: number | null
+          status_code: number
+          user_agent: string | null
+        }
+        Insert: {
+          api_key_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown
+          method: string
+          path: string
+          query_params?: Json | null
+          response_time_ms?: number | null
+          status_code: number
+          user_agent?: string | null
+        }
+        Update: {
+          api_key_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown
+          method?: string
+          path?: string
+          query_params?: Json | null
+          response_time_ms?: number | null
+          status_code?: number
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_request_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
             referencedColumns: ["id"]
           },
         ]
@@ -1127,11 +1226,134 @@ export type Database = {
           },
         ]
       }
+      webhook_logs: {
+        Row: {
+          attempt: number | null
+          created_at: string | null
+          error_message: string | null
+          event: string
+          id: string
+          next_retry_at: string | null
+          payload: Json
+          response_body: string | null
+          response_headers: Json | null
+          response_time_ms: number | null
+          status_code: number | null
+          success: boolean | null
+          webhook_id: string
+        }
+        Insert: {
+          attempt?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          event: string
+          id?: string
+          next_retry_at?: string | null
+          payload: Json
+          response_body?: string | null
+          response_headers?: Json | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          success?: boolean | null
+          webhook_id: string
+        }
+        Update: {
+          attempt?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          event?: string
+          id?: string
+          next_retry_at?: string | null
+          payload?: Json
+          response_body?: string | null
+          response_headers?: Json | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          success?: boolean | null
+          webhook_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_logs_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhooks: {
+        Row: {
+          created_at: string | null
+          events: string[]
+          failure_count: number | null
+          headers: Json | null
+          id: string
+          is_active: boolean | null
+          last_status_code: number | null
+          last_triggered_at: string | null
+          max_retries: number | null
+          retry_delay_seconds: number | null
+          secret: string
+          site_id: string
+          success_count: number | null
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          events: string[]
+          failure_count?: number | null
+          headers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_status_code?: number | null
+          last_triggered_at?: string | null
+          max_retries?: number | null
+          retry_delay_seconds?: number | null
+          secret: string
+          site_id: string
+          success_count?: number | null
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          events?: string[]
+          failure_count?: number | null
+          headers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_status_code?: number | null
+          last_triggered_at?: string | null
+          max_retries?: number | null
+          retry_delay_seconds?: number | null
+          secret?: string
+          site_id?: string
+          success_count?: number | null
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_api_rate_limit: {
+        Args: { target_api_key_id: string }
+        Returns: boolean
+      }
+      cleanup_old_logs: { Args: never; Returns: undefined }
       count_unread_submissions: {
         Args: { target_site_id: string }
         Returns: number
@@ -1159,6 +1381,33 @@ export type Database = {
       duplicate_site: {
         Args: { new_name: string; new_slug: string; source_site_id: string }
         Returns: string
+      }
+      generate_api_key_prefix: { Args: never; Returns: string }
+      get_active_webhooks: {
+        Args: { event_type: string; target_site_id: string }
+        Returns: {
+          created_at: string | null
+          events: string[]
+          failure_count: number | null
+          headers: Json | null
+          id: string
+          is_active: boolean | null
+          last_status_code: number | null
+          last_triggered_at: string | null
+          max_retries: number | null
+          retry_delay_seconds: number | null
+          secret: string
+          site_id: string
+          success_count: number | null
+          updated_at: string | null
+          url: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "webhooks"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_content_type_fields: {
         Args: { target_content_type_id: string }
@@ -1237,6 +1486,18 @@ export type Database = {
       unpublish_entry: { Args: { target_entry_id: string }; Returns: undefined }
       unpublish_page: { Args: { target_page_id: string }; Returns: undefined }
       unpublish_site: { Args: { target_site_id: string }; Returns: undefined }
+      update_api_key_usage: {
+        Args: { client_ip?: unknown; target_api_key_id: string }
+        Returns: undefined
+      }
+      update_webhook_stats: {
+        Args: {
+          http_status: number
+          target_webhook_id: string
+          was_success: boolean
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -1365,9 +1626,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

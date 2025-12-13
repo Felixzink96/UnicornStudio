@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.9.2
+ * Version:           1.9.3
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.9.2');
+define('UNICORN_STUDIO_VERSION', '1.9.3');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -184,6 +184,9 @@ final class Unicorn_Studio {
         // Enqueue frontend CSS (priority 20 to run after theme styles)
         add_action('wp_enqueue_scripts', [$this->css, 'enqueue_styles'], 20);
 
+        // Output page-specific JavaScript in footer
+        add_action('wp_footer', [$this, 'output_page_scripts'], 999);
+
         // Register webhook endpoint
         add_action('rest_api_init', [$this->webhooks, 'register_endpoint']);
 
@@ -201,6 +204,39 @@ final class Unicorn_Studio {
             false,
             dirname(UNICORN_STUDIO_PLUGIN_BASENAME) . '/languages/'
         );
+    }
+
+    /**
+     * Output page-specific JavaScript in footer
+     * This outputs JS that was extracted from synced Unicorn Studio pages
+     */
+    public function output_page_scripts() {
+        // Only on singular pages
+        if (!is_singular('page')) {
+            return;
+        }
+
+        global $post;
+        if (!$post) {
+            return;
+        }
+
+        // Check if this is a Unicorn Studio page
+        $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
+        if (!$unicorn_id) {
+            return;
+        }
+
+        // Get the extracted JS
+        $js = get_post_meta($post->ID, '_unicorn_studio_js', true);
+        if (empty($js)) {
+            return;
+        }
+
+        // Output the JS
+        echo "\n<script id=\"unicorn-studio-page-js\">\n";
+        echo $js;
+        echo "\n</script>\n";
     }
 
     /**

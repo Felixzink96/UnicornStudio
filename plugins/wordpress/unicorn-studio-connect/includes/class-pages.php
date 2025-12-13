@@ -182,16 +182,20 @@ class Unicorn_Studio_Pages {
         // Check if page already exists by unicorn_studio_id
         $existing_page = $this->get_page_by_unicorn_id($page['id']);
 
+        // Prepare content - extracts HTML and JS separately
+        $prepared = $this->prepare_content($page);
+
         $post_data = [
             'post_title'   => $page['title'] ?? $page['name'],
             'post_name'    => $page['slug'],
-            'post_content' => $this->prepare_content($page),
+            'post_content' => $prepared['html'],
             'post_status'  => !empty($page['is_published']) ? 'publish' : 'draft',
             'post_type'    => 'page',
             'meta_input'   => [
                 '_unicorn_studio_id'      => $page['id'],
                 '_unicorn_studio_path'    => $page['path'] ?? '',
                 '_unicorn_studio_html'    => $page['html'] ?? '',
+                '_unicorn_studio_js'      => $prepared['js'], // Store extracted JS
                 '_unicorn_studio_content' => maybe_serialize($page['content'] ?? []),
                 '_unicorn_studio_seo'     => maybe_serialize($page['seo'] ?? []),
                 '_unicorn_studio_sync'    => current_time('mysql'),
@@ -279,17 +283,22 @@ class Unicorn_Studio_Pages {
      * Prepare content for WordPress
      *
      * @param array $page Page data
-     * @return string
+     * @return array ['html' => string, 'js' => string]
      */
     private function prepare_content($page) {
         $html = $page['html'] ?? '';
 
         if (empty($html)) {
-            return '';
+            return ['html' => '', 'js' => ''];
         }
 
         // Clean the HTML for WordPress
         $html = $this->clean_html_for_wordpress($html);
+
+        // Extract inline scripts from HTML
+        $extracted = $this->extract_scripts($html);
+        $html = $extracted['html'];
+        $js = $extracted['js'];
 
         // Wrap in a shortcode or block that renders the HTML
         // This allows the HTML to be rendered properly
@@ -299,7 +308,50 @@ class Unicorn_Studio_Pages {
         $content .= '</div>' . "\n";
         $content .= '<!-- /wp:html -->';
 
-        return $content;
+        return ['html' => $content, 'js' => $js];
+    }
+
+    /**
+     * Extract inline scripts from HTML
+     *
+     * @param string $html HTML content
+     * @return array ['html' => string without scripts, 'js' => extracted JS code]
+     */
+    private function extract_scripts($html) {
+        $js = '';
+
+        // Match inline scripts (not external src scripts)
+        // Pattern matches <script>...</script> and <script type="...">...</script>
+        $pattern = '/<script(?:\s+[^>]*)?(?<!src=["\'][^"\']*["\'])>(.+?)<\/script>/is';
+
+        // Also match scripts without any attributes
+        $pattern_simple = '/<script>(.*?)<\/script>/is';
+
+        // Extract all inline scripts
+        if (preg_match_all($pattern_simple, $html, $matches)) {
+            foreach ($matches[1] as $script) {
+                $js .= trim($script) . "\n\n";
+            }
+            // Remove the scripts from HTML
+            $html = preg_replace($pattern_simple, '', $html);
+        }
+
+        // Also check for scripts with type attribute but no src
+        $pattern_typed = '/<script\s+type=["\'][^"\']*["\'](?:\s+[^>]*)?>(.+?)<\/script>/is';
+        if (preg_match_all($pattern_typed, $html, $matches)) {
+            foreach ($matches[1] as $script) {
+                // Avoid duplicates
+                if (strpos($js, trim($script)) === false) {
+                    $js .= trim($script) . "\n\n";
+                }
+            }
+            $html = preg_replace($pattern_typed, '', $html);
+        }
+
+        return [
+            'html' => trim($html),
+            'js' => trim($js),
+        ];
     }
 
     /**

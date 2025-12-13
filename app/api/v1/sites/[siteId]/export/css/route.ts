@@ -124,10 +124,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const siteSettings = siteRes.data?.settings as Record<string, unknown> | null
     const cssVariables = generateCSSVariables(designVars, siteSettings)
 
-    // 7. Compile Tailwind CSS using v4 API
+    // 7. Generate Tailwind CSS
+    // Note: Tailwind v4's programmatic API doesn't generate utilities correctly,
+    // so we use our comprehensive fallback generator
     let tailwindCSS = ''
     try {
-      tailwindCSS = await compileTailwindCSS(extractedClasses)
+      // Try Tailwind v4 first
+      const compiledCSS = await compileTailwindCSS(extractedClasses)
+
+      // Check if Tailwind actually generated utility classes (not just theme)
+      // If the output is mostly theme variables without actual utility rules, use fallback
+      const hasUtilityClasses = compiledCSS.includes('.text-') ||
+                                compiledCSS.includes('.bg-') ||
+                                compiledCSS.includes('.flex') ||
+                                compiledCSS.includes('.p-') ||
+                                compiledCSS.includes('.m-')
+
+      if (hasUtilityClasses && compiledCSS.length > 5000) {
+        console.log('[CSS Export] Using Tailwind v4 compiled CSS')
+        tailwindCSS = compiledCSS
+      } else {
+        console.log('[CSS Export] Tailwind v4 returned theme only, using fallback generator')
+        tailwindCSS = generateFallbackCSS(extractedClasses)
+      }
     } catch (tailwindError) {
       console.error('Tailwind compilation error:', tailwindError)
       // Fallback to basic utility generation if Tailwind compile fails

@@ -46,16 +46,31 @@ class Unicorn_Studio_CSS_Manager {
      * Enqueue CSS in frontend
      */
     public function enqueue_styles() {
+        // Debug logging
+        $debug = defined('WP_DEBUG') && WP_DEBUG;
+
         if (!Unicorn_Studio::is_connected()) {
+            if ($debug) {
+                error_log('[Unicorn Studio CSS] Not connected - skipping CSS enqueue');
+            }
             return;
         }
 
         if (!Unicorn_Studio::get_option('sync_css', true)) {
+            if ($debug) {
+                error_log('[Unicorn Studio CSS] sync_css option is disabled');
+            }
             return;
         }
 
         $css_file = $this->css_dir . 'styles.css';
         $version = get_option('unicorn_studio_css_version', '1');
+
+        if ($debug) {
+            error_log('[Unicorn Studio CSS] Checking file: ' . $css_file);
+            error_log('[Unicorn Studio CSS] File exists: ' . (file_exists($css_file) ? 'YES' : 'NO'));
+            error_log('[Unicorn Studio CSS] CSS URL: ' . $this->css_url . 'styles.css');
+        }
 
         if (file_exists($css_file)) {
             wp_enqueue_style(
@@ -64,6 +79,14 @@ class Unicorn_Studio_CSS_Manager {
                 [],
                 $version
             );
+
+            if ($debug) {
+                error_log('[Unicorn Studio CSS] Style enqueued successfully with version: ' . $version);
+            }
+        } else {
+            if ($debug) {
+                error_log('[Unicorn Studio CSS] File does not exist, cannot enqueue');
+            }
         }
     }
 

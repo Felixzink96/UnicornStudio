@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.9.0
+ * Version:           1.9.1
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.9.0');
+define('UNICORN_STUDIO_VERSION', '1.9.1');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -181,8 +181,8 @@ final class Unicorn_Studio {
         // Register ACF fields
         add_action('acf/init', [$this->fields, 'register_field_groups']);
 
-        // Enqueue frontend CSS
-        add_action('wp_enqueue_scripts', [$this->css, 'enqueue_styles']);
+        // Enqueue frontend CSS (priority 20 to run after theme styles)
+        add_action('wp_enqueue_scripts', [$this->css, 'enqueue_styles'], 20);
 
         // Register webhook endpoint
         add_action('rest_api_init', [$this->webhooks, 'register_endpoint']);

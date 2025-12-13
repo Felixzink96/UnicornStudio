@@ -106,6 +106,20 @@ class Unicorn_Studio_Font_Manager {
     public function sync_fonts() {
         $debug = defined('WP_DEBUG') && WP_DEBUG;
 
+        // First trigger font sync on the server (downloads from Google Fonts to Supabase)
+        $sync_response = $this->api->request('/fonts/sync', 'POST');
+
+        if (is_wp_error($sync_response)) {
+            if ($debug) {
+                error_log('[Unicorn Studio Fonts] Sync API error: ' . $sync_response->get_error_message());
+            }
+            // Continue anyway - fonts might already be stored
+        } else {
+            if ($debug) {
+                error_log('[Unicorn Studio Fonts] Sync response: ' . print_r($sync_response, true));
+            }
+        }
+
         // Get fonts metadata from API
         $response = $this->api->request('/export/fonts');
 

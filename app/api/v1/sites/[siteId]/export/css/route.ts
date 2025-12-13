@@ -332,11 +332,6 @@ img, video {
   max-width: 100%;
   height: auto;
 }
-
-a {
-  color: inherit;
-  text-decoration: inherit;
-}
 `.trim()
 }
 

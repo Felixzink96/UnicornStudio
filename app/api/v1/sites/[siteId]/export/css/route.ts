@@ -131,15 +131,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // 10. Compile Tailwind CSS using v4 API with custom theme
     let tailwindCSS = ''
+    let keyframesCSS = ''
     try {
       tailwindCSS = await compileTailwindCSS(extractedClasses, tailwindConfig || undefined)
+      // Get keyframes separately - they need to be added AFTER Tailwind compilation
+      if (tailwindConfig?.keyframes) {
+        keyframesCSS = buildKeyframesCSS(tailwindConfig.keyframes)
+      }
     } catch (tailwindError) {
       console.error('Tailwind compilation error:', tailwindError)
       // Fallback to basic utility generation if Tailwind compile fails
       tailwindCSS = generateFallbackCSS(extractedClasses)
     }
 
-    // 11. Combine everything - NO manual CSS generation, Tailwind v4 @theme handles it all
+    // 11. Build custom utilities (Tailwind v4 @theme doesn't auto-generate these classes)
+    let customUtilities = ''
+    if (tailwindConfig?.animation) {
+      customUtilities += buildAnimationUtilities(tailwindConfig.animation) + '\n\n'
+    }
+    if (tailwindConfig?.backgroundImage) {
+      customUtilities += buildBackgroundImageUtilities(tailwindConfig.backgroundImage) + '\n\n'
+    }
+
+    // 12. Combine everything
     const fullCSS = `
 /* ==================================================================
    UNICORN STUDIO - Generated CSS
@@ -161,6 +175,16 @@ ${cssVariables}
    Compiled from ${extractedClasses.size} classes found in your content
    ---------------------------------------------------------------- */
 ${tailwindCSS}
+
+/* ----------------------------------------------------------------
+   CUSTOM KEYFRAMES (from Tailwind config)
+   ---------------------------------------------------------------- */
+${keyframesCSS}
+
+/* ----------------------------------------------------------------
+   CUSTOM UTILITIES (animations, background-images, etc.)
+   ---------------------------------------------------------------- */
+${customUtilities}
 `.trim()
 
     // 9. Return CSS with proper headers
@@ -178,11 +202,11 @@ ${tailwindCSS}
 }
 
 /**
- * Build @theme CSS and keyframes from custom Tailwind config
+ * Build @theme CSS from custom Tailwind config (colors, fonts, animation vars)
+ * Note: Keyframes are built separately via buildKeyframesCSS()
  */
 function buildThemeCSS(config: TailwindCustomConfig): string {
   const themeVars: string[] = []
-  const keyframesCSS: string[] = []
 
   // Custom colors
   if (config.colors) {
@@ -199,40 +223,67 @@ function buildThemeCSS(config: TailwindCustomConfig): string {
     })
   }
 
-  // Custom animations (reference in @theme)
+  // Custom animation variables (for reference, though we generate utilities manually)
   if (config.animation) {
     Object.entries(config.animation).forEach(([name, value]) => {
       themeVars.push(`  --animate-${name}: ${value};`)
     })
   }
 
-  // Build keyframes CSS (outside @theme)
-  if (config.keyframes) {
-    Object.entries(config.keyframes).forEach(([name, frames]) => {
-      let kfCSS = `@keyframes ${name} {\n`
-      Object.entries(frames).forEach(([frameKey, props]) => {
-        kfCSS += `  ${frameKey} {\n`
-        Object.entries(props).forEach(([prop, val]) => {
-          kfCSS += `    ${prop}: ${val};\n`
-        })
-        kfCSS += `  }\n`
+  if (themeVars.length === 0) {
+    return ''
+  }
+
+  return `@theme {\n${themeVars.join('\n')}\n}\n`
+}
+
+/**
+ * Build @keyframes CSS from config
+ */
+function buildKeyframesCSS(keyframes: Record<string, Record<string, Record<string, string>>>): string {
+  const keyframeRules: string[] = []
+
+  Object.entries(keyframes).forEach(([name, frames]) => {
+    let kfCSS = `@keyframes ${name} {\n`
+    Object.entries(frames).forEach(([frameKey, props]) => {
+      kfCSS += `  ${frameKey} {\n`
+      Object.entries(props).forEach(([prop, val]) => {
+        kfCSS += `    ${prop}: ${val};\n`
       })
-      kfCSS += `}`
-      keyframesCSS.push(kfCSS)
+      kfCSS += `  }\n`
     })
-  }
+    kfCSS += `}`
+    keyframeRules.push(kfCSS)
+  })
 
-  let result = ''
+  return keyframeRules.join('\n\n')
+}
 
-  if (themeVars.length > 0) {
-    result += `@theme {\n${themeVars.join('\n')}\n}\n\n`
-  }
+/**
+ * Build .animate-* utility classes from config
+ * Tailwind v4 @theme defines --animate-* vars but doesn't auto-generate the classes
+ */
+function buildAnimationUtilities(animations: Record<string, string>): string {
+  const rules: string[] = []
 
-  if (keyframesCSS.length > 0) {
-    result += keyframesCSS.join('\n\n')
-  }
+  Object.entries(animations).forEach(([name, value]) => {
+    rules.push(`.animate-${name} { animation: ${value}; }`)
+  })
 
-  return result
+  return rules.join('\n')
+}
+
+/**
+ * Build .bg-* utility classes for custom background images/gradients
+ */
+function buildBackgroundImageUtilities(backgroundImages: Record<string, string>): string {
+  const rules: string[] = []
+
+  Object.entries(backgroundImages).forEach(([name, value]) => {
+    rules.push(`.bg-${name} { background-image: ${value}; }`)
+  })
+
+  return rules.join('\n')
 }
 
 /**

@@ -216,49 +216,62 @@ class Unicorn_Studio_Pages {
             }
         }
 
-        if ($existing_page) {
-            // Update existing page
-            $post_data['ID'] = $existing_page->ID;
-            $result = wp_update_post($post_data, true);
+        // Disable kses filters to allow SVGs and full HTML
+        // WordPress normally strips SVG tags for security
+        kses_remove_filters();
 
-            if (is_wp_error($result)) {
+        try {
+            if ($existing_page) {
+                // Update existing page
+                $post_data['ID'] = $existing_page->ID;
+                $result = wp_update_post($post_data, true);
+
+                if (is_wp_error($result)) {
+                    kses_init_filters();
+                    return [
+                        'success' => false,
+                        'error'   => $result->get_error_message(),
+                    ];
+                }
+
+                // Set as front page if is_home
+                if (!empty($page['is_home'])) {
+                    $this->set_as_front_page($existing_page->ID);
+                }
+
+                kses_init_filters();
                 return [
-                    'success' => false,
-                    'error'   => $result->get_error_message(),
+                    'success' => true,
+                    'action'  => 'updated',
+                    'post_id' => $existing_page->ID,
+                ];
+            } else {
+                // Create new page
+                $post_id = wp_insert_post($post_data, true);
+
+                if (is_wp_error($post_id)) {
+                    kses_init_filters();
+                    return [
+                        'success' => false,
+                        'error'   => $post_id->get_error_message(),
+                    ];
+                }
+
+                // Set as front page if is_home
+                if (!empty($page['is_home'])) {
+                    $this->set_as_front_page($post_id);
+                }
+
+                kses_init_filters();
+                return [
+                    'success' => true,
+                    'action'  => 'created',
+                    'post_id' => $post_id,
                 ];
             }
-
-            // Set as front page if is_home
-            if (!empty($page['is_home'])) {
-                $this->set_as_front_page($existing_page->ID);
-            }
-
-            return [
-                'success' => true,
-                'action'  => 'updated',
-                'post_id' => $existing_page->ID,
-            ];
-        } else {
-            // Create new page
-            $post_id = wp_insert_post($post_data, true);
-
-            if (is_wp_error($post_id)) {
-                return [
-                    'success' => false,
-                    'error'   => $post_id->get_error_message(),
-                ];
-            }
-
-            // Set as front page if is_home
-            if (!empty($page['is_home'])) {
-                $this->set_as_front_page($post_id);
-            }
-
-            return [
-                'success' => true,
-                'action'  => 'created',
-                'post_id' => $post_id,
-            ];
+        } catch (\Exception $e) {
+            kses_init_filters();
+            throw $e;
         }
     }
 

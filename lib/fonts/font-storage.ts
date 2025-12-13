@@ -3,7 +3,7 @@
 // Stores downloaded fonts in Supabase Storage
 // ============================================
 
-import { createClient } from '@/lib/supabase/client'
+import { createAPIClient } from '@/lib/api/auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DetectedFont } from './font-detector'
 import {
@@ -89,8 +89,8 @@ async function uploadFontFile(
       })
 
     if (uploadError) {
-      console.error(`Failed to upload font ${fontFile.filename}:`, uploadError)
-      return null
+      console.error(`Failed to upload font ${fontFile.filename}:`, uploadError.message, uploadError)
+      throw new Error(`Upload failed: ${uploadError.message}`)
     }
 
     // Get public URL
@@ -120,7 +120,7 @@ export async function downloadAndStoreFonts(
   siteId: string,
   fonts: DetectedFont[]
 ): Promise<FontStorageResult> {
-  const supabase = createClient()
+  const supabase = createAPIClient()
   const storedFonts: StoredFont[] = []
   const errors: string[] = []
   let totalSize = 0
@@ -231,7 +231,7 @@ export function generateExportFontFaceCSS(
  * Get stored fonts for a site
  */
 export async function getStoredFonts(siteId: string): Promise<StoredFont[]> {
-  const supabase = createClient()
+  const supabase = createAPIClient()
   const storedFonts: StoredFont[] = []
 
   try {
@@ -314,7 +314,7 @@ export async function getStoredFonts(siteId: string): Promise<StoredFont[]> {
  * Delete all stored fonts for a site
  */
 export async function deleteStoredFonts(siteId: string): Promise<boolean> {
-  const supabase = createClient()
+  const supabase = createAPIClient()
 
   try {
     // List all files in the site's font directory

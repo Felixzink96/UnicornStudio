@@ -42,6 +42,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // 3. Get design variables to find which fonts to download
     const supabase = createAPIClient()
+    const detectedFonts: DetectedFont[] = []
+
+    // Try design_variables first
     const { data: designVars, error: designError } = await supabase
       .from('design_variables')
       .select('typography')
@@ -50,7 +53,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (designError && designError.code !== 'PGRST116') {
       console.error('[Fonts Sync] Error fetching design variables:', designError)
-      return serverErrorResponse('Failed to fetch design variables')
     }
 
     const typography = designVars?.typography as {
@@ -59,44 +61,86 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       fontMono?: string
     } | null
 
-    if (!typography) {
-      console.log('[Fonts Sync] No typography configured in design variables')
-      return successResponse({
-        success: true,
-        message: 'No fonts configured',
-        storedFonts: [],
-        totalFonts: 0,
-      })
+    console.log('[Fonts Sync] Typography from design_variables:', typography)
+
+    // Extract fonts from typography
+    if (typography) {
+      const fontStrings = [
+        typography.fontHeading,
+        typography.fontBody,
+        typography.fontMono,
+      ].filter(Boolean) as string[]
+
+      for (const fontStack of fontStrings) {
+        const cleanName = fontStack.split(',')[0].trim().replace(/['"]/g, '')
+        if (cleanName.match(/^(system-ui|sans-serif|serif|monospace|cursive|fantasy|ui-sans-serif|ui-serif|ui-monospace)$/i)) {
+          continue
+        }
+        if (!detectedFonts.some(f => f.name === cleanName)) {
+          detectedFonts.push({
+            name: cleanName,
+            weights: [400, 500, 600, 700],
+            styles: ['normal'],
+            source: 'google',
+          })
+        }
+      }
     }
 
-    // 4. Convert design variable fonts to DetectedFont format
-    const detectedFonts: DetectedFont[] = []
-    const fontStrings = [
-      typography.fontHeading,
-      typography.fontBody,
-      typography.fontMono,
-    ].filter(Boolean) as string[]
+    // Fallback: Extract fonts from published pages HTML
+    if (detectedFonts.length === 0) {
+      console.log('[Fonts Sync] No fonts in design_variables, checking pages...')
 
-    for (const fontStack of fontStrings) {
-      // Clean the font name (remove quotes, extract first font from stack)
-      const cleanName = fontStack.split(',')[0].trim().replace(/['"]/g, '')
+      const { data: pages } = await supabase
+        .from('pages')
+        .select('html')
+        .eq('site_id', siteId)
+        .eq('is_published', true)
+        .limit(10)
 
-      // Skip system fonts
-      if (cleanName.match(/^(system-ui|sans-serif|serif|monospace|cursive|fantasy|ui-sans-serif|ui-serif|ui-monospace)$/i)) {
-        continue
+      if (pages && pages.length > 0) {
+        for (const page of pages) {
+          if (!page.html) continue
+
+          // Extract Google Fonts URLs from HTML
+          const googleFontMatches = page.html.match(/fonts\.googleapis\.com\/css2\?family=([^"'&]+)/g)
+          if (googleFontMatches) {
+            for (const match of googleFontMatches) {
+              const familyMatch = match.match(/family=([^:&]+)/)
+              if (familyMatch) {
+                const fontName = decodeURIComponent(familyMatch[1].replace(/\+/g, ' '))
+                if (!detectedFonts.some(f => f.name === fontName)) {
+                  detectedFonts.push({
+                    name: fontName,
+                    weights: [400, 500, 600, 700],
+                    styles: ['normal'],
+                    source: 'google',
+                  })
+                }
+              }
+            }
+          }
+
+          // Extract from font-family CSS
+          const fontFamilyMatches = page.html.match(/font-family:\s*['"]?([^;'"]+)/gi)
+          if (fontFamilyMatches) {
+            for (const match of fontFamilyMatches) {
+              const fontName = match.replace(/font-family:\s*/i, '').split(',')[0].trim().replace(/['"]/g, '')
+              if (fontName.match(/^(system-ui|sans-serif|serif|monospace|cursive|fantasy|ui-|inherit|initial)$/i)) {
+                continue
+              }
+              if (!detectedFonts.some(f => f.name === fontName)) {
+                detectedFonts.push({
+                  name: fontName,
+                  weights: [400, 500, 600, 700],
+                  styles: ['normal'],
+                  source: 'google',
+                })
+              }
+            }
+          }
+        }
       }
-
-      // Check if already in list
-      if (detectedFonts.some(f => f.name === cleanName)) {
-        continue
-      }
-
-      detectedFonts.push({
-        name: cleanName,
-        weights: [400, 500, 600, 700], // Common weights
-        styles: ['normal'],
-        source: 'google',
-      })
     }
 
     console.log(`[Fonts Sync] Found ${detectedFonts.length} fonts to download:`, detectedFonts.map(f => f.name))

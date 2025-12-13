@@ -35,7 +35,12 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
     <div class="unicorn-sync-grid">
         <!-- Sync Overview -->
         <div class="unicorn-card unicorn-sync-overview">
-            <h2><?php esc_html_e('Übersicht', 'unicorn-studio'); ?></h2>
+            <h2>
+                <?php esc_html_e('Übersicht', 'unicorn-studio'); ?>
+                <span style="font-size: 12px; font-weight: normal; color: #666; margin-left: 10px;">
+                    v<?php echo esc_html(UNICORN_STUDIO_VERSION); ?>
+                </span>
+            </h2>
 
             <div class="unicorn-stats">
                 <div class="unicorn-stat">

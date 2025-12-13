@@ -283,7 +283,7 @@ function extractGoogleFonts(html: string): { fonts: string[], urls: string[], ta
     }
   }
 
-  return { fonts, urls }
+  return { fonts, urls, tailwindFontConfig: null }
 }
 
 /**

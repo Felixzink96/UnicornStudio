@@ -35,6 +35,7 @@ interface PushResult {
     css?: { success: boolean; error?: string }
   }
   errors: string[]
+  wordpress_debug?: Record<string, unknown>
 }
 
 // Check if URL looks like a WordPress webhook
@@ -196,7 +197,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Add WordPress debug info to result
-        ;(result as Record<string, unknown>).wordpress_debug = {
+        result.wordpress_debug = {
           event: wpResponse.event,
           result: wpResult,
           debug: wpDebug,

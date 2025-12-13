@@ -93,9 +93,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       detectedFonts.push({
         name: cleanName,
-        variants: ['400', '500', '600', '700'], // Common weights
+        weights: [400, 500, 600, 700], // Common weights
+        styles: ['normal'],
         source: 'google',
-        confidence: 100,
       })
     }
 

@@ -175,14 +175,17 @@ async function saveTailwindConfigToSite(
       }
     })
 
-    // Save to site settings
+    // Save to site settings (cast to any to bypass strict Json type)
+    const newSettings = {
+      ...currentSettings,
+      tailwindConfig: mergedConfig,
+    }
+
     const { error } = await supabase
       .from('sites')
       .update({
-        settings: {
-          ...currentSettings,
-          tailwindConfig: mergedConfig as Record<string, unknown>,
-        } as Record<string, unknown>,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        settings: newSettings as any,
       })
       .eq('id', siteId)
 

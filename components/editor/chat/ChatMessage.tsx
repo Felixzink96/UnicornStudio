@@ -193,8 +193,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
         if ((hasNewHeader && globalHeader) || (hasNewFooter && globalFooter)) {
           console.log('Removing inline header/footer - global components will be used instead')
           finalHtml = removeHeaderFooterFromHtml(finalHtml, {
-            removeHeader: hasNewHeader && !!globalHeader,
-            removeFooter: hasNewFooter && !!globalFooter,
+            removeHeader: !!(hasNewHeader && globalHeader),
+            removeFooter: !!(hasNewFooter && globalFooter),
           })
         }
       }

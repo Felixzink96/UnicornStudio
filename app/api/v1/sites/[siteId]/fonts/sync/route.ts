@@ -93,17 +93,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       const { data: pages } = await supabase
         .from('pages')
-        .select('html')
+        .select('html_content')
         .eq('site_id', siteId)
         .eq('is_published', true)
         .limit(10)
 
       if (pages && pages.length > 0) {
         for (const page of pages) {
-          if (!page.html) continue
+          if (!page.html_content) continue
 
           // Extract Google Fonts URLs from HTML
-          const googleFontMatches = page.html.match(/fonts\.googleapis\.com\/css2\?family=([^"'&]+)/g)
+          const googleFontMatches = page.html_content.match(/fonts\.googleapis\.com\/css2\?family=([^"'&]+)/g)
           if (googleFontMatches) {
             for (const match of googleFontMatches) {
               const familyMatch = match.match(/family=([^:&]+)/)
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           }
 
           // Extract from font-family CSS
-          const fontFamilyMatches = page.html.match(/font-family:\s*['"]?([^;'"]+)/gi)
+          const fontFamilyMatches = page.html_content.match(/font-family:\s*['"]?([^;'"]+)/gi)
           if (fontFamilyMatches) {
             for (const match of fontFamilyMatches) {
               const fontName = match.replace(/font-family:\s*/i, '').split(',')[0].trim().replace(/['"]/g, '')

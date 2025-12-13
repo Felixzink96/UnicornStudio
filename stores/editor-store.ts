@@ -181,8 +181,8 @@ async function saveTailwindConfigToSite(
       .update({
         settings: {
           ...currentSettings,
-          tailwindConfig: mergedConfig,
-        },
+          tailwindConfig: mergedConfig as Record<string, unknown>,
+        } as Record<string, unknown>,
       })
       .eq('id', siteId)
 

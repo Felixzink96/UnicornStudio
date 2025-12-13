@@ -191,11 +191,11 @@ function buildThemeCSS(config: TailwindCustomConfig): string {
     })
   }
 
-  // Custom font families
+  // Custom font families (Tailwind v4 uses --font-{name}, not --font-family-{name})
   if (config.fontFamily) {
     Object.entries(config.fontFamily).forEach(([name, fonts]) => {
       const fontStack = fonts.map(f => f.includes(' ') ? `"${f}"` : f).join(', ')
-      themeVars.push(`  --font-family-${name}: ${fontStack};`)
+      themeVars.push(`  --font-${name}: ${fontStack};`)
     })
   }
 

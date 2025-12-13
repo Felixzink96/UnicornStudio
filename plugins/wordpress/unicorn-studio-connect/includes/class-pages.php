@@ -275,6 +275,9 @@ class Unicorn_Studio_Pages {
             return '';
         }
 
+        // Clean the HTML for WordPress
+        $html = $this->clean_html_for_wordpress($html);
+
         // Wrap in a shortcode or block that renders the HTML
         // This allows the HTML to be rendered properly
         $content = '<!-- wp:html -->' . "\n";
@@ -284,6 +287,40 @@ class Unicorn_Studio_Pages {
         $content .= '<!-- /wp:html -->';
 
         return $content;
+    }
+
+    /**
+     * Clean HTML for WordPress
+     * - Extracts body content from full HTML documents
+     * - Removes Tailwind CDN script (we use locally hosted CSS)
+     *
+     * @param string $html Raw HTML
+     * @return string Cleaned HTML
+     */
+    private function clean_html_for_wordpress($html) {
+        // Remove Tailwind CDN script - we use our own generated CSS
+        $html = preg_replace('/<script[^>]*src=["\']https?:\/\/cdn\.tailwindcss\.com[^"\']*["\'][^>]*><\/script>/i', '', $html);
+        $html = preg_replace('/<script[^>]*src=["\']https?:\/\/cdn\.tailwindcss\.com[^"\']*["\'][^>]*\/>/i', '', $html);
+
+        // Check if this is a full HTML document
+        if (strpos($html, '<!DOCTYPE') !== false || strpos($html, '<html') !== false) {
+            // Extract body content
+            if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $html, $matches)) {
+                $html = trim($matches[1]);
+            } else {
+                // Fallback: Remove doctype, html, head, body tags
+                $html = preg_replace('/<!DOCTYPE[^>]*>/i', '', $html);
+                $html = preg_replace('/<\/?html[^>]*>/i', '', $html);
+                $html = preg_replace('/<head>.*?<\/head>/is', '', $html);
+                $html = preg_replace('/<\/?body[^>]*>/i', '', $html);
+            }
+        }
+
+        // Remove any remaining script tags that might load external resources
+        // Keep inline scripts that might be needed for functionality
+        $html = preg_replace('/<script[^>]*src=["\'][^"\']*tailwind[^"\']*["\'][^>]*><\/script>/i', '', $html);
+
+        return trim($html);
     }
 
     /**

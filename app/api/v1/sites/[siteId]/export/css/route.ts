@@ -125,33 +125,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const cssVariables = generateCSSVariables(designVars, siteSettings)
 
     // 7. Generate Tailwind CSS
-    // Note: Tailwind v4's programmatic API doesn't generate utilities correctly,
-    // so we use our comprehensive fallback generator
-    let tailwindCSS = ''
-    try {
-      // Try Tailwind v4 first
-      const compiledCSS = await compileTailwindCSS(extractedClasses)
-
-      // Check if Tailwind actually generated utility classes (not just theme)
-      // If the output is mostly theme variables without actual utility rules, use fallback
-      const hasUtilityClasses = compiledCSS.includes('.text-') ||
-                                compiledCSS.includes('.bg-') ||
-                                compiledCSS.includes('.flex') ||
-                                compiledCSS.includes('.p-') ||
-                                compiledCSS.includes('.m-')
-
-      if (hasUtilityClasses && compiledCSS.length > 5000) {
-        console.log('[CSS Export] Using Tailwind v4 compiled CSS')
-        tailwindCSS = compiledCSS
-      } else {
-        console.log('[CSS Export] Tailwind v4 returned theme only, using fallback generator')
-        tailwindCSS = generateFallbackCSS(extractedClasses)
-      }
-    } catch (tailwindError) {
-      console.error('Tailwind compilation error:', tailwindError)
-      // Fallback to basic utility generation if Tailwind compile fails
-      tailwindCSS = generateFallbackCSS(extractedClasses)
-    }
+    // Note: Tailwind v4's programmatic compile() API doesn't generate utility CSS correctly
+    // (it only outputs theme variables, not actual utility classes like .text-4xl)
+    // So we use our comprehensive fallback generator that covers all Tailwind utilities
+    console.log(`[CSS Export] Generating CSS for ${extractedClasses.size} classes using fallback generator`)
+    const tailwindCSS = generateFallbackCSS(extractedClasses)
+    console.log(`[CSS Export] Generated ${tailwindCSS.length} bytes of utility CSS`)
 
     // 8. Combine everything
     const fullCSS = `

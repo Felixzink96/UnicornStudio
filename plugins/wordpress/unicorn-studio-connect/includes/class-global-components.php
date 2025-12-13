@@ -160,8 +160,17 @@ class Unicorn_Studio_Global_Components {
      * @return string|null
      */
     public static function render_header(bool $echo = true): ?string {
+        // Debug logging
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $all_components = self::get_components();
+            error_log('[Unicorn Header] All components: ' . print_r($all_components, true));
+        }
+
         // Check if header is hidden for this page
         if (self::is_header_hidden()) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[Unicorn Header] Header is hidden for this page');
+            }
             return null;
         }
 
@@ -173,7 +182,17 @@ class Unicorn_Studio_Global_Components {
             $header = self::get_global_header();
         }
 
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[Unicorn Header] Header data: ' . print_r($header, true));
+        }
+
         if (!$header || empty($header['html'])) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[Unicorn Header] No header HTML found');
+            }
+            if ($echo) {
+                echo "\n<!-- Unicorn Header: No HTML found. Check wp_options -> unicorn_studio_global_components -->\n";
+            }
             return null;
         }
 
@@ -218,6 +237,9 @@ class Unicorn_Studio_Global_Components {
         }
 
         if (!$footer || empty($footer['html'])) {
+            if ($echo) {
+                echo "\n<!-- Unicorn Footer: No HTML found. Check wp_options -> unicorn_studio_global_components -->\n";
+            }
             return null;
         }
 

@@ -13,8 +13,10 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
-  generatedHtml?: string
+  generatedHtml?: string      // Full page HTML (for applying)
+  previewHtml?: string        // Just the new/modified section (for preview)
   designNotes?: string[]
+  thinking?: string
   model?: string
   tokensUsed?: number
   timestamp: Date
@@ -86,6 +88,31 @@ export interface PageData {
 }
 
 // ============================================
+// GLOBAL COMPONENTS
+// ============================================
+
+export interface GlobalComponentData {
+  id: string
+  name: string
+  html: string
+  css?: string
+  js?: string
+}
+
+export interface DetectedGlobalComponents {
+  header: {
+    html: string
+    suggestedName: string
+    confidence: number
+  } | null
+  footer: {
+    html: string
+    suggestedName: string
+    confidence: number
+  } | null
+}
+
+// ============================================
 // EDITOR STATE
 // ============================================
 
@@ -121,6 +148,7 @@ export interface EditorState {
 
   // Context
   siteContext: SiteContext | null
+  designVariables: Record<string, unknown> | null
   pages: PageData[]
   currentPage: PageData | null
 
@@ -128,6 +156,12 @@ export interface EditorState {
   showElementPanel: boolean
   elementPanelTab: 'edit' | 'prompt' | 'code'
   showLayersPanel: boolean
+
+  // Global Components
+  globalHeader: GlobalComponentData | null
+  globalFooter: GlobalComponentData | null
+  detectedGlobalComponents: DetectedGlobalComponents | null
+  showGlobalComponentsDialog: boolean
 }
 
 // ============================================
@@ -183,6 +217,16 @@ export interface EditorActions {
   setShowLayersPanel: (show: boolean) => void
   moveElement: (selector: string, newParentSelector: string, position: number) => void
   reorderSiblings: (parentSelector: string, fromIndex: number, toIndex: number) => void
+
+  // Global Components
+  loadGlobalComponents: () => Promise<void>
+  setDetectedGlobalComponents: (components: DetectedGlobalComponents | null) => void
+  setShowGlobalComponentsDialog: (show: boolean) => void
+  saveAsGlobalComponent: (
+    headerName: string | null,
+    footerName: string | null
+  ) => Promise<void>
+  getHtmlWithGlobalComponents: () => string
 }
 
 // ============================================

@@ -35,13 +35,15 @@ class Unicorn_Studio_Sync_Manager {
      */
     public function sync_all() {
         $results = [
-            'content_types' => null,
-            'taxonomies'    => null,
-            'entries'       => null,
-            'pages'         => null,
-            'css'           => null,
-            'started_at'    => current_time('mysql'),
-            'errors'        => [],
+            'content_types'     => null,
+            'taxonomies'        => null,
+            'entries'           => null,
+            'pages'             => null,
+            'css'               => null,
+            'fonts'             => null,
+            'global_components' => null,
+            'started_at'        => current_time('mysql'),
+            'errors'            => [],
         ];
 
         // 1. Sync Content Types (structure)
@@ -68,6 +70,14 @@ class Unicorn_Studio_Sync_Manager {
         if (Unicorn_Studio::get_option('sync_css', true)) {
             $results['css'] = $this->sync_css();
         }
+
+        // 6. Sync Fonts (GDPR-compliant local hosting)
+        if (Unicorn_Studio::get_option('sync_css', true)) {
+            $results['fonts'] = $this->sync_fonts();
+        }
+
+        // 7. Sync Global Components (Header/Footer)
+        $results['global_components'] = $this->sync_global_components();
 
         // Update last sync time
         update_option('unicorn_studio_last_sync', current_time('mysql'));
@@ -226,6 +236,77 @@ class Unicorn_Studio_Sync_Manager {
     }
 
     /**
+     * Sync Fonts (GDPR-compliant local hosting)
+     *
+     * @return array|WP_Error
+     */
+    public function sync_fonts() {
+        $result = unicorn_studio()->fonts->sync_fonts();
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        return [
+            'success' => $result['success'] ?? true,
+            'count'   => $result['count'] ?? 0,
+            'size'    => $result['size'] ?? '0 KB',
+            'errors'  => $result['errors'] ?? [],
+        ];
+    }
+
+    /**
+     * Sync Global Components (Header/Footer)
+     *
+     * @return array|WP_Error
+     */
+    public function sync_global_components() {
+        $response = $this->api->request('/global-components?is_global=true');
+
+        if (is_wp_error($response)) {
+            // Try fallback without filter
+            $response = $this->api->request('/global-components');
+
+            if (is_wp_error($response)) {
+                return $response;
+            }
+        }
+
+        $components = $response['data'] ?? [];
+
+        // Filter to only header/footer positions
+        $filtered = [];
+        foreach ($components as $component) {
+            $position = $component['component_position'] ?? $component['position'] ?? '';
+            if (in_array($position, ['header', 'footer'], true)) {
+                $filtered[] = $component;
+            }
+        }
+
+        // Sync components
+        if (!empty($filtered)) {
+            Unicorn_Studio_Global_Components::sync_from_api($filtered);
+        }
+
+        // Count synced header/footer
+        $has_header = false;
+        $has_footer = false;
+
+        foreach ($filtered as $component) {
+            $position = $component['component_position'] ?? $component['position'] ?? '';
+            if ($position === 'header') $has_header = true;
+            if ($position === 'footer') $has_footer = true;
+        }
+
+        return [
+            'success' => true,
+            'count'   => count($filtered),
+            'header'  => $has_header,
+            'footer'  => $has_footer,
+        ];
+    }
+
+    /**
      * AJAX handler for sync
      */
     public function ajax_sync() {
@@ -256,6 +337,15 @@ class Unicorn_Studio_Sync_Manager {
 
             case 'css':
                 $result = $this->sync_css();
+                break;
+
+            case 'fonts':
+                $result = $this->sync_fonts();
+                break;
+
+            case 'components':
+            case 'global_components':
+                $result = $this->sync_global_components();
                 break;
 
             case 'all':
@@ -297,15 +387,26 @@ class Unicorn_Studio_Sync_Manager {
      * @return array
      */
     public static function get_status() {
+        $global_header = Unicorn_Studio_Global_Components::get_global_header();
+        $global_footer = Unicorn_Studio_Global_Components::get_global_footer();
+
         return [
-            'connected'       => Unicorn_Studio::is_connected(),
-            'last_sync'       => self::get_last_sync(),
-            'content_types'   => count(get_option('unicorn_studio_content_types', [])),
-            'taxonomies'      => count(get_option('unicorn_studio_taxonomies', [])),
-            'css_exists'      => unicorn_studio()->css->css_exists(),
-            'css_size'        => unicorn_studio()->css->get_css_size(),
-            'css_modified'    => unicorn_studio()->css->get_last_modified(),
-            'acf_available'   => Unicorn_Studio_Fields::is_acf_available(),
+            'connected'        => Unicorn_Studio::is_connected(),
+            'last_sync'        => self::get_last_sync(),
+            'content_types'    => count(get_option('unicorn_studio_content_types', [])),
+            'taxonomies'       => count(get_option('unicorn_studio_taxonomies', [])),
+            'css_exists'       => unicorn_studio()->css->css_exists(),
+            'css_size'         => unicorn_studio()->css->get_css_size(),
+            'css_modified'     => unicorn_studio()->css->get_last_modified(),
+            'fonts_count'      => unicorn_studio()->fonts->get_fonts_count(),
+            'fonts_size'       => unicorn_studio()->fonts->get_fonts_size(),
+            'fonts_families'   => unicorn_studio()->fonts->get_font_families(),
+            'fonts_synced'     => unicorn_studio()->fonts->get_last_sync(),
+            'has_header'       => !empty($global_header),
+            'has_footer'       => !empty($global_footer),
+            'header_name'      => $global_header['name'] ?? null,
+            'footer_name'      => $global_footer['name'] ?? null,
+            'acf_available'    => Unicorn_Studio_Fields::is_acf_available(),
         ];
     }
 }

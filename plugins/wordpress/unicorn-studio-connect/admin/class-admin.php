@@ -54,6 +54,15 @@ class Unicorn_Studio_Admin {
             'unicorn-studio-sync',
             [$this, 'render_sync_page']
         );
+
+        add_submenu_page(
+            'unicorn-studio',
+            __('Design & Komponenten', 'unicorn-studio'),
+            __('Design & Komponenten', 'unicorn-studio'),
+            'manage_options',
+            'unicorn-studio-design',
+            [$this, 'render_design_page']
+        );
     }
 
     /**
@@ -120,5 +129,12 @@ class Unicorn_Studio_Admin {
      */
     public function render_sync_page() {
         include UNICORN_STUDIO_PLUGIN_DIR . 'admin/views/sync.php';
+    }
+
+    /**
+     * Render design & components page
+     */
+    public function render_design_page() {
+        include UNICORN_STUDIO_PLUGIN_DIR . 'admin/views/design.php';
     }
 }

@@ -16,13 +16,17 @@ SELECTOR: [CSS-Selector] (nur bei modify/delete, z.B. #services h1)
 \`\`\`
 
 OPERATIONEN:
-1. "replace_all" - Nur für LEERE Seiten (ohne existierende <section>), erstellt komplettes HTML
-2. "add" - Fügt neue Section hinzu. POSITION bestimmt wo:
-   - "end" = vor </body> (Standard)
-   - "start" = nach <body>
-   - "before" oder "after" = relativ zu TARGET
-3. "modify" - Ersetzt ein Element. SELECTOR gibt an welches Element.
+1. "replace_all" - ⚠️ NUR für komplett LEERE Seiten! Erstellt komplettes HTML mit <!DOCTYPE>
+2. "add" - Fügt neue Section hinzu. Gib NUR die neue Section aus, NICHT die ganze Seite!
+   - POSITION: "end" = vor </body> (Standard)
+   - POSITION: "start" = nach <body>
+   - POSITION: "before" oder "after" = relativ zu TARGET (z.B. TARGET: #footer)
+3. "modify" - Ersetzt ein Element. SELECTOR gibt an welches. Gib NUR das geänderte Element aus!
 4. "delete" - Entfernt Element. SELECTOR gibt an welches.
+
+⚠️ KRITISCHE REGEL:
+Wenn die Seite bereits Sections enthält, NIEMALS replace_all verwenden!
+Gib immer NUR den neuen/geänderten Teil aus, nicht die komplette Seite!
 
 BEISPIEL - Neue Section hinzufügen:
 \`\`\`
@@ -200,7 +204,35 @@ KONTEXT:
 - Stil: {{style}}
 - Farben: {{colors}}
 - Fonts: {{fonts}}
+
+{{designTokensSection}}
+
+{{globalComponentsSection}}
 `
+
+export interface DesignTokensForAI {
+  colors: {
+    primary: string
+    primaryHover: string
+    secondary: string
+    accent: string
+    background: string
+    foreground: string
+    muted: string
+    border: string
+  }
+  fonts: {
+    heading: string
+    body: string
+  }
+}
+
+export interface GlobalComponentsForAI {
+  hasGlobalHeader: boolean
+  hasGlobalFooter: boolean
+  headerHtml?: string // Optionally include for style reference
+  footerHtml?: string
+}
 
 export function buildSystemPrompt(context: {
   siteType?: string
@@ -208,13 +240,139 @@ export function buildSystemPrompt(context: {
   style?: string
   colors?: Record<string, string>
   fonts?: Record<string, string>
+  designTokens?: DesignTokensForAI
+  globalComponents?: GlobalComponentsForAI
 }): string {
+  let designTokensSection = ''
+  let globalComponentsSection = ''
+
+  if (context.designTokens) {
+    const tokens = context.designTokens
+    designTokensSection = `
+## DESIGN TOKENS - PFLICHT! ##
+
+Diese Website hat ein konfiguriertes Design System. Du MUSST die folgenden Token-Klassen verwenden.
+NIEMALS hardcoded Farben wie bg-blue-600 oder text-gray-900 verwenden!
+
+### FARBEN (Verwende diese Klassen!)
+
+| Token-Klasse | Verwendung | Aktueller Wert |
+|--------------|------------|----------------|
+| bg-primary | Buttons, CTAs, Akzente | ${tokens.colors.primary} |
+| hover:bg-primary-hover | Hover-States für Buttons | ${tokens.colors.primaryHover} |
+| bg-secondary | Sekundäre Elemente, Tags | ${tokens.colors.secondary} |
+| bg-accent | Highlights, Badges | ${tokens.colors.accent} |
+| bg-background | Seitenhintergrund | ${tokens.colors.background} |
+| text-foreground | Haupttext, Headlines | ${tokens.colors.foreground} |
+| bg-muted | Subtile Hintergründe | ${tokens.colors.muted} |
+| border-border | Rahmen, Trennlinien | ${tokens.colors.border} |
+
+### FONTS (Verwende diese Klassen!)
+
+| Token-Klasse | Verwendung |
+|--------------|------------|
+| font-heading | Alle Überschriften (h1-h6) |
+| font-body | Fließtext, Paragraphen, Listen |
+
+### WICHTIGE BEISPIELE
+
+✅ RICHTIG - Mit Design Tokens:
+<button class="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-lg">
+  Button Text
+</button>
+
+<h1 class="font-heading text-4xl font-bold text-foreground">
+  Headline
+</h1>
+
+<p class="font-body text-foreground/70">
+  Fließtext hier...
+</p>
+
+<section class="bg-background py-24">
+  <div class="bg-muted rounded-xl p-8">
+    Karten-Inhalt
+  </div>
+</section>
+
+❌ FALSCH - Hardcoded Farben:
+<button class="bg-blue-600 hover:bg-blue-700 text-white">
+<h1 class="text-gray-900">
+<p class="text-gray-600">
+<section class="bg-white">
+<div class="bg-gray-50">
+
+### REGELN
+
+1. IMMER bg-primary statt bg-blue-600, bg-purple-600, etc.
+2. IMMER text-foreground statt text-gray-900, text-zinc-900, etc.
+3. IMMER bg-background statt bg-white
+4. IMMER bg-muted statt bg-gray-50, bg-zinc-50, etc.
+5. IMMER font-heading für Headlines, font-body für Text
+6. Opacity ist erlaubt: text-foreground/70 für helleren Text
+
+Wenn der User die Farbe ändert, wird bg-primary automatisch aktualisiert!
+Das ist der Sinn von Design Tokens - zentrale Kontrolle über das Design.
+`
+  }
+
+  // Build global components section
+  if (context.globalComponents) {
+    const gc = context.globalComponents
+
+    if (gc.hasGlobalHeader || gc.hasGlobalFooter) {
+      globalComponentsSection = `
+## GLOBALE KOMPONENTEN - WICHTIG! ##
+
+Diese Website hat bereits globale Komponenten, die automatisch auf allen Seiten angezeigt werden.
+Du sollst diese NICHT neu generieren!
+
+`
+
+      if (gc.hasGlobalHeader) {
+        globalComponentsSection += `### ✅ GLOBAL HEADER EXISTIERT BEREITS
+Die Website hat einen globalen Header. Du darfst KEINEN neuen Header generieren!
+- Kein <header> Tag
+- Keine Navigation am Anfang der Seite
+- Generiere NUR Content-Sections (wie Hero, Features, Services, etc.)
+
+`
+      }
+
+      if (gc.hasGlobalFooter) {
+        globalComponentsSection += `### ✅ GLOBAL FOOTER EXISTIERT BEREITS
+Die Website hat einen globalen Footer. Du darfst KEINEN neuen Footer generieren!
+- Kein <footer> Tag
+- Keine Copyright/Impressum Sections
+- Generiere NUR Content-Sections
+
+`
+      }
+
+      globalComponentsSection += `### DEINE AUFGABE
+Generiere NUR den Content-Bereich der Seite (Sections zwischen Header und Footer).
+Header und Footer werden automatisch vom System eingefügt.
+`
+    } else {
+      // No global components yet - encourage creating them
+      globalComponentsSection = `
+## GLOBALE KOMPONENTEN
+
+Diese Website hat noch keine globalen Header/Footer.
+Wenn du einen Header oder Footer erstellst, markiere sie mit COMPONENT_TYPE und COMPONENT_NAME,
+damit sie als globale Komponenten gespeichert werden können.
+`
+    }
+  }
+
   return SYSTEM_PROMPT
     .replace('{{siteType}}', context.siteType || 'Business Website')
     .replace('{{industry}}', context.industry || 'Allgemein')
     .replace('{{style}}', context.style || 'Modern, Clean, Professional')
     .replace('{{colors}}', context.colors ? JSON.stringify(context.colors) : 'Standard (Purple)')
     .replace('{{fonts}}', context.fonts ? JSON.stringify(context.fonts) : 'System Fonts')
+    .replace('{{designTokensSection}}', designTokensSection)
+    .replace('{{globalComponentsSection}}', globalComponentsSection)
 }
 
 export const ELEMENT_EDIT_PROMPT = `Du bearbeitest ein einzelnes HTML-Element.

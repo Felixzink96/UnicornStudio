@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.11.0
+ * Version:           1.12.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.11.0');
+define('UNICORN_STUDIO_VERSION', '1.12.0');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -71,6 +71,7 @@ final class Unicorn_Studio {
     public $taxonomies;
     public $pages;
     public $css;
+    public $fonts;
     public $webhooks;
     public $asset_optimizer;
     public $theme_manager;
@@ -125,6 +126,7 @@ final class Unicorn_Studio {
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-taxonomies.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-pages.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-css-manager.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-font-manager.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-webhook-handler.php';
 
         // New feature classes
@@ -144,6 +146,7 @@ final class Unicorn_Studio {
         $this->taxonomies = new Unicorn_Studio_Taxonomies();
         $this->pages = new Unicorn_Studio_Pages($this->api);
         $this->css = new Unicorn_Studio_CSS_Manager($this->api);
+        $this->fonts = new Unicorn_Studio_Font_Manager($this->api);
         $this->webhooks = new Unicorn_Studio_Webhook_Handler();
 
         // New feature components
@@ -187,8 +190,9 @@ final class Unicorn_Studio {
         // Output page-specific CSS in head
         add_action('wp_head', [$this, 'output_page_styles'], 999);
 
-        // Output page-specific fonts in head
-        add_action('wp_head', [$this, 'output_page_fonts'], 5);
+        // Output local fonts (GDPR-compliant)
+        add_action('wp_head', [$this->fonts, 'output_font_preloads'], 5);
+        add_action('wp_enqueue_scripts', [$this->fonts, 'enqueue_fonts'], 25);
 
         // Add body classes
         add_filter('body_class', [$this, 'add_page_body_classes']);
@@ -281,52 +285,13 @@ final class Unicorn_Studio {
 
     /**
      * Output page-specific fonts in head
+     * DEPRECATED: Fonts are now loaded locally via Font Manager for GDPR compliance
+     * This method is kept for backwards compatibility but does nothing
      */
     public function output_page_fonts() {
-        if (!is_singular('page')) {
-            return;
-        }
-
-        global $post;
-        if (!$post) {
-            return;
-        }
-
-        $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
-        if (!$unicorn_id) {
-            return;
-        }
-
-        $fonts = get_post_meta($post->ID, '_unicorn_studio_fonts', true);
-        if (empty($fonts)) {
-            return;
-        }
-
-        $fonts = maybe_unserialize($fonts);
-        if (!is_array($fonts)) {
-            return;
-        }
-
-        // Output preconnect first
-        $has_google_fonts = false;
-        foreach ($fonts as $font_url) {
-            if (strpos($font_url, 'fonts.googleapis.com') !== false) {
-                $has_google_fonts = true;
-                break;
-            }
-        }
-
-        if ($has_google_fonts) {
-            echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
-            echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
-        }
-
-        // Output font stylesheets
-        foreach ($fonts as $font_url) {
-            if (strpos($font_url, 'fonts.googleapis.com/css') !== false) {
-                echo '<link rel="stylesheet" href="' . esc_url($font_url) . '">' . "\n";
-            }
-        }
+        // GDPR-compliant: Fonts are now loaded locally via Font Manager
+        // See Unicorn_Studio_Font_Manager::enqueue_fonts()
+        // This prevents external requests to Google Fonts CDN
     }
 
     /**
@@ -482,11 +447,15 @@ register_activation_hook(__FILE__, function() {
         'cpt_prefix' => 'us_',
     ]);
 
-    // Create CSS directory
+    // Create CSS and fonts directories
     $upload_dir = wp_upload_dir();
     $css_dir = $upload_dir['basedir'] . '/unicorn-studio/';
+    $fonts_dir = $upload_dir['basedir'] . '/unicorn-studio/fonts/';
     if (!file_exists($css_dir)) {
         wp_mkdir_p($css_dir);
+    }
+    if (!file_exists($fonts_dir)) {
+        wp_mkdir_p($fonts_dir);
     }
 
     // Flush rewrite rules

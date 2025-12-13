@@ -198,3 +198,99 @@ button[disabled],
 .disabled {
   cursor: not-allowed !important;
 }
+
+/* ================================================================
+   DESIGN TOKEN SYSTEM
+   These variables and classes enable consistent design across pages.
+   Values are set dynamically when a site is loaded in the editor.
+   ================================================================ */
+
+:root {
+  /* Design Token Variables - defaults that get overridden per-site */
+  --site-primary: #3b82f6;
+  --site-primary-hover: #2563eb;
+  --site-secondary: #64748b;
+  --site-accent: #f59e0b;
+  --site-background: #ffffff;
+  --site-foreground: #0f172a;
+  --site-muted: #f1f5f9;
+  --site-border: #e2e8f0;
+
+  /* Design Token Fonts */
+  --site-font-heading: 'Inter', system-ui, sans-serif;
+  --site-font-body: 'Inter', system-ui, sans-serif;
+  --site-font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Design Token Utility Classes for Generated Pages */
+/* These classes are used by AI-generated content */
+
+/* Background colors */
+.bg-primary {
+  background-color: var(--site-primary) !important;
+}
+.bg-primary-hover {
+  background-color: var(--site-primary-hover) !important;
+}
+.hover\:bg-primary-hover:hover {
+  background-color: var(--site-primary-hover) !important;
+}
+.bg-secondary {
+  background-color: var(--site-secondary) !important;
+}
+.bg-accent {
+  background-color: var(--site-accent) !important;
+}
+.bg-background {
+  background-color: var(--site-background) !important;
+}
+.bg-muted {
+  background-color: var(--site-muted) !important;
+}
+
+/* Text colors */
+.text-primary {
+  color: var(--site-primary) !important;
+}
+.text-secondary {
+  color: var(--site-secondary) !important;
+}
+.text-accent {
+  color: var(--site-accent) !important;
+}
+.text-foreground {
+  color: var(--site-foreground) !important;
+}
+.text-muted-foreground {
+  color: color-mix(in srgb, var(--site-foreground) 60%, transparent) !important;
+}
+
+/* Border colors */
+.border-primary {
+  border-color: var(--site-primary) !important;
+}
+.border-secondary {
+  border-color: var(--site-secondary) !important;
+}
+.border-border {
+  border-color: var(--site-border) !important;
+}
+
+/* Font families */
+.font-heading {
+  font-family: var(--site-font-heading) !important;
+}
+.font-body {
+  font-family: var(--site-font-body) !important;
+}
+.font-mono {
+  font-family: var(--site-font-mono) !important;
+}
+
+/* Ring colors for focus states */
+.ring-primary {
+  --tw-ring-color: var(--site-primary) !important;
+}
+.focus\:ring-primary:focus {
+  --tw-ring-color: var(--site-primary) !important;
+}

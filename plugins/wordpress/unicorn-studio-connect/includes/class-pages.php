@@ -258,6 +258,9 @@ class Unicorn_Studio_Pages {
                     $this->set_as_front_page($existing_page->ID);
                 }
 
+                // Save header/footer settings
+                $this->save_header_footer_settings($existing_page->ID, $page);
+
                 kses_init_filters();
                 return [
                     'success' => true,
@@ -280,6 +283,9 @@ class Unicorn_Studio_Pages {
                 if (!empty($page['is_home'])) {
                     $this->set_as_front_page($post_id);
                 }
+
+                // Save header/footer settings
+                $this->save_header_footer_settings($post_id, $page);
 
                 kses_init_filters();
                 return [
@@ -680,5 +686,77 @@ class Unicorn_Studio_Pages {
         }
 
         return true;
+    }
+
+    /**
+     * Save header/footer settings for a page
+     *
+     * @param int   $post_id Post ID
+     * @param array $page    Page data from Unicorn Studio
+     * @return void
+     */
+    private function save_header_footer_settings($post_id, $page) {
+        // Check for header_footer_settings in page data
+        $settings = $page['header_footer_settings'] ?? null;
+
+        // Also check direct fields (for backwards compatibility)
+        if (!$settings) {
+            $settings = [
+                'hide_header'      => $page['hide_header'] ?? false,
+                'hide_footer'      => $page['hide_footer'] ?? false,
+                'custom_header_id' => $page['custom_header_id'] ?? null,
+                'custom_footer_id' => $page['custom_footer_id'] ?? null,
+            ];
+        }
+
+        // Save hide_header
+        if (isset($settings['hide_header'])) {
+            if ($settings['hide_header']) {
+                update_post_meta($post_id, '_unicorn_hide_header', '1');
+            } else {
+                delete_post_meta($post_id, '_unicorn_hide_header');
+            }
+        }
+
+        // Save hide_footer
+        if (isset($settings['hide_footer'])) {
+            if ($settings['hide_footer']) {
+                update_post_meta($post_id, '_unicorn_hide_footer', '1');
+            } else {
+                delete_post_meta($post_id, '_unicorn_hide_footer');
+            }
+        }
+
+        // Save custom_header_id
+        if (isset($settings['custom_header_id'])) {
+            if ($settings['custom_header_id']) {
+                update_post_meta($post_id, '_unicorn_custom_header_id', $settings['custom_header_id']);
+
+                // Also save the custom header component if provided
+                if (!empty($settings['custom_header'])) {
+                    $components = get_option('unicorn_studio_components', []);
+                    $components[$settings['custom_header_id']] = $settings['custom_header'];
+                    update_option('unicorn_studio_components', $components);
+                }
+            } else {
+                delete_post_meta($post_id, '_unicorn_custom_header_id');
+            }
+        }
+
+        // Save custom_footer_id
+        if (isset($settings['custom_footer_id'])) {
+            if ($settings['custom_footer_id']) {
+                update_post_meta($post_id, '_unicorn_custom_footer_id', $settings['custom_footer_id']);
+
+                // Also save the custom footer component if provided
+                if (!empty($settings['custom_footer'])) {
+                    $components = get_option('unicorn_studio_components', []);
+                    $components[$settings['custom_footer_id']] = $settings['custom_footer'];
+                    update_option('unicorn_studio_components', $components);
+                }
+            } else {
+                delete_post_meta($post_id, '_unicorn_custom_footer_id');
+            }
+        }
     }
 }

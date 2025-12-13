@@ -317,24 +317,30 @@ class Unicorn_Studio_Global_Components {
 
         foreach ($components_data as $component) {
             $id = $component['id'] ?? '';
-            $position = $component['position'] ?? 'content';
+            // Handle both field names: component_position (from RPC) and position (from direct query)
+            $position = $component['component_position'] ?? $component['position'] ?? 'content';
+            $is_global = $component['is_global'] ?? false;
 
-            // Store in general components storage
-            $all_components[$id] = [
+            // Normalize the component data
+            $normalized = [
                 'id'       => $id,
-                'name'     => $component['name'] ?? '',
-                'html'     => $component['html'] ?? '',
-                'css'      => $component['css'] ?? '',
-                'js'       => $component['js'] ?? '',
+                'name'     => $component['component_name'] ?? $component['name'] ?? '',
+                'html'     => $component['component_html'] ?? $component['html'] ?? '',
+                'css'      => $component['component_css'] ?? $component['css'] ?? '',
+                'js'       => $component['component_js'] ?? $component['js'] ?? '',
                 'position' => $position,
             ];
 
+            // Store in general components storage
+            $all_components[$id] = $normalized;
+
             // If it's a global header or footer, also store in global components
-            if ($component['is_global'] ?? false) {
-                if ($position === 'header' && ($component['set_as_default'] ?? true)) {
-                    self::save_component('header', $component);
-                } elseif ($position === 'footer' && ($component['set_as_default'] ?? true)) {
-                    self::save_component('footer', $component);
+            // Accept components that are marked as global OR are in header/footer position
+            if ($is_global || in_array($position, ['header', 'footer'], true)) {
+                if ($position === 'header') {
+                    self::save_component('header', $normalized);
+                } elseif ($position === 'footer') {
+                    self::save_component('footer', $normalized);
                 }
             }
         }

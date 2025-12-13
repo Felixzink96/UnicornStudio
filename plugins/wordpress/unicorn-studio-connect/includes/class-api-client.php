@@ -413,6 +413,15 @@ class Unicorn_Studio_API_Client {
     }
 
     /**
+     * Get fonts metadata for local hosting (GDPR-compliant)
+     *
+     * @return array|WP_Error Response with fonts data
+     */
+    public function get_fonts() {
+        return $this->request('/export/fonts');
+    }
+
+    /**
      * Register webhook
      *
      * @param string $url    Webhook URL

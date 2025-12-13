@@ -26,35 +26,46 @@ class Unicorn_Studio_Webhook_Handler {
     }
 
     /**
-     * Verify webhook signature
+     * Verify webhook authentication
+     *
+     * Accepts either:
+     * 1. Bearer token (for pushes from Unicorn Studio server)
+     * 2. HMAC signature (for traditional webhooks)
      *
      * @param WP_REST_Request $request Request object
      * @return bool|WP_Error
      */
     public function verify_signature($request) {
+        // Method 1: Check Bearer token (used by Push from Unicorn Studio)
+        $auth_header = $request->get_header('Authorization');
+        if ($auth_header && strpos($auth_header, 'Bearer ') === 0) {
+            $token = substr($auth_header, 7);
+            $stored_api_key = Unicorn_Studio::get_api_key();
+
+            if ($token && $stored_api_key && hash_equals($stored_api_key, $token)) {
+                return true;
+            }
+        }
+
+        // Method 2: Check HMAC signature (traditional webhook signature)
         $signature = $request->get_header('X-Unicorn-Signature');
         $secret = get_option('unicorn_studio_webhook_secret');
 
-        if (!$signature || !$secret) {
-            return new WP_Error(
-                'invalid_signature',
-                __('Ungültige Webhook-Signatur.', 'unicorn-studio'),
-                ['status' => 401]
-            );
+        if ($signature && $secret) {
+            $payload = $request->get_body();
+            $expected = hash_hmac('sha256', $payload, $secret);
+
+            if (hash_equals($expected, $signature)) {
+                return true;
+            }
         }
 
-        $payload = $request->get_body();
-        $expected = hash_hmac('sha256', $payload, $secret);
-
-        if (!hash_equals($expected, $signature)) {
-            return new WP_Error(
-                'invalid_signature',
-                __('Ungültige Webhook-Signatur.', 'unicorn-studio'),
-                ['status' => 401]
-            );
-        }
-
-        return true;
+        // Neither method succeeded
+        return new WP_Error(
+            'invalid_auth',
+            __('Ungültige Webhook-Authentifizierung.', 'unicorn-studio'),
+            ['status' => 401]
+        );
     }
 
     /**
@@ -208,10 +219,28 @@ class Unicorn_Studio_Webhook_Handler {
 
             case 'global_components.sync':
                 // Full sync of global components
+                // Handle both formats: { components: [...] } or { header: {...}, footer: {...} }
                 if (isset($data['components']) && is_array($data['components'])) {
                     return Unicorn_Studio_Global_Components::sync_from_api($data['components']);
                 }
-                return true;
+
+                // New format: separate header and footer objects
+                $synced = false;
+                if (isset($data['header']) && is_array($data['header'])) {
+                    Unicorn_Studio_Global_Components::save_component('header', $data['header']);
+                    $synced = true;
+                }
+                if (isset($data['footer']) && is_array($data['footer'])) {
+                    Unicorn_Studio_Global_Components::save_component('footer', $data['footer']);
+                    $synced = true;
+                }
+
+                // Also sync CSS after global components update
+                if ($synced) {
+                    unicorn_studio()->css->sync_css();
+                }
+
+                return $synced;
 
             // ========================================
             // Full Sync Event

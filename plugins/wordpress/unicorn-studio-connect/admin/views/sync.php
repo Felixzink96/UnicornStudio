@@ -50,6 +50,19 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                     <span class="unicorn-stat-value"><?php echo $status['css_exists'] ? $status['css_size'] : '-'; ?></span>
                     <span class="unicorn-stat-label"><?php esc_html_e('CSS', 'unicorn-studio'); ?></span>
                 </div>
+                <div class="unicorn-stat">
+                    <span class="unicorn-stat-value"><?php echo $status['fonts_count'] ?: '0'; ?></span>
+                    <span class="unicorn-stat-label"><?php esc_html_e('Fonts (lokal)', 'unicorn-studio'); ?></span>
+                </div>
+                <div class="unicorn-stat">
+                    <span class="unicorn-stat-value">
+                        <?php
+                        $comp_count = ($status['has_header'] ? 1 : 0) + ($status['has_footer'] ? 1 : 0);
+                        echo $comp_count;
+                        ?>
+                    </span>
+                    <span class="unicorn-stat-label"><?php esc_html_e('Header/Footer', 'unicorn-studio'); ?></span>
+                </div>
             </div>
 
             <p class="unicorn-last-sync">
@@ -86,6 +99,12 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                     </button>
                     <button type="button" class="button unicorn-sync-btn" data-type="css" <?php echo !$status['connected'] ? 'disabled' : ''; ?>>
                         <?php esc_html_e('CSS aktualisieren', 'unicorn-studio'); ?>
+                    </button>
+                    <button type="button" class="button unicorn-sync-btn" data-type="fonts" <?php echo !$status['connected'] ? 'disabled' : ''; ?>>
+                        <?php esc_html_e('Fonts herunterladen', 'unicorn-studio'); ?>
+                    </button>
+                    <button type="button" class="button unicorn-sync-btn" data-type="global_components" <?php echo !$status['connected'] ? 'disabled' : ''; ?>>
+                        <?php esc_html_e('Header/Footer', 'unicorn-studio'); ?>
                     </button>
                 </div>
             </div>
@@ -140,6 +159,108 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            <?php endif; ?>
+        </div>
+
+        <!-- Global Components (Header/Footer) -->
+        <div class="unicorn-card">
+            <h2>
+                <span class="dashicons dashicons-layout"></span>
+                <?php esc_html_e('Globale Komponenten', 'unicorn-studio'); ?>
+            </h2>
+
+            <div class="unicorn-components-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                <!-- Header Status -->
+                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_header'] ? '#d4edda' : '#fff3cd'; ?>; border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <span class="dashicons dashicons-<?php echo $status['has_header'] ? 'yes-alt' : 'warning'; ?>" style="color: <?php echo $status['has_header'] ? '#28a745' : '#856404'; ?>;"></span>
+                        <strong><?php esc_html_e('Header', 'unicorn-studio'); ?></strong>
+                    </div>
+                    <?php if ($status['has_header']) : ?>
+                        <p style="margin: 0; font-size: 13px; color: #155724;">
+                            <?php echo esc_html($status['header_name'] ?: 'Global Header'); ?>
+                        </p>
+                    <?php else : ?>
+                        <p style="margin: 0; font-size: 13px; color: #856404;">
+                            <?php esc_html_e('Nicht synchronisiert', 'unicorn-studio'); ?>
+                        </p>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Footer Status -->
+                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_footer'] ? '#d4edda' : '#fff3cd'; ?>; border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <span class="dashicons dashicons-<?php echo $status['has_footer'] ? 'yes-alt' : 'warning'; ?>" style="color: <?php echo $status['has_footer'] ? '#28a745' : '#856404'; ?>;"></span>
+                        <strong><?php esc_html_e('Footer', 'unicorn-studio'); ?></strong>
+                    </div>
+                    <?php if ($status['has_footer']) : ?>
+                        <p style="margin: 0; font-size: 13px; color: #155724;">
+                            <?php echo esc_html($status['footer_name'] ?: 'Global Footer'); ?>
+                        </p>
+                    <?php else : ?>
+                        <p style="margin: 0; font-size: 13px; color: #856404;">
+                            <?php esc_html_e('Nicht synchronisiert', 'unicorn-studio'); ?>
+                        </p>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <?php if (!$status['has_header'] && !$status['has_footer']) : ?>
+                <div class="notice notice-warning inline" style="margin-top: 15px;">
+                    <p>
+                        <span class="dashicons dashicons-info"></span>
+                        <?php esc_html_e('Klicke auf "Header/Footer" um globale Komponenten aus Unicorn Studio zu synchronisieren.', 'unicorn-studio'); ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Local Fonts (GDPR) -->
+        <div class="unicorn-card">
+            <h2>
+                <span class="dashicons dashicons-editor-textcolor"></span>
+                <?php esc_html_e('Lokale Fonts (DSGVO-konform)', 'unicorn-studio'); ?>
+            </h2>
+
+            <?php if ($status['fonts_count'] > 0) : ?>
+                <div class="unicorn-gdpr-badge">
+                    <span class="dashicons dashicons-yes-alt"></span>
+                    <?php esc_html_e('DSGVO-konform: Fonts werden lokal gehostet', 'unicorn-studio'); ?>
+                </div>
+
+                <table class="widefat" style="margin-top: 15px;">
+                    <thead>
+                        <tr>
+                            <th><?php esc_html_e('Font Family', 'unicorn-studio'); ?></th>
+                            <th><?php esc_html_e('Speicherort', 'unicorn-studio'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($status['fonts_families'] as $family) : ?>
+                            <tr>
+                                <td><strong><?php echo esc_html($family); ?></strong></td>
+                                <td><code>wp-content/uploads/unicorn-studio/fonts/</code></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+
+                <p class="description" style="margin-top: 15px;">
+                    <strong><?php esc_html_e('Gesamtgröße:', 'unicorn-studio'); ?></strong> <?php echo esc_html($status['fonts_size']); ?>
+                    <?php if ($status['fonts_synced']) : ?>
+                        <br><strong><?php esc_html_e('Letzte Aktualisierung:', 'unicorn-studio'); ?></strong> <?php echo esc_html($status['fonts_synced']); ?>
+                    <?php endif; ?>
+                </p>
+            <?php else : ?>
+                <p class="description">
+                    <?php esc_html_e('Noch keine Fonts lokal gespeichert. Klicke auf "Fonts herunterladen" um Google Fonts lokal zu speichern.', 'unicorn-studio'); ?>
+                </p>
+                <div class="notice notice-warning inline" style="margin-top: 10px;">
+                    <p>
+                        <span class="dashicons dashicons-warning"></span>
+                        <?php esc_html_e('Ohne lokale Fonts werden keine Schriftarten vom Google CDN geladen. Fonts müssen synchronisiert werden.', 'unicorn-studio'); ?>
+                    </p>
+                </div>
             <?php endif; ?>
         </div>
 
@@ -242,5 +363,18 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
 #unicorn-sync-result.error {
     background: #f8d7da;
     color: #721c24;
+}
+.unicorn-gdpr-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #d4edda;
+    color: #155724;
+    padding: 8px 15px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.unicorn-gdpr-badge .dashicons {
+    color: #28a745;
 }
 </style>

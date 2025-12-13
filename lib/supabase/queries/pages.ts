@@ -38,7 +38,7 @@ export async function getPageBySlug(siteId: string, slug: string) {
   return data
 }
 
-// Default HTML for new pages
+// Default HTML for new pages (empty - AI will generate content)
 const DEFAULT_HTML = `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -47,16 +47,6 @@ const DEFAULT_HTML = `<!DOCTYPE html>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-white">
-  <section class="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-pink-500">
-    <div class="text-center text-white px-4">
-      <h1 class="text-5xl md:text-7xl font-bold mb-6">
-        Willkommen
-      </h1>
-      <p class="text-xl md:text-2xl opacity-90 mb-8 max-w-2xl mx-auto">
-        Beschreibe im Chat, welche Website du erstellen möchtest.
-      </p>
-    </div>
-  </section>
 </body>
 </html>`
 

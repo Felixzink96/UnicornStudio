@@ -12,7 +12,10 @@ import type {
   ChatMessage,
   PageData,
   SiteContext,
+  DetectedGlobalComponents,
+  GlobalComponentData,
 } from '@/types/editor'
+import { insertGlobalComponents, removeHeaderFooterFromHtml } from '@/lib/ai/html-operations'
 
 const MAX_HISTORY = 50
 
@@ -247,11 +250,65 @@ const initialState: EditorState = {
   isSaving: false,
   lastSavedAt: null,
   siteContext: null,
+  designVariables: null,
   pages: [],
   currentPage: null,
   showElementPanel: false,
   elementPanelTab: 'edit',
   showLayersPanel: false,
+  // Global Components
+  globalHeader: null,
+  globalFooter: null,
+  detectedGlobalComponents: null,
+  showGlobalComponentsDialog: false,
+}
+
+/**
+ * Apply design tokens to document as CSS custom properties
+ * This enables the token-based utility classes to work in the editor
+ */
+function applyDesignTokensToDocument(designVars: Record<string, unknown>) {
+  if (typeof window === 'undefined') return
+
+  const root = document.documentElement
+  const colors = designVars.colors as Record<string, Record<string, string>> | undefined
+  const typography = designVars.typography as Record<string, string> | undefined
+
+  // Apply color tokens
+  if (colors?.brand) {
+    const primary = colors.brand.primary || '#3b82f6'
+    root.style.setProperty('--site-primary', primary)
+    root.style.setProperty('--site-primary-hover', darkenColor(primary, 10))
+    root.style.setProperty('--site-secondary', colors.brand.secondary || '#64748b')
+    root.style.setProperty('--site-accent', colors.brand.accent || '#f59e0b')
+  }
+
+  if (colors?.neutral) {
+    root.style.setProperty('--site-background', colors.neutral['50'] || '#ffffff')
+    root.style.setProperty('--site-foreground', colors.neutral['900'] || '#0f172a')
+    root.style.setProperty('--site-muted', colors.neutral['100'] || '#f1f5f9')
+    root.style.setProperty('--site-border', colors.neutral['200'] || '#e2e8f0')
+  }
+
+  // Apply typography tokens
+  if (typography) {
+    root.style.setProperty('--site-font-heading', `'${typography.fontHeading || 'Inter'}', system-ui, sans-serif`)
+    root.style.setProperty('--site-font-body', `'${typography.fontBody || 'Inter'}', system-ui, sans-serif`)
+    root.style.setProperty('--site-font-mono', `'${typography.fontMono || 'JetBrains Mono'}', monospace`)
+  }
+}
+
+/**
+ * Darken a hex color by a percentage
+ */
+function darkenColor(hex: string, percent: number): string {
+  hex = hex.replace('#', '')
+  const num = parseInt(hex, 16)
+  const amt = Math.round(2.55 * percent)
+  const R = Math.max(0, (num >> 16) - amt)
+  const G = Math.max(0, ((num >> 8) & 0x00FF) - amt)
+  const B = Math.max(0, (num & 0x0000FF) - amt)
+  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)
 }
 
 export const useEditorStore = create<EditorState & EditorActions>()(
@@ -293,10 +350,23 @@ export const useEditorStore = create<EditorState & EditorActions>()(
         .eq('page_id', pageId)
         .order('created_at')
 
+      // Load design variables and apply CSS variables
+      const { data: designVars } = await supabase
+        .from('design_variables')
+        .select('*')
+        .eq('site_id', siteId)
+        .single()
+
+      // Apply design tokens as CSS variables
+      if (designVars && typeof window !== 'undefined') {
+        applyDesignTokensToDocument(designVars)
+      }
+
       const htmlContent = (page?.html_content as string) || getDefaultHtml()
 
       set((state) => {
         state.siteId = siteId
+        state.designVariables = designVars || null
         state.pageId = pageId
         state.html = htmlContent
         state.originalHtml = htmlContent
@@ -335,6 +405,9 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           timestamp: new Date(m.created_at || Date.now()),
         }))
       })
+
+      // Load global components after setting state
+      await get().loadGlobalComponents()
     },
 
     reset: () => {
@@ -787,10 +860,172 @@ export const useEditorStore = create<EditorState & EditorActions>()(
 
       get().updateHtml(newHtml, true)
     },
+
+    // ============================================
+    // GLOBAL COMPONENTS
+    // ============================================
+
+    loadGlobalComponents: async () => {
+      const state = get()
+      if (!state.siteId) return
+
+      const supabase = createClient()
+
+      // Get site with global component references
+      const { data: site } = await supabase
+        .from('sites')
+        .select('global_header_id, global_footer_id')
+        .eq('id', state.siteId)
+        .single()
+
+      if (!site) return
+
+      let globalHeader: GlobalComponentData | null = null
+      let globalFooter: GlobalComponentData | null = null
+
+      // Load header component if exists
+      if (site.global_header_id) {
+        const { data: header } = await supabase
+          .from('components')
+          .select('id, name, html, css, js')
+          .eq('id', site.global_header_id)
+          .single()
+
+        if (header) {
+          globalHeader = {
+            id: header.id,
+            name: header.name,
+            html: header.html || '',
+            css: header.css || undefined,
+            js: header.js || undefined,
+          }
+        }
+      }
+
+      // Load footer component if exists
+      if (site.global_footer_id) {
+        const { data: footer } = await supabase
+          .from('components')
+          .select('id, name, html, css, js')
+          .eq('id', site.global_footer_id)
+          .single()
+
+        if (footer) {
+          globalFooter = {
+            id: footer.id,
+            name: footer.name,
+            html: footer.html || '',
+            css: footer.css || undefined,
+            js: footer.js || undefined,
+          }
+        }
+      }
+
+      set((s) => {
+        s.globalHeader = globalHeader
+        s.globalFooter = globalFooter
+      })
+
+      console.log('[Global Components] Loaded:', { globalHeader, globalFooter })
+    },
+
+    setDetectedGlobalComponents: (components: DetectedGlobalComponents | null) => {
+      set((s) => {
+        s.detectedGlobalComponents = components
+      })
+    },
+
+    setShowGlobalComponentsDialog: (show: boolean) => {
+      set((s) => {
+        s.showGlobalComponentsDialog = show
+      })
+    },
+
+    saveAsGlobalComponent: async (headerName: string | null, footerName: string | null) => {
+      const state = get()
+      if (!state.siteId || !state.detectedGlobalComponents) return
+
+      const supabase = createClient()
+
+      let newHeaderId: string | null = null
+      let newFooterId: string | null = null
+
+      // Save header as global component
+      if (headerName && state.detectedGlobalComponents.header) {
+        const { data: headerResult, error: headerError } = await supabase.rpc(
+          'create_global_component',
+          {
+            p_site_id: state.siteId,
+            p_name: headerName,
+            p_html: state.detectedGlobalComponents.header.html,
+            p_position: 'header',
+            p_set_as_site_default: true,
+          }
+        )
+
+        if (headerError) {
+          console.error('Error saving header:', headerError)
+        } else {
+          newHeaderId = headerResult
+          console.log('Header saved with ID:', newHeaderId)
+        }
+      }
+
+      // Save footer as global component
+      if (footerName && state.detectedGlobalComponents.footer) {
+        const { data: footerResult, error: footerError } = await supabase.rpc(
+          'create_global_component',
+          {
+            p_site_id: state.siteId,
+            p_name: footerName,
+            p_html: state.detectedGlobalComponents.footer.html,
+            p_position: 'footer',
+            p_set_as_site_default: true,
+          }
+        )
+
+        if (footerError) {
+          console.error('Error saving footer:', footerError)
+        } else {
+          newFooterId = footerResult
+          console.log('Footer saved with ID:', newFooterId)
+        }
+      }
+
+      // Remove header/footer from current page HTML
+      const currentHtml = state.html
+      const cleanedHtml = removeHeaderFooterFromHtml(currentHtml, {
+        removeHeader: !!headerName && !!state.detectedGlobalComponents.header,
+        removeFooter: !!footerName && !!state.detectedGlobalComponents.footer,
+      })
+
+      // Update state
+      set((s) => {
+        s.html = cleanedHtml
+        s.detectedGlobalComponents = null
+        s.showGlobalComponentsDialog = false
+        s.hasUnsavedChanges = true
+      })
+
+      // Reload global components to get the new ones
+      await get().loadGlobalComponents()
+
+      // Save page with cleaned HTML
+      await get().save()
+    },
+
+    getHtmlWithGlobalComponents: () => {
+      const state = get()
+      return insertGlobalComponents(
+        state.html,
+        state.globalHeader,
+        state.globalFooter
+      )
+    },
   }))
 )
 
-// Default HTML for new pages
+// Default HTML for new pages (empty - AI will generate content)
 function getDefaultHtml(): string {
   return `<!DOCTYPE html>
 <html lang="de">
@@ -800,24 +1035,6 @@ function getDefaultHtml(): string {
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-white">
-  <section class="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-pink-500">
-    <div class="text-center text-white px-4">
-      <h1 class="text-5xl md:text-7xl font-bold mb-6">
-        Willkommen
-      </h1>
-      <p class="text-xl md:text-2xl opacity-90 mb-8 max-w-2xl mx-auto">
-        Beschreibe im Chat, welche Website du erstellen möchtest.
-      </p>
-      <div class="flex flex-col sm:flex-row gap-4 justify-center">
-        <a href="#" class="px-8 py-4 bg-white text-purple-600 font-semibold rounded-full hover:bg-opacity-90 transition">
-          Mehr erfahren
-        </a>
-        <a href="#" class="px-8 py-4 border-2 border-white text-white font-semibold rounded-full hover:bg-white hover:text-purple-600 transition">
-          Kontakt
-        </a>
-      </div>
-    </div>
-  </section>
 </body>
 </html>`
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useEditorStore } from '@/stores/editor-store'
 import {
@@ -14,8 +14,10 @@ import {
   Code,
   Eye,
   Layers,
+  Brain,
 } from 'lucide-react'
 import type { ChatMessage as ChatMessageType } from '@/types/editor'
+import { removeHeaderFooterFromHtml, extractGlobalComponents } from '@/lib/ai/html-operations'
 
 interface ChatMessageProps {
   message: ChatMessageType
@@ -24,40 +26,63 @@ interface ChatMessageProps {
 export function ChatMessage({ message }: ChatMessageProps) {
   const [copied, setCopied] = useState(false)
   const [showCode, setShowCode] = useState(false)
+  const [showThinking, setShowThinking] = useState(false)
 
   const applyGeneratedHtml = useEditorStore((s) => s.applyGeneratedHtml)
   const html = useEditorStore((s) => s.html)
   const deleteMessage = useEditorStore((s) => s.deleteMessage)
   const save = useEditorStore((s) => s.save)
+  const designVariables = useEditorStore((s) => s.designVariables)
+  const globalHeader = useEditorStore((s) => s.globalHeader)
+  const globalFooter = useEditorStore((s) => s.globalFooter)
 
-  // Check if this message's HTML is already applied to the page
-  const isAlreadyApplied = useMemo(() => {
-    const msgHtml = message.generatedHtml
-    if (!msgHtml || !html) return false
+  // Generate CSS variables from design tokens for preview
+  const designTokensCSS = useMemo(() => {
+    if (!designVariables) return ''
 
-    // Extract body content from both for comparison
-    const extractBody = (h: string) => {
-      const match = h.match(/<body[^>]*>([\s\S]*)<\/body>/)
-      return match ? match[1].trim() : h.trim()
+    const colors = designVariables.colors as Record<string, Record<string, string>> | undefined
+    const typography = designVariables.typography as Record<string, string> | undefined
+
+    const vars: string[] = []
+
+    if (colors?.brand) {
+      const primary = colors.brand.primary || '#3b82f6'
+      vars.push(`--color-primary: ${primary}`)
+      vars.push(`--color-primary-hover: ${primary}`) // simplified
+      vars.push(`--color-secondary: ${colors.brand.secondary || '#64748b'}`)
+      vars.push(`--color-accent: ${colors.brand.accent || '#f59e0b'}`)
     }
 
-    const currentBody = extractBody(html)
-    const msgBody = extractBody(msgHtml)
-
-    // Check if the message's HTML is contained in current HTML
-    return currentBody.includes(msgBody) || currentBody === msgBody
-  }, [message.generatedHtml, html])
-
-  const [applyState, setApplyState] = useState<'idle' | 'applying' | 'applied'>(
-    isAlreadyApplied ? 'applied' : 'idle'
-  )
-
-  // Sync apply state when HTML changes (e.g., after reload)
-  useEffect(() => {
-    if (isAlreadyApplied && applyState === 'idle') {
-      setApplyState('applied')
+    if (colors?.neutral) {
+      vars.push(`--color-background: ${colors.neutral['50'] || '#ffffff'}`)
+      vars.push(`--color-foreground: ${colors.neutral['900'] || '#0f172a'}`)
+      vars.push(`--color-muted: ${colors.neutral['100'] || '#f1f5f9'}`)
+      vars.push(`--color-border: ${colors.neutral['200'] || '#e2e8f0'}`)
     }
-  }, [isAlreadyApplied, applyState])
+
+    if (typography) {
+      vars.push(`--font-heading: '${typography.fontHeading || 'Inter'}', system-ui, sans-serif`)
+      vars.push(`--font-body: '${typography.fontBody || 'Inter'}', system-ui, sans-serif`)
+    }
+
+    if (vars.length === 0) return ''
+
+    return `:root { ${vars.join('; ')} }
+      .bg-primary { background-color: var(--color-primary) !important; }
+      .hover\\:bg-primary-hover:hover { background-color: var(--color-primary-hover) !important; }
+      .bg-secondary { background-color: var(--color-secondary) !important; }
+      .bg-accent { background-color: var(--color-accent) !important; }
+      .bg-background { background-color: var(--color-background) !important; }
+      .bg-muted { background-color: var(--color-muted) !important; }
+      .text-foreground { color: var(--color-foreground) !important; }
+      .text-primary { color: var(--color-primary) !important; }
+      .border-border { border-color: var(--color-border) !important; }
+      .font-heading { font-family: var(--font-heading) !important; }
+      .font-body { font-family: var(--font-body) !important; }`
+  }, [designVariables])
+
+  // Track if user has manually applied this message
+  const [applyState, setApplyState] = useState<'idle' | 'applying' | 'applied'>('idle')
 
   // Extract HTML from content (for streaming preview)
   // New format: MESSAGE: ... --- OPERATION: ... --- <html>
@@ -69,17 +94,46 @@ export function ChatMessage({ message }: ChatMessageProps) {
     if (parts.length >= 3) {
       let html = parts.slice(2).join('\n---\n')
       html = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim()
+      // Clean up any operation metadata that leaked into HTML
+      html = cleanOperationMetadata(html)
       if (html) return html
     }
 
     // Fallback: look for HTML starting with <
     const htmlMatch = message.content.match(/<(!DOCTYPE|html|section|div|header|nav)[^]*$/i)
-    if (htmlMatch) return htmlMatch[0]
+    if (htmlMatch) {
+      return cleanOperationMetadata(htmlMatch[0])
+    }
 
     // Old format: ```html block
     const codeMatch = message.content.match(/```html\n([\s\S]*?)(?:```|$)/)
-    return codeMatch ? codeMatch[1] : null
+    return codeMatch ? cleanOperationMetadata(codeMatch[1]) : null
   }, [message.content])
+
+  // Helper to remove operation metadata that leaked into HTML
+  function cleanOperationMetadata(html: string): string {
+    if (!html) return html
+    return html
+      // Remove operation block if it appears at start of HTML
+      .replace(/^---\s*\nOPERATION:\s*\w+\s*\nPOSITION:\s*\w+\s*\n---\s*\n?/i, '')
+      // Remove individual operation lines
+      .replace(/\n?---\s*\n?OPERATION:\s*\w+\s*\n?/gi, '')
+      .replace(/POSITION:\s*\w+\s*\n?---\s*\n?/gi, '')
+      .replace(/OPERATION:\s*\w+\s*\n?/gi, '')
+      .replace(/POSITION:\s*\w+\s*\n?/gi, '')
+      .replace(/TARGET:\s*[^\n]+\n?/gi, '')
+      .replace(/SELECTOR:\s*[^\n]+\n?/gi, '')
+      .replace(/COMPONENT_TYPE:\s*\w+\s*\n?/gi, '')
+      .replace(/COMPONENT_NAME:\s*[^\n]+\n?/gi, '')
+      // Remove stray --- separators
+      .replace(/^---\s*\n/gm, '')
+      .replace(/\n---\s*$/gm, '')
+      // Remove AI meta-comments that shouldn't be in HTML
+      .replace(/<!--\s*Kein Code generiert[^>]*-->/gi, '')
+      .replace(/<!--\s*No code generated[^>]*-->/gi, '')
+      .replace(/<!--\s*Bitte wähle[^>]*-->/gi, '')
+      .trim()
+  }
 
   // Extract message text (before the HTML)
   const textContent = useMemo(() => {
@@ -96,7 +150,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
   }, [message.content])
 
   const handleCopy = async () => {
-    const textToCopy = message.generatedHtml || streamingHtml || message.content
+    // Copy the preview content (section) not the full page
+    const textToCopy = message.previewHtml || message.generatedHtml || streamingHtml || message.content
     await navigator.clipboard.writeText(textToCopy)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -112,20 +167,43 @@ export function ChatMessage({ message }: ChatMessageProps) {
       // Small delay for UX
       await new Promise(resolve => setTimeout(resolve, 300))
 
+      let finalHtml: string
+
       if (htmlToApply.includes('<!DOCTYPE') || htmlToApply.includes('<html')) {
-        applyGeneratedHtml(htmlToApply)
+        finalHtml = htmlToApply
       } else {
         const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/)
         if (bodyMatch) {
-          const newHtml = html.replace(
+          finalHtml = html.replace(
             /<body[^>]*>[\s\S]*<\/body>/,
             `<body class="bg-white">\n${htmlToApply}\n</body>`
           )
-          applyGeneratedHtml(newHtml)
+        } else {
+          finalHtml = htmlToApply
         }
       }
 
-      // Save to database
+      // If global header/footer exist, remove them from the HTML being saved
+      // They will be added back by the preview via insertGlobalComponents
+      if (globalHeader || globalFooter) {
+        const extracted = extractGlobalComponents(finalHtml)
+        const hasNewHeader = extracted.header && extracted.header.confidence >= 50
+        const hasNewFooter = extracted.footer && extracted.footer.confidence >= 50
+
+        if ((hasNewHeader && globalHeader) || (hasNewFooter && globalFooter)) {
+          console.log('Removing inline header/footer - global components will be used instead')
+          finalHtml = removeHeaderFooterFromHtml(finalHtml, {
+            removeHeader: hasNewHeader && !!globalHeader,
+            removeFooter: hasNewFooter && !!globalFooter,
+          })
+        }
+      }
+
+      // Apply to editor
+      applyGeneratedHtml(finalHtml)
+
+      // Wait a tick for state to update, then save
+      await new Promise(resolve => setTimeout(resolve, 50))
       await save()
 
       setApplyState('applied')
@@ -209,15 +287,38 @@ export function ChatMessage({ message }: ChatMessageProps) {
   }
 
   // Assistant Message
-  const rawDisplayHtml = message.generatedHtml || streamingHtml
+  // Use previewHtml (just the new section) if available, otherwise fall back to generatedHtml
+  const rawPreviewHtml = message.previewHtml || message.generatedHtml || streamingHtml
+
+  // Check if this is a partial update (just a section) vs full page
+  const isPartialUpdate = rawPreviewHtml && !rawPreviewHtml.includes('<!DOCTYPE') && !rawPreviewHtml.includes('<html')
 
   // Wrap partial HTML with Tailwind for preview
   const displayHtml = useMemo(() => {
-    if (!rawDisplayHtml) return null
+    if (!rawPreviewHtml) return null
 
-    // If it's already a full document, use as-is
-    if (rawDisplayHtml.includes('<!DOCTYPE') || rawDisplayHtml.includes('<html')) {
-      return rawDisplayHtml
+    // CSS for preview - clean margins, allow hover but block clicks + design tokens
+    const fitContentStyle = `<style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white;
+      }
+      body > *:last-child { margin-bottom: 0 !important; }
+      ${designTokensCSS}
+    </style>
+    <script>
+      document.addEventListener('click', (e) => e.preventDefault(), true);
+      document.addEventListener('submit', (e) => e.preventDefault(), true);
+    </script>`
+
+    // If it's already a full document, inject our style
+    if (rawPreviewHtml.includes('<!DOCTYPE') || rawPreviewHtml.includes('<html')) {
+      if (rawPreviewHtml.includes('</head>')) {
+        return rawPreviewHtml.replace('</head>', `${fitContentStyle}</head>`)
+      }
+      return rawPreviewHtml
     }
 
     // Wrap partial HTML (section, div, etc.) with Tailwind
@@ -225,12 +326,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
 <html>
 <head>
   <script src="https://cdn.tailwindcss.com"></script>
+  ${fitContentStyle}
 </head>
-<body class="bg-white">
-${rawDisplayHtml}
+<body>
+${rawPreviewHtml}
 </body>
 </html>`
-  }, [rawDisplayHtml])
+  }, [rawPreviewHtml, designTokensCSS])
 
   return (
     <div className="w-full overflow-hidden">
@@ -272,7 +374,7 @@ ${rawDisplayHtml}
             )}
 
             {/* Live Code/Preview Card - während UND nach Streaming */}
-            {rawDisplayHtml && (
+            {rawPreviewHtml && (
               <div className="border border-zinc-200 rounded-xl overflow-hidden bg-white shadow-sm">
                 {/* Card Header */}
                 <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 border-b border-zinc-200">
@@ -326,23 +428,44 @@ ${rawDisplayHtml}
                   /* Code View - Live typing effect */
                   <div className="max-h-80 overflow-auto bg-zinc-900 p-4">
                     <pre className="text-xs text-zinc-300 font-mono whitespace-pre-wrap">
-                      {rawDisplayHtml}
+                      {rawPreviewHtml}
                       {message.isStreaming && (
                         <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-0.5" />
                       )}
                     </pre>
                   </div>
                 ) : (
-                  /* Preview - Live updating */
-                  <div className="aspect-video bg-white relative overflow-hidden">
+                  /* Preview - desktop view scaled to fit exactly */
+                  <div
+                    className="bg-white relative overflow-hidden w-full"
+                    style={{ height: '250px' }}
+                    ref={(el) => {
+                      if (el) {
+                        const containerWidth = el.clientWidth
+                        const containerHeight = 250
+                        const scale = containerWidth / 1200
+                        const iframeHeight = containerHeight / scale
+                        const iframe = el.querySelector('iframe')
+                        if (iframe) {
+                          iframe.style.transform = `scale(${scale})`
+                          iframe.style.height = `${iframeHeight}px`
+                        }
+                      }
+                    }}
+                  >
                     <iframe
                       srcDoc={displayHtml ?? undefined}
-                      className="absolute inset-0 w-[200%] h-[200%] border-0 pointer-events-none origin-top-left scale-50"
-                      sandbox="allow-scripts"
+                      className="border-0 absolute top-0 left-0"
+                      style={{
+                        width: '1200px',
+                        height: '250px',
+                        transformOrigin: 'top left'
+                      }}
+                      sandbox="allow-scripts allow-same-origin"
                       title="Preview"
                     />
                     {message.isStreaming && (
-                      <div className="absolute inset-0 bg-gradient-to-t from-white/50 to-transparent pointer-events-none" />
+                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
                     )}
                   </div>
                 )}
@@ -374,6 +497,33 @@ ${rawDisplayHtml}
                         Anwenden
                       </button>
                     )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Thinking Display - persisted in message */}
+            {message.thinking && !message.isStreaming && (
+              <div className="border border-purple-200 rounded-xl overflow-hidden bg-purple-50/30">
+                <button
+                  onClick={() => setShowThinking(!showThinking)}
+                  className="w-full flex items-center justify-between px-3 py-2 hover:bg-purple-100/50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-purple-600" />
+                    <span className="text-xs font-medium text-purple-700">AI Denkprozess</span>
+                  </div>
+                  {showThinking ? (
+                    <ChevronUp className="h-4 w-4 text-purple-500" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-purple-500" />
+                  )}
+                </button>
+                {showThinking && (
+                  <div className="px-3 py-2 border-t border-purple-200 max-h-48 overflow-y-auto">
+                    <p className="text-xs text-purple-800/80 whitespace-pre-wrap leading-relaxed">
+                      {message.thinking}
+                    </p>
                   </div>
                 )}
               </div>

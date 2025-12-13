@@ -41,6 +41,7 @@ interface PushResult {
     pages?: { count: number; success: boolean; error?: string }
     taxonomies?: { count: number; success: boolean; error?: string }
     css?: { success: boolean; error?: string }
+    global_components?: { count: number; success: boolean; error?: string }
   }
   errors: string[]
 }
@@ -149,20 +150,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       result.results.entries = { count: 0, success: false, error: msg }
     }
 
-    // 6. Push Pages (only published)
+    // 6. Push Pages (only published) with header/footer settings
     try {
       const { data: pages } = await supabase
         .from('pages')
-        .select('*')
+        .select('*, custom_header:components!pages_custom_header_id_fkey(id, name, html, css, js), custom_footer:components!pages_custom_footer_id_fkey(id, name, html, css, js)')
         .eq('site_id', siteId)
         .eq('is_published', true)
 
       if (pages && pages.length > 0) {
         for (const page of pages) {
+          // Include header/footer settings in page data
           await sendWebhook(webhookUrl, headers, {
             event: 'page.updated',
             site_id: siteId,
-            data: page,
+            data: {
+              ...page,
+              // Explicitly include header/footer control fields
+              header_footer_settings: {
+                hide_header: page.hide_header || false,
+                hide_footer: page.hide_footer || false,
+                custom_header_id: page.custom_header_id,
+                custom_footer_id: page.custom_footer_id,
+                custom_header: page.custom_header || null,
+                custom_footer: page.custom_footer || null,
+              },
+            },
           })
         }
         result.results.pages = { count: pages.length, success: true }
@@ -221,7 +234,125 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       result.results.css = { success: false, error: msg }
     }
 
-    // 9. Update last_pushed_to_wordpress_at timestamp
+    // 9. Push Global Components (Header/Footer)
+    try {
+      let header = null
+      let footer = null
+      let componentCount = 0
+
+      // First, try to get components from site.global_header_id and global_footer_id
+      if (site.global_header_id) {
+        const { data: headerComponent } = await supabase
+          .from('components')
+          .select('*')
+          .eq('id', site.global_header_id)
+          .single()
+
+        if (headerComponent) {
+          header = headerComponent
+          componentCount++
+        }
+      }
+
+      if (site.global_footer_id) {
+        const { data: footerComponent } = await supabase
+          .from('components')
+          .select('*')
+          .eq('id', site.global_footer_id)
+          .single()
+
+        if (footerComponent) {
+          footer = footerComponent
+          componentCount++
+        }
+      }
+
+      // Fallback: Query for is_global components if not found via site references
+      if (!header || !footer) {
+        const { data: globalComponents } = await supabase
+          .from('components')
+          .select('*')
+          .eq('site_id', siteId)
+          .in('position', ['header', 'footer'])
+          .eq('is_global', true)
+
+        if (globalComponents) {
+          if (!header) {
+            header = globalComponents.find((c) => c.position === 'header') || null
+            if (header) componentCount++
+          }
+          if (!footer) {
+            footer = globalComponents.find((c) => c.position === 'footer') || null
+            if (footer) componentCount++
+          }
+        }
+      }
+
+      // Send components if found
+      if (header || footer) {
+        // Send individual component events
+        if (header) {
+          await sendWebhook(webhookUrl, headers, {
+            event: 'component.updated',
+            site_id: siteId,
+            data: header,
+          })
+        }
+        if (footer) {
+          await sendWebhook(webhookUrl, headers, {
+            event: 'component.updated',
+            site_id: siteId,
+            data: footer,
+          })
+        }
+
+        // Send global_components.sync event with all components grouped
+        await sendWebhook(webhookUrl, headers, {
+          event: 'global_components.sync',
+          site_id: siteId,
+          data: {
+            global_header_id: site.global_header_id,
+            global_footer_id: site.global_footer_id,
+            header: header
+              ? {
+                  id: header.id,
+                  name: header.name,
+                  html: header.html,
+                  css: header.css,
+                  js: header.js,
+                  position: 'header',
+                }
+              : null,
+            footer: footer
+              ? {
+                  id: footer.id,
+                  name: footer.name,
+                  html: footer.html,
+                  css: footer.css,
+                  js: footer.js,
+                  position: 'footer',
+                }
+              : null,
+          },
+        })
+
+        result.results.global_components = {
+          count: componentCount,
+          success: true,
+        }
+      } else {
+        result.results.global_components = {
+          count: 0,
+          success: true,
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Global Components sync failed'
+      result.errors.push(msg)
+      result.results.global_components = { count: 0, success: false, error: msg }
+    }
+
+    // 10. Update last_pushed_to_wordpress_at timestamp
     result.success = result.errors.length === 0
 
     if (result.success) {

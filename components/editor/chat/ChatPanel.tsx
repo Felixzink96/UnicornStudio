@@ -11,6 +11,13 @@ import {
 } from '@/lib/ai/html-operations'
 import { detectComponentType, detectPromptIntent } from '@/lib/ai/component-detection'
 import { createClient } from '@/lib/supabase/client'
+import { extractStylesFromHtml, suggestDesignTokens, type SuggestedTokens } from '@/lib/design/style-extractor'
+import { detectFontsFromHtml, type DetectedFont } from '@/lib/fonts/font-detector'
+import { DesignSystemDialog } from '@/components/design/DesignSystemDialog'
+import { GlobalComponentsDialog } from '@/components/design/GlobalComponentsDialog'
+import { getDesignVariables, updateDesignVariables } from '@/lib/supabase/queries/design-variables'
+import { extractGlobalComponents, removeHeaderFooterFromHtml } from '@/lib/ai/html-operations'
+import type { DetectedComponent } from '@/types/global-components'
 import {
   Send,
   Sparkles,
@@ -20,6 +27,8 @@ import {
   Wand2,
   FileText,
   X,
+  Brain,
+  ChevronUp,
 } from 'lucide-react'
 
 export function ChatPanel() {
@@ -27,12 +36,28 @@ export function ChatPanel() {
   const [selectedModel, setSelectedModel] = useState({
     name: 'Gemini 3 Pro',
     id: 'gemini-3-pro-preview',
-    description: 'Bestes Model'
+    description: 'Neuestes Model'
   })
   const [promptBuilderOpen, setPromptBuilderOpen] = useState(false)
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Design System Dialog State
+  const [designDialogOpen, setDesignDialogOpen] = useState(false)
+  const [suggestedTokens, setSuggestedTokens] = useState<SuggestedTokens | null>(null)
+  const [detectedFonts, setDetectedFonts] = useState<DetectedFont[]>([])
+  const [hasCheckedDesignTokens, setHasCheckedDesignTokens] = useState(false)
+
+  // Global Components Dialog State
+  const [globalComponentsDialogOpen, setGlobalComponentsDialogOpen] = useState(false)
+  const [detectedHeader, setDetectedHeader] = useState<DetectedComponent | null>(null)
+  const [detectedFooter, setDetectedFooter] = useState<DetectedComponent | null>(null)
+  const [pendingFinalHtml, setPendingFinalHtml] = useState<string | null>(null)
+
+  // Thinking Mode State
+  const [thinkingEnabled, setThinkingEnabled] = useState(false)
+  const [currentThinking, setCurrentThinking] = useState('')
 
   // @-Mention State
   const [showPageSuggestions, setShowPageSuggestions] = useState(false)
@@ -48,6 +73,9 @@ export function ChatPanel() {
   const selectedElement = useEditorStore((s) => s.selectedElement)
   const pages = useEditorStore((s) => s.pages)
   const siteId = useEditorStore((s) => s.siteId)
+  const globalHeader = useEditorStore((s) => s.globalHeader)
+  const globalFooter = useEditorStore((s) => s.globalFooter)
+  const loadGlobalComponents = useEditorStore((s) => s.loadGlobalComponents)
 
   // Filter pages for suggestions (show all pages)
   const filteredPages = useMemo(() => {
@@ -67,12 +95,41 @@ export function ChatPanel() {
   const setGenerating = useEditorStore((s) => s.setGenerating)
   const applyGeneratedHtml = useEditorStore((s) => s.applyGeneratedHtml)
 
-  // Auto-scroll to bottom
+  // Track if user is near bottom for smart scrolling
+  const isUserNearBottom = useRef(true)
+  const lastMessageCount = useRef(messages.length)
+
+  // Get last message for tracking streaming updates
+  const lastMessage = messages[messages.length - 1]
+  const lastMessageContent = lastMessage?.content || ''
+  const lastMessageThinking = lastMessage?.thinking || ''
+  const isStreaming = lastMessage?.isStreaming || false
+
+  // Handle scroll events to track if user scrolled up
+  const handleScroll = () => {
+    if (!scrollRef.current) return
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
+    // Consider "near bottom" if within 100px of bottom
+    isUserNearBottom.current = scrollHeight - scrollTop - clientHeight < 100
+  }
+
+  // Smart auto-scroll: scroll on new message OR content updates during streaming
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (!scrollRef.current) return
+
+    const isNewMessage = messages.length > lastMessageCount.current
+    lastMessageCount.current = messages.length
+
+    // Scroll to bottom if: new message added OR streaming OR user was already near bottom
+    if (isNewMessage || isStreaming || isUserNearBottom.current) {
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+      })
     }
-  }, [messages])
+  }, [messages, lastMessageContent, lastMessageThinking, isStreaming])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -93,6 +150,126 @@ export function ChatPanel() {
 
   // Store current prompt for component detection
   const currentPromptRef = useRef('')
+
+  // Check and show design dialog if needed
+  const checkAndShowDesignDialog = async (siteId: string, generatedHtml: string) => {
+    try {
+      // Get existing design variables
+      const variables = await getDesignVariables(siteId)
+
+      // Check if primary color is still default (not customized)
+      // Database default is #3b82f6 (blue-500)
+      const defaultPrimary = '#3b82f6'
+      const currentPrimary = variables.colors?.brand?.primary
+      const hasCustomTokens = currentPrimary && currentPrimary !== defaultPrimary
+
+      console.log('[Design Dialog] Check:', { currentPrimary, defaultPrimary, hasCustomTokens })
+
+      if (!hasCustomTokens) {
+        // Extract styles from generated HTML
+        const extracted = extractStylesFromHtml(generatedHtml)
+        const tokens = suggestDesignTokens(extracted)
+        const fonts = detectFontsFromHtml(generatedHtml)
+
+        console.log('[Design Dialog] Showing dialog with tokens:', tokens)
+
+        setSuggestedTokens(tokens)
+        setDetectedFonts(fonts)
+        setDesignDialogOpen(true)
+      }
+    } catch (error) {
+      console.error('Error checking design tokens:', error)
+    }
+  }
+
+  // Handle saving design tokens from dialog
+  const handleSaveDesignTokens = async (tokens: SuggestedTokens, downloadFonts: boolean) => {
+    if (!siteId) return
+
+    try {
+      // Update design variables in database
+      // Use type assertion since we're only updating partial values
+      await updateDesignVariables(siteId, {
+        colors: {
+          brand: {
+            primary: tokens.colors.primary,
+            secondary: tokens.colors.secondary,
+            accent: tokens.colors.accent,
+          },
+          neutral: {
+            '50': tokens.colors.background,
+            '100': tokens.colors.muted,
+            '200': tokens.colors.border,
+            '900': tokens.colors.foreground,
+          },
+          semantic: {
+            success: '#22c55e',
+            warning: '#f59e0b',
+            error: '#ef4444',
+            info: '#3b82f6',
+          },
+        },
+        typography: {
+          fontHeading: tokens.fonts.heading,
+          fontBody: tokens.fonts.body,
+          fontMono: tokens.fonts.mono,
+        },
+        spacing: {
+          scale: {
+            xs: '0.5rem',
+            sm: '1rem',
+            md: '1.5rem',
+            lg: '2rem',
+            xl: tokens.spacing.section,
+            '2xl': '4rem',
+            '3xl': '6rem',
+            section: tokens.spacing.section,
+            container: tokens.spacing.container,
+            'card-gap': tokens.spacing.cardGap,
+          },
+          containerWidths: {
+            sm: '640px',
+            md: '768px',
+            lg: '1024px',
+            xl: tokens.spacing.container,
+            '2xl': '1536px',
+          },
+        },
+        borders: {
+          radius: {
+            none: '0',
+            sm: '0.125rem',
+            md: tokens.radii.default,
+            lg: tokens.radii.lg,
+            xl: '1rem',
+            '2xl': '1.5rem',
+            full: '9999px',
+            default: tokens.radii.default,
+          },
+        },
+      } as Parameters<typeof updateDesignVariables>[1])
+
+      // Download fonts if requested
+      if (downloadFonts && detectedFonts.length > 0) {
+        const googleFonts = detectedFonts.filter(f => f.source === 'google')
+        if (googleFonts.length > 0) {
+          await fetch('/api/fonts/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              siteId,
+              fonts: googleFonts,
+            }),
+          })
+        }
+      }
+
+      console.log('Design tokens saved successfully')
+    } catch (error) {
+      console.error('Error saving design tokens:', error)
+      throw error
+    }
+  }
 
   const handleSend = async (promptOverride?: string) => {
     const promptToSend = promptOverride || input.trim()
@@ -120,6 +297,9 @@ export function ChatPanel() {
     addMessage({ role: 'assistant', content: '', isStreaming: true })
 
     try {
+      // Reset thinking content for new request
+      setCurrentThinking('')
+
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -130,6 +310,7 @@ export function ChatPanel() {
           selectedElement: selectedElement,
           model: selectedModel.id,
           referencedPages: referencedPagesData.length > 0 ? referencedPagesData : undefined,
+          thinkingEnabled,
         }),
       })
 
@@ -152,6 +333,11 @@ export function ChatPanel() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6))
+
+              if (data.type === 'thinking') {
+                // Accumulate thinking content
+                setCurrentThinking(prev => prev + data.content)
+              }
 
               if (data.type === 'text') {
                 fullContent += data.content
@@ -189,76 +375,75 @@ export function ChatPanel() {
                   displayMessage = parsed.message || fullContent
                   console.log('Applied operation, HTML changed:', finalHtml !== currentHtml)
 
-                  // AUTO-SAVE GLOBAL COMPONENT
-                  // First check if AI explicitly marked it, otherwise auto-detect
-                  let componentType = parsed.componentType
-                  let componentName = parsed.componentName
+                  // GLOBAL COMPONENTS HANDLING
+                  // Extract header/footer from generated HTML
+                  const extracted = extractGlobalComponents(finalHtml)
+                  console.log('Extracted global components:', {
+                    header: extracted.header?.confidence,
+                    footer: extracted.footer?.confidence,
+                  })
 
-                  // If AI didn't mark it, try to auto-detect based on HTML content
-                  if (!componentType && parsed.html) {
-                    const detectedType = detectComponentType(parsed.html)
-                    if (detectedType === 'header' || detectedType === 'footer') {
-                      // Also check if user asked for header/footer
-                      const intent = detectPromptIntent(currentPromptRef.current)
-                      if ((detectedType === 'header' && intent.wantsHeader) ||
-                          (detectedType === 'footer' && intent.wantsFooter)) {
-                        componentType = detectedType
-                        componentName = `Global ${detectedType === 'header' ? 'Header' : 'Footer'}`
-                        console.log('Auto-detected component type:', componentType)
-                      }
-                    }
-                  }
+                  // Get current global components from store
+                  const currentGlobalHeader = useEditorStore.getState().globalHeader
+                  const currentGlobalFooter = useEditorStore.getState().globalFooter
 
-                  // Save if it's a header or footer
-                  if (componentType && siteId && (componentType === 'header' || componentType === 'footer')) {
-                    console.log('Saving global component:', componentType, componentName)
+                  // Check if we have new header/footer and no existing ones
+                  const hasNewHeader = extracted.header && extracted.header.confidence >= 50
+                  const hasNewFooter = extracted.footer && extracted.footer.confidence >= 50
+                  const needsHeaderSave = hasNewHeader && !currentGlobalHeader
+                  const needsFooterSave = hasNewFooter && !currentGlobalFooter
 
-                    // Extract the component HTML from the generated content
-                    const componentHtml = parsed.html
-
-                    // Save to database
-                    saveGlobalComponent({
-                      siteId,
-                      name: componentName || `Global ${componentType === 'header' ? 'Header' : 'Footer'}`,
-                      html: componentHtml,
-                      position: componentType,
-                      setAsDefault: true,
-                    }).then((result) => {
-                      if (result.success) {
-                        console.log('Global component saved:', result.componentId)
-                        // Update display message to inform user
-                        const msgs = useEditorStore.getState().messages
-                        const lastMsg = msgs[msgs.length - 1]
-                        if (lastMsg?.role === 'assistant') {
-                          updateMessage(lastMsg.id, {
-                            content: displayMessage + `\n\n✅ **${componentType === 'header' ? 'Header' : 'Footer'} als Global Component gespeichert!** Er erscheint jetzt automatisch auf allen Seiten.`,
-                          })
-                        }
-                      }
-                    }).catch((err) => {
-                      console.error('Failed to save global component:', err)
-                    })
+                  if (needsHeaderSave || needsFooterSave) {
+                    // Show dialog to save as global components
+                    console.log('Showing GlobalComponentsDialog for new components')
+                    setDetectedHeader(needsHeaderSave ? extracted.header : null)
+                    setDetectedFooter(needsFooterSave ? extracted.footer : null)
+                    setPendingFinalHtml(finalHtml)
+                    setGlobalComponentsDialogOpen(true)
+                  } else if ((hasNewHeader && currentGlobalHeader) || (hasNewFooter && currentGlobalFooter)) {
+                    // Global components already exist - just add info message
+                    // DON'T remove header/footer here - that should happen when applying!
+                    console.log('Global components already exist - will be handled on apply')
+                    displayMessage += '\n\n_Hinweis: Globale Header/Footer sind bereits vorhanden und werden automatisch verwendet._'
                   }
                 } else {
                   console.log('Failed to parse operation format')
                 }
 
-                // Update message with final result
+                // Update message with final result (including thinking)
                 const msgs = useEditorStore.getState().messages
                 const lastMsg = msgs[msgs.length - 1]
+                const thinkingContent = currentThinking // Capture current thinking state
+
+                // For add/modify operations, show only the new section in preview
+                // For replace_all, show the full page
+                const isPartialUpdate = parsed && (parsed.operation === 'add' || parsed.operation === 'modify')
+                const previewContent = isPartialUpdate ? parsed.html : finalHtml
 
                 if (lastMsg?.role === 'assistant') {
                   updateMessage(lastMsg.id, {
                     content: displayMessage,
-                    generatedHtml: finalHtml,
+                    generatedHtml: finalHtml,        // Full page (for applying)
+                    previewHtml: previewContent,     // Just new section (for preview)
+                    thinking: thinkingContent || undefined,
                     isStreaming: false,
-                    tokensUsed: data.usage?.output_tokens,
+                    // Show only output tokens (what AI generated), not total (includes our prompt)
+                    tokensUsed: data.usage?.output_tokens || 0,
                     model: selectedModel.name,
                   })
                 }
 
                 // Don't auto-apply - user must click "Anwenden" button
                 // applyGeneratedHtml(finalHtml)
+
+                // Check if we should show Design System Dialog
+                // Only show once per session and only if site has no custom tokens
+                if (siteId && !hasCheckedDesignTokens && parsed && parsed.html) {
+                  setHasCheckedDesignTokens(true)
+
+                  // Check if site already has custom design tokens
+                  checkAndShowDesignDialog(siteId, finalHtml)
+                }
               }
 
               if (data.type === 'error') throw new Error(data.message)
@@ -366,15 +551,21 @@ export function ChatPanel() {
     }
   }
 
+  // Models with thinking support flag
   const models = [
-    { name: 'Gemini 3 Pro', id: 'gemini-3-pro-preview', description: 'Bestes Model' },
-    { name: 'Gemini 2.5 Flash', id: 'gemini-2.5-flash', description: 'Schnell & günstig' },
+    { name: 'Gemini 3 Pro', id: 'gemini-3-pro-preview', description: 'Neuestes Model', supportsThinking: true },
+    { name: 'Gemini 2.5 Flash', id: 'gemini-2.5-flash', description: 'Smart & Thinking', supportsThinking: true },
+    { name: 'Gemini 2.5 Pro', id: 'gemini-2.5-pro', description: 'Bestes Model', supportsThinking: true },
+    { name: 'Gemini 2.0 Flash', id: 'gemini-2.0-flash', description: 'Sehr schnell', supportsThinking: false },
   ]
+
+  // Check if current model supports thinking
+  const currentModelSupportsThinking = models.find(m => m.id === selectedModel.id)?.supportsThinking ?? false
 
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
       {/* Messages Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="p-4 space-y-6 min-w-0">
           {/* Empty State */}
           {messages.length === 0 && (
@@ -409,18 +600,24 @@ export function ChatPanel() {
             </div>
           )}
 
-          {/* Messages */}
-          {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
-          ))}
+          {/* Messages with Thinking integrated */}
+          {messages.map((message, index) => {
+            const isLastMessage = index === messages.length - 1
+            const isStreamingAssistant = message.role === 'assistant' && message.isStreaming
+            const showThinkingBeforeThis = isLastMessage && isStreamingAssistant && thinkingEnabled && currentThinking
 
-          {/* Thinking Indicator */}
-          {isGenerating && messages[messages.length - 1]?.role === 'user' && (
-            <div className="flex items-center gap-2 text-sm text-zinc-500">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>AI denkt nach...</span>
-            </div>
-          )}
+            return (
+              <div key={message.id}>
+                {/* Show Thinking BEFORE the streaming assistant response */}
+                {showThinkingBeforeThis && (
+                  <div className="mb-4">
+                    <ThinkingDisplay content={currentThinking} isComplete={!!message.content} />
+                  </div>
+                )}
+                <ChatMessage message={message} />
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -560,6 +757,21 @@ export function ChatPanel() {
                 </div>
               )}
             </div>
+
+            {/* Thinking Mode Toggle - nur bei unterstützten Models */}
+            {currentModelSupportsThinking && (
+              <button
+                onClick={() => setThinkingEnabled(!thinkingEnabled)}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  thinkingEnabled
+                    ? 'text-purple-700 bg-purple-100 hover:bg-purple-200'
+                    : 'text-zinc-500 bg-zinc-100 hover:bg-zinc-200'
+                }`}
+                title={thinkingEnabled ? 'Thinking Mode aktiv (klicken zum deaktivieren)' : 'Thinking Mode aktivieren'}
+              >
+                <Brain className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {/* Token/Character Count */}
@@ -577,6 +789,137 @@ export function ChatPanel() {
         onOpenChange={setPromptBuilderOpen}
         onSubmit={(prompt) => handleSend(prompt)}
       />
+
+      {/* Design System Dialog */}
+      {suggestedTokens && (
+        <DesignSystemDialog
+          open={designDialogOpen}
+          onOpenChange={setDesignDialogOpen}
+          suggestedTokens={suggestedTokens}
+          detectedFonts={detectedFonts}
+          onSave={handleSaveDesignTokens}
+          onSkip={() => setDesignDialogOpen(false)}
+        />
+      )}
+
+      {/* Global Components Dialog */}
+      <GlobalComponentsDialog
+        open={globalComponentsDialogOpen}
+        onOpenChange={setGlobalComponentsDialogOpen}
+        detectedHeader={detectedHeader}
+        detectedFooter={detectedFooter}
+        onSave={async (headerName, footerName) => {
+          if (!siteId) return
+
+          // Save header as global component
+          if (headerName && detectedHeader) {
+            const result = await saveGlobalComponent({
+              siteId,
+              name: headerName,
+              html: detectedHeader.html,
+              position: 'header',
+              setAsDefault: true,
+            })
+            if (result.success) {
+              console.log('Header saved:', result.componentId)
+            }
+          }
+
+          // Save footer as global component
+          if (footerName && detectedFooter) {
+            const result = await saveGlobalComponent({
+              siteId,
+              name: footerName,
+              html: detectedFooter.html,
+              position: 'footer',
+              setAsDefault: true,
+            })
+            if (result.success) {
+              console.log('Footer saved:', result.componentId)
+            }
+          }
+
+          // Remove saved header/footer from pending HTML and apply
+          if (pendingFinalHtml) {
+            const cleanedHtml = removeHeaderFooterFromHtml(pendingFinalHtml, {
+              removeHeader: !!headerName && !!detectedHeader,
+              removeFooter: !!footerName && !!detectedFooter,
+            })
+            applyGeneratedHtml(cleanedHtml)
+          }
+
+          // Reload global components
+          await loadGlobalComponents()
+
+          // Reset state
+          setDetectedHeader(null)
+          setDetectedFooter(null)
+          setPendingFinalHtml(null)
+          setGlobalComponentsDialogOpen(false)
+        }}
+        onSkip={() => {
+          // Just apply the HTML as-is (keeping inline header/footer)
+          if (pendingFinalHtml) {
+            applyGeneratedHtml(pendingFinalHtml)
+          }
+          setDetectedHeader(null)
+          setDetectedFooter(null)
+          setPendingFinalHtml(null)
+          setGlobalComponentsDialogOpen(false)
+        }}
+      />
+    </div>
+  )
+}
+
+/**
+ * ThinkingDisplay - Shows AI reasoning process during generation
+ */
+function ThinkingDisplay({ content, isComplete }: { content: string; isComplete?: boolean }) {
+  const [isExpanded, setIsExpanded] = useState(true)
+
+  // Auto-collapse when thinking is complete and response starts
+  useEffect(() => {
+    if (isComplete) {
+      setIsExpanded(false)
+    }
+  }, [isComplete])
+
+  return (
+    <div className={`border rounded-xl overflow-hidden transition-all ${
+      isComplete
+        ? 'border-purple-200/50 bg-purple-50/30'
+        : 'border-purple-300 bg-purple-50/50 shadow-sm'
+    }`}>
+      {/* Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between px-4 py-2 bg-purple-100/50 hover:bg-purple-100 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Brain className={`h-4 w-4 text-purple-600 ${!isComplete ? 'animate-pulse' : ''}`} />
+          <span className="text-sm font-medium text-purple-700">
+            {isComplete ? 'AI hat nachgedacht' : 'AI denkt nach...'}
+          </span>
+        </div>
+        {isExpanded ? (
+          <ChevronUp className="h-4 w-4 text-purple-500" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-purple-500" />
+        )}
+      </button>
+
+      {/* Content */}
+      {isExpanded && (
+        <div className="px-4 py-3 max-h-48 overflow-y-auto">
+          <p className="text-sm text-purple-900/80 whitespace-pre-wrap leading-relaxed">
+            {content}
+            {!isComplete && (
+              <span className="inline-block w-1.5 h-4 bg-purple-500 animate-pulse ml-0.5 align-middle" />
+            )}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

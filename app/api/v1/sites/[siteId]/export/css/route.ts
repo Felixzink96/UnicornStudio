@@ -11,6 +11,7 @@ import {
 } from '@/lib/api/responses'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { getStoredFonts, generateExportFontFaceCSS } from '@/lib/fonts/font-storage'
 
 interface RouteParams {
   params: Promise<{ siteId: string }>
@@ -129,6 +130,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const siteSettings = siteRes.data?.settings as Record<string, unknown> | null
     const cssVariables = generateCSSVariables(designVars, siteSettings)
 
+    // 9.5. Get stored fonts and generate @font-face CSS
+    let fontFaceCSS = ''
+    try {
+      const storedFonts = await getStoredFonts(siteId)
+      if (storedFonts.length > 0) {
+        fontFaceCSS = generateExportFontFaceCSS(storedFonts, './fonts')
+        console.log(`[CSS Export] Generated @font-face CSS for ${storedFonts.length} font files`)
+      }
+    } catch (fontError) {
+      console.error('[CSS Export] Error loading fonts:', fontError)
+    }
+
     // 10. Compile Tailwind CSS using v4 API with custom theme
     let tailwindCSS = ''
     let keyframesCSS = ''
@@ -165,6 +178,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
    Host this file locally for GDPR compliance.
    ================================================================== */
 
+${fontFaceCSS ? `/* ----------------------------------------------------------------
+   LOCAL FONTS (@font-face)
+   These fonts are hosted locally for GDPR compliance.
+   Make sure to copy the font files to the ./fonts/ directory.
+   ---------------------------------------------------------------- */
+${fontFaceCSS}
+` : ''}
 /* ----------------------------------------------------------------
    CSS VARIABLES (Design Tokens)
    ---------------------------------------------------------------- */
@@ -371,7 +391,7 @@ function extractAllClasses(html: string): Set<string> {
 }
 
 /**
- * Generate CSS Variables from design tokens
+ * Generate CSS Variables and Token Classes from design tokens
  */
 function generateCSSVariables(
   designVars: Record<string, unknown> | null,
@@ -383,6 +403,7 @@ function generateCSSVariables(
     colors: {
       brand: { primary: '#3b82f6', secondary: '#64748b', accent: '#f59e0b' },
       semantic: { success: '#22c55e', warning: '#f59e0b', error: '#ef4444', info: '#3b82f6' },
+      neutral: { '50': '#fafafa', '100': '#f4f4f5', '200': '#e4e4e7', '900': '#18181b' },
     },
     typography: { fontHeading: 'Inter', fontBody: 'Inter', fontMono: 'JetBrains Mono' },
   }
@@ -419,13 +440,82 @@ function generateCSSVariables(
   // Typography
   const typography = (designVars?.typography as Record<string, unknown>) || defaults.typography
   css += `\n  /* Typography */\n`
-  css += `  --font-heading: ${typography.fontHeading || 'Inter'}, system-ui, sans-serif;\n`
-  css += `  --font-body: ${typography.fontBody || 'Inter'}, system-ui, sans-serif;\n`
-  css += `  --font-mono: ${typography.fontMono || 'JetBrains Mono'}, monospace;\n`
+  css += `  --font-heading: '${typography.fontHeading || 'Inter'}', system-ui, sans-serif;\n`
+  css += `  --font-body: '${typography.fontBody || 'Inter'}', system-ui, sans-serif;\n`
+  css += `  --font-mono: '${typography.fontMono || 'JetBrains Mono'}', monospace;\n`
 
-  css += '}\n'
+  // Design Token Variables (for use in classes)
+  css += `\n  /* Design Token Variables */\n`
+
+  // Primary colors with hover variant
+  const primaryColor = colors.brand?.primary || defaults.colors.brand.primary
+  const primaryHover = darkenHexColor(primaryColor, 10)
+  css += `  --color-primary: ${primaryColor};\n`
+  css += `  --color-primary-hover: ${primaryHover};\n`
+
+  // Other token colors
+  css += `  --color-secondary: ${colors.brand?.secondary || defaults.colors.brand.secondary};\n`
+  css += `  --color-accent: ${colors.brand?.accent || defaults.colors.brand.accent};\n`
+  css += `  --color-background: ${colors.neutral?.['50'] || defaults.colors.neutral['50']};\n`
+  css += `  --color-foreground: ${colors.neutral?.['900'] || defaults.colors.neutral['900']};\n`
+  css += `  --color-muted: ${colors.neutral?.['100'] || defaults.colors.neutral['100']};\n`
+  css += `  --color-border: ${colors.neutral?.['200'] || defaults.colors.neutral['200']};\n`
+
+  css += '}\n\n'
+
+  // Generate Design Token Utility Classes
+  css += `/* Design Token Utility Classes */\n`
+  css += `/* These classes use CSS variables and update automatically when tokens change */\n\n`
+
+  // Background colors
+  css += `.bg-primary { background-color: var(--color-primary); }\n`
+  css += `.bg-primary-hover { background-color: var(--color-primary-hover); }\n`
+  css += `.hover\\:bg-primary-hover:hover { background-color: var(--color-primary-hover); }\n`
+  css += `.bg-secondary { background-color: var(--color-secondary); }\n`
+  css += `.bg-accent { background-color: var(--color-accent); }\n`
+  css += `.bg-background { background-color: var(--color-background); }\n`
+  css += `.bg-muted { background-color: var(--color-muted); }\n\n`
+
+  // Text colors
+  css += `.text-primary { color: var(--color-primary); }\n`
+  css += `.text-secondary { color: var(--color-secondary); }\n`
+  css += `.text-accent { color: var(--color-accent); }\n`
+  css += `.text-foreground { color: var(--color-foreground); }\n`
+  css += `.text-muted-foreground { color: color-mix(in srgb, var(--color-foreground) 60%, transparent); }\n\n`
+
+  // Border colors
+  css += `.border-primary { border-color: var(--color-primary); }\n`
+  css += `.border-secondary { border-color: var(--color-secondary); }\n`
+  css += `.border-border { border-color: var(--color-border); }\n\n`
+
+  // Font families
+  css += `.font-heading { font-family: var(--font-heading); }\n`
+  css += `.font-body { font-family: var(--font-body); }\n`
+  css += `.font-mono { font-family: var(--font-mono); }\n\n`
+
+  // Ring colors for focus states
+  css += `.ring-primary { --tw-ring-color: var(--color-primary); }\n`
+  css += `.focus\\:ring-primary:focus { --tw-ring-color: var(--color-primary); }\n`
 
   return css
+}
+
+/**
+ * Darken a hex color by a percentage
+ */
+function darkenHexColor(hex: string, percent: number): string {
+  // Remove # if present
+  hex = hex.replace('#', '')
+
+  // Parse hex values
+  const num = parseInt(hex, 16)
+  const amt = Math.round(2.55 * percent)
+
+  const R = Math.max(0, (num >> 16) - amt)
+  const G = Math.max(0, ((num >> 8) & 0x00FF) - amt)
+  const B = Math.max(0, (num & 0x0000FF) - amt)
+
+  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)
 }
 
 /**

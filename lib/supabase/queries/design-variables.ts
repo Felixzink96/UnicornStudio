@@ -210,53 +210,87 @@ export async function resetDesignVariables(
  * Generate CSS from design variables
  */
 export function generateCSS(variables: DesignVariables): string {
+  if (!variables) return ':root {}\n'
+
   let css = ':root {\n'
 
   // Colors
-  for (const [category, colors] of Object.entries(variables.colors)) {
-    for (const [key, value] of Object.entries(colors)) {
-      css += `  --color-${category}-${key}: ${value};\n`
+  if (variables.colors) {
+    for (const [category, colors] of Object.entries(variables.colors)) {
+      if (colors && typeof colors === 'object') {
+        for (const [key, value] of Object.entries(colors)) {
+          if (value) css += `  --color-${category}-${key}: ${value};\n`
+        }
+      }
     }
   }
 
   // Typography
-  css += `  --font-heading: ${variables.typography.fontHeading};\n`
-  css += `  --font-body: ${variables.typography.fontBody};\n`
-  css += `  --font-mono: ${variables.typography.fontMono};\n`
+  if (variables.typography) {
+    if (variables.typography.fontHeading) {
+      css += `  --font-heading: ${variables.typography.fontHeading};\n`
+    }
+    if (variables.typography.fontBody) {
+      css += `  --font-body: ${variables.typography.fontBody};\n`
+    }
+    if (variables.typography.fontMono) {
+      css += `  --font-mono: ${variables.typography.fontMono};\n`
+    }
 
-  for (const [key, value] of Object.entries(variables.typography.fontSizes)) {
-    css += `  --font-size-${key}: ${value};\n`
-  }
+    if (variables.typography.fontSizes) {
+      for (const [key, value] of Object.entries(variables.typography.fontSizes)) {
+        if (value) css += `  --font-size-${key}: ${value};\n`
+      }
+    }
 
-  for (const [key, value] of Object.entries(variables.typography.fontWeights)) {
-    css += `  --font-weight-${key}: ${value};\n`
-  }
+    if (variables.typography.fontWeights) {
+      for (const [key, value] of Object.entries(variables.typography.fontWeights)) {
+        if (value) css += `  --font-weight-${key}: ${value};\n`
+      }
+    }
 
-  for (const [key, value] of Object.entries(variables.typography.lineHeights)) {
-    css += `  --line-height-${key}: ${value};\n`
+    if (variables.typography.lineHeights) {
+      for (const [key, value] of Object.entries(variables.typography.lineHeights)) {
+        if (value) css += `  --line-height-${key}: ${value};\n`
+      }
+    }
   }
 
   // Spacing
-  for (const [key, value] of Object.entries(variables.spacing.scale)) {
-    css += `  --spacing-${key}: ${value};\n`
-  }
+  if (variables.spacing) {
+    if (variables.spacing.scale) {
+      for (const [key, value] of Object.entries(variables.spacing.scale)) {
+        if (value) css += `  --spacing-${key}: ${value};\n`
+      }
+    }
 
-  for (const [key, value] of Object.entries(variables.spacing.containerWidths)) {
-    css += `  --container-${key}: ${value};\n`
+    if (variables.spacing.containerWidths) {
+      for (const [key, value] of Object.entries(variables.spacing.containerWidths)) {
+        if (value) css += `  --container-${key}: ${value};\n`
+      }
+    }
   }
 
   // Borders
-  for (const [key, value] of Object.entries(variables.borders.radius)) {
-    css += `  --radius-${key}: ${value};\n`
-  }
+  if (variables.borders) {
+    if (variables.borders.radius) {
+      for (const [key, value] of Object.entries(variables.borders.radius)) {
+        if (value) css += `  --radius-${key}: ${value};\n`
+      }
+    }
 
-  for (const [key, value] of Object.entries(variables.borders.widths)) {
-    css += `  --border-${key}: ${value};\n`
+    if (variables.borders.widths) {
+      for (const [key, value] of Object.entries(variables.borders.widths)) {
+        if (value) css += `  --border-${key}: ${value};\n`
+      }
+    }
   }
 
   // Shadows
-  for (const [key, value] of Object.entries(variables.shadows)) {
-    css += `  --shadow-${key}: ${value};\n`
+  if (variables.shadows) {
+    for (const [key, value] of Object.entries(variables.shadows)) {
+      if (value) css += `  --shadow-${key}: ${value};\n`
+    }
   }
 
   css += '}\n'
@@ -268,27 +302,29 @@ export function generateCSS(variables: DesignVariables): string {
  * Generate Tailwind config from design variables
  */
 export function generateTailwindConfig(variables: DesignVariables): object {
+  if (!variables) return { theme: { extend: {} } }
+
   return {
     theme: {
       extend: {
         colors: {
-          brand: variables.colors.brand,
-          semantic: variables.colors.semantic,
-          neutral: variables.colors.neutral,
+          brand: variables.colors?.brand || {},
+          semantic: variables.colors?.semantic || {},
+          neutral: variables.colors?.neutral || {},
         },
         fontFamily: {
-          heading: [variables.typography.fontHeading, 'sans-serif'],
-          body: [variables.typography.fontBody, 'sans-serif'],
-          mono: [variables.typography.fontMono, 'monospace'],
+          heading: [variables.typography?.fontHeading || 'Inter', 'sans-serif'],
+          body: [variables.typography?.fontBody || 'Inter', 'sans-serif'],
+          mono: [variables.typography?.fontMono || 'monospace', 'monospace'],
         },
-        fontSize: variables.typography.fontSizes,
-        fontWeight: variables.typography.fontWeights,
-        lineHeight: variables.typography.lineHeights,
-        spacing: variables.spacing.scale,
-        maxWidth: variables.spacing.containerWidths,
-        borderRadius: variables.borders.radius,
-        borderWidth: variables.borders.widths,
-        boxShadow: variables.shadows,
+        fontSize: variables.typography?.fontSizes || {},
+        fontWeight: variables.typography?.fontWeights || {},
+        lineHeight: variables.typography?.lineHeights || {},
+        spacing: variables.spacing?.scale || {},
+        maxWidth: variables.spacing?.containerWidths || {},
+        borderRadius: variables.borders?.radius || {},
+        borderWidth: variables.borders?.widths || {},
+        boxShadow: variables.shadows || {},
       },
     },
   }

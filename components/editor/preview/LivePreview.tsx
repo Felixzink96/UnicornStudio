@@ -1,8 +1,9 @@
 'use client'
 
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useMemo } from 'react'
 import { useEditorStore } from '@/stores/editor-store'
 import type { SelectedElement, Breakpoint } from '@/types/editor'
+import { insertGlobalComponents } from '@/lib/ai/html-operations'
 
 const BREAKPOINT_WIDTHS: Record<Breakpoint, string> = {
   desktop: '100%',
@@ -18,6 +19,13 @@ export function LivePreview() {
   const breakpoint = useEditorStore((s) => s.breakpoint)
   const selectElement = useEditorStore((s) => s.selectElement)
   const updateHtml = useEditorStore((s) => s.updateHtml)
+  const globalHeader = useEditorStore((s) => s.globalHeader)
+  const globalFooter = useEditorStore((s) => s.globalFooter)
+
+  // Combine page HTML with global header/footer for preview
+  const previewHtml = useMemo(() => {
+    return insertGlobalComponents(html, globalHeader, globalFooter)
+  }, [html, globalHeader, globalFooter])
 
   const getHtmlWithScript = useCallback((html: string): string => {
     if (viewMode !== 'design') return html
@@ -690,7 +698,7 @@ export function LivePreview() {
       >
         <iframe
           ref={iframeRef}
-          srcDoc={getHtmlWithScript(html)}
+          srcDoc={getHtmlWithScript(previewHtml)}
           className="w-full h-full border-0 block bg-white"
           sandbox="allow-scripts allow-same-origin"
         />

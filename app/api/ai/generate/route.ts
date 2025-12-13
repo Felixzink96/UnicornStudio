@@ -1,8 +1,76 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import { buildSystemPrompt } from '@/lib/ai/system-prompt'
+import { GoogleGenAI } from '@google/genai'
+import { buildSystemPrompt, type DesignTokensForAI, type GlobalComponentsForAI } from '@/lib/ai/system-prompt'
 import { createClient } from '@/lib/supabase/server'
+import { darkenHex } from '@/lib/design/style-extractor'
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
+const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! })
+
+// Extract style summary from HTML to reduce token usage
+// Instead of sending full page HTML (~10k tokens), send compact summary (~500 tokens)
+function extractStyleSummary(html: string): string {
+  const summary: string[] = []
+
+  // Extract section IDs
+  const sectionIds = html.match(/id=["']([^"']+)["']/g)?.map(m => m.match(/["']([^"']+)["']/)?.[1]).filter(Boolean) || []
+  if (sectionIds.length > 0) {
+    summary.push(`Sections: ${sectionIds.slice(0, 8).join(', ')}`)
+  }
+
+  // Extract color classes (most common)
+  const bgColors = html.match(/\bbg-[a-z]+-\d{2,3}\b/g) || []
+  const textColors = html.match(/\btext-[a-z]+-\d{2,3}\b/g) || []
+  const uniqueBgColors = [...new Set(bgColors)].slice(0, 5)
+  const uniqueTextColors = [...new Set(textColors)].slice(0, 5)
+
+  if (uniqueBgColors.length > 0) {
+    summary.push(`Hintergrund-Farben: ${uniqueBgColors.join(', ')}`)
+  }
+  if (uniqueTextColors.length > 0) {
+    summary.push(`Text-Farben: ${uniqueTextColors.join(', ')}`)
+  }
+
+  // Extract button styles (first button found)
+  const buttonMatch = html.match(/<button[^>]*class=["']([^"']+)["'][^>]*>/i)
+  if (buttonMatch) {
+    summary.push(`Button-Style: ${buttonMatch[1].split(' ').slice(0, 10).join(' ')}`)
+  }
+
+  // Extract gradient usage
+  const gradients = html.match(/\bbg-gradient-to-[a-z]+\b/g)
+  if (gradients && gradients.length > 0) {
+    summary.push(`Gradients: ${[...new Set(gradients)].join(', ')}`)
+  }
+
+  // Extract spacing patterns
+  const sectionPadding = html.match(/\bpy-\d+\b/g)
+  if (sectionPadding) {
+    const commonPadding = [...new Set(sectionPadding)].slice(0, 3)
+    summary.push(`Section-Padding: ${commonPadding.join(', ')}`)
+  }
+
+  // Extract font classes
+  const fontClasses = html.match(/\bfont-(sans|serif|mono|heading|body|[a-z]+)\b/g)
+  if (fontClasses) {
+    summary.push(`Fonts: ${[...new Set(fontClasses)].join(', ')}`)
+  }
+
+  // Extract border-radius patterns
+  const rounded = html.match(/\brounded(-[a-z]+)?\b/g)
+  if (rounded) {
+    summary.push(`Border-Radius: ${[...new Set(rounded)].slice(0, 4).join(', ')}`)
+  }
+
+  // Extract one sample heading for context
+  const h1Match = html.match(/<h1[^>]*>([^<]+)</i)
+  const h2Match = html.match(/<h2[^>]*>([^<]+)</i)
+  if (h1Match) {
+    summary.push(`Haupt-Headline: "${h1Match[1].trim().substring(0, 50)}"`)
+  } else if (h2Match) {
+    summary.push(`Headline-Beispiel: "${h2Match[1].trim().substring(0, 50)}"`)
+  }
+
+  return summary.join('\n')
+}
 
 export async function POST(request: Request) {
   try {
@@ -15,22 +83,97 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { prompt, existingHtml, context, selectedElement, model: modelId, referencedPages } = body as {
+    const { prompt, existingHtml, context, selectedElement, model: modelId, referencedPages, thinkingEnabled } = body as {
       prompt: string
       existingHtml?: string
-      context?: { siteType?: string; industry?: string; style?: string; colors?: Record<string, string>; fonts?: Record<string, string> }
+      context?: {
+        siteId?: string
+        siteType?: string
+        industry?: string
+        style?: string
+        colors?: Record<string, string>
+        fonts?: Record<string, string>
+      }
       selectedElement?: { outerHTML: string; selector?: string }
       model?: string
       referencedPages?: Array<{ name: string; html: string }>
+      thinkingEnabled?: boolean
     }
 
-    // Build the system prompt with context
+    // Load design tokens from database if siteId is provided
+    let designTokens: DesignTokensForAI | undefined
+    const siteId = context?.siteId
+
+    if (siteId) {
+      try {
+        const { data: variables } = await supabase
+          .from('design_variables')
+          .select('*')
+          .eq('site_id', siteId)
+          .single()
+
+        // Type cast the JSON fields
+        const colors = variables?.colors as Record<string, Record<string, string>> | null
+        const typography = variables?.typography as Record<string, string> | null
+
+        // Check if site has custom design tokens (not default)
+        // Database default is #3b82f6 (blue-500)
+        const defaultPrimary = '#3b82f6'
+        if (variables && colors?.brand?.primary && colors.brand.primary !== defaultPrimary) {
+          designTokens = {
+            colors: {
+              primary: colors.brand.primary,
+              primaryHover: darkenHex(colors.brand.primary, 10),
+              secondary: colors.brand.secondary || '#64748b',
+              accent: colors.brand.accent || colors.brand.secondary || '#f59e0b',
+              background: colors.neutral?.['50'] || '#ffffff',
+              foreground: colors.neutral?.['900'] || '#0f172a',
+              muted: colors.neutral?.['100'] || '#f1f5f9',
+              border: colors.neutral?.['200'] || '#e2e8f0',
+            },
+            fonts: {
+              heading: typography?.fontHeading || 'Inter',
+              body: typography?.fontBody || 'Inter',
+            },
+          }
+        }
+      } catch (error) {
+        // No design tokens found, continue without them
+        console.log('No custom design tokens for site:', siteId)
+      }
+    }
+
+    // Load global components info to tell AI if header/footer already exist
+    let globalComponents: GlobalComponentsForAI | undefined
+    if (siteId) {
+      try {
+        const { data: site } = await supabase
+          .from('sites')
+          .select('global_header_id, global_footer_id')
+          .eq('id', siteId)
+          .single()
+
+        if (site) {
+          globalComponents = {
+            hasGlobalHeader: !!site.global_header_id,
+            hasGlobalFooter: !!site.global_footer_id,
+          }
+          console.log('Global components status:', globalComponents)
+        }
+      } catch (error) {
+        console.log('Could not load global components info:', error)
+      }
+    }
+
+    // Build the system prompt with context and design tokens
     const systemPrompt = buildSystemPrompt({
       siteType: context?.siteType,
       industry: context?.industry,
       style: context?.style,
       colors: context?.colors,
       fonts: context?.fonts,
+      designTokens,
+      globalComponents,
     })
 
     // Determine if page has content
@@ -49,18 +192,35 @@ export async function POST(request: Request) {
     }
 
     if (hasExistingContent) {
-      userMessage += `BESTEHENDE SEITE - ANALYSIERE SIE GENAU:
+      userMessage += `⚠️ WICHTIG: DIE SEITE HAT BEREITS INHALT!
+
+BESTEHENDER HTML-CODE:
 \`\`\`html
 ${existingHtml}
 \`\`\`
 
-DEINE AUFGABEN:
-1. Analysiere die bestehende Seite: Welches Thema? Welche Farben? Welcher Stil?
-2. Erstelle Content der thematisch passt (KEIN generischer Text!)
-3. Übernimm exakt das Farbschema und Design der bestehenden Sections
-4. Verwende OPERATION: add um die neue Section hinzuzufügen
+🚫 VERBOTEN: replace_all oder kompletten HTML-Code mit <!DOCTYPE> ausgeben!
+✅ PFLICHT: Nur OPERATION: add, modify oder delete verwenden!
 
-Die neue Section muss aussehen als wäre sie Teil der existierenden Seite!`
+DEINE AUFGABEN:
+1. Analysiere den bestehenden Code und übernimm exakt das Design
+2. Gib NUR den NEUEN/GEÄNDERTEN Teil aus - NICHT die ganze Seite!
+3. Bei Löschungen: Verwende OPERATION: delete mit SELECTOR
+
+BEISPIEL FÜR KORREKTEN OUTPUT:
+\`\`\`
+MESSAGE: Neue FAQ Section hinzugefügt
+---
+OPERATION: add
+POSITION: end
+---
+<section id="faq" class="py-24 bg-white">
+  ... NUR diese Section ...
+</section>
+\`\`\`
+
+❌ FALSCH: <!DOCTYPE html>... komplette Seite
+✅ RICHTIG: Nur <section>... neue Section ...</section>`
     } else {
       userMessage += `Die Seite ist leer. Verwende OPERATION: replace_all um eine komplette HTML-Seite zu erstellen.`
     }
@@ -78,37 +238,81 @@ ANFRAGE: ${prompt}
 Verwende OPERATION: modify mit dem passenden SELECTOR.`
     }
 
-    // Initialize Gemini model (no JSON schema - just text streaming)
-    // Use gemini-2.0-flash-exp for faster responses, fallback to provided model
-    const model = genAI.getGenerativeModel({
-      model: modelId || 'gemini-2.0-flash-exp',
-      systemInstruction: systemPrompt,
-    })
+    // Always use the model selected by user in chat
+    const selectedModel = modelId || 'gemini-2.0-flash'
 
-    // Generate with streaming
-    const result = await model.generateContentStream(userMessage)
+    // Build generation config
+    const config: Record<string, unknown> = {
+      temperature: 1.2,       // Hoch = sehr kreativ
+      topP: 0.85,             // Fokussiert aber nicht zu eingeschränkt
+      topK: 40,               // Standard Token-Auswahl
+      maxOutputTokens: 65536, // Maximum für große Seiten
+    }
+
+    // Add thinking config if enabled
+    if (thinkingEnabled) {
+      config.thinkingConfig = {
+        includeThoughts: true,
+        thinkingBudget: 8192,
+      }
+    }
+
+    // Generate with streaming using new SDK
+    const response = await genAI.models.generateContentStream({
+      model: selectedModel,
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userMessage }] }
+      ],
+      config: Object.keys(config).length > 0 ? config : undefined,
+    })
 
     // Create a ReadableStream that emits SSE events
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of result.stream) {
-            const text = chunk.text()
-            if (text) {
-              const data = JSON.stringify({ type: 'text', content: text })
+          // Track usage metadata from chunks
+          let usageMetadata: {
+            promptTokenCount?: number
+            candidatesTokenCount?: number
+            totalTokenCount?: number
+            thoughtsTokenCount?: number
+          } | null = null
+
+          for await (const chunk of response) {
+            // Capture usage metadata if available (usually on last chunk)
+            if (chunk.usageMetadata) {
+              usageMetadata = chunk.usageMetadata
+            }
+
+            // Check for thought parts when thinking is enabled
+            if (chunk.candidates?.[0]?.content?.parts) {
+              for (const part of chunk.candidates[0].content.parts) {
+                if (part.thought && part.text) {
+                  // Send thinking content
+                  const thinkingData = JSON.stringify({ type: 'thinking', content: part.text })
+                  controller.enqueue(encoder.encode(`data: ${thinkingData}\n\n`))
+                } else if (part.text) {
+                  // Send regular content
+                  const data = JSON.stringify({ type: 'text', content: part.text })
+                  controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+                }
+              }
+            } else if (chunk.text) {
+              // Fallback for simple text response
+              const data = JSON.stringify({ type: 'text', content: chunk.text })
               controller.enqueue(encoder.encode(`data: ${data}\n\n`))
             }
           }
 
-          // Get final response for token count
-          const response = await result.response
-
+          // Send done event with actual usage data
           const doneData = JSON.stringify({
             type: 'done',
             usage: {
-              input_tokens: response.usageMetadata?.promptTokenCount || 0,
-              output_tokens: response.usageMetadata?.candidatesTokenCount || 0,
+              input_tokens: usageMetadata?.promptTokenCount || 0,
+              output_tokens: usageMetadata?.candidatesTokenCount || 0,
+              thinking_tokens: usageMetadata?.thoughtsTokenCount || 0,
+              total_tokens: usageMetadata?.totalTokenCount || 0,
             }
           })
           controller.enqueue(encoder.encode(`data: ${doneData}\n\n`))

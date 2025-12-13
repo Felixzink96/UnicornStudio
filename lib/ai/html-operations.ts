@@ -1,4 +1,5 @@
-import type { ComponentPosition } from '@/types/global-components'
+import type { ComponentPosition, DetectedComponent } from '@/types/global-components'
+import { analyzeHtmlForComponents, detectHeader, detectFooter } from './component-detection'
 
 // Types for HTML operations
 export interface ParsedOperation {
@@ -65,11 +66,8 @@ export function parseOperationFormat(content: string): ParsedOperation | null {
     const componentNameMatch = content.match(/COMPONENT_NAME:\s*([^\n]+)/i)
     const componentName = componentNameMatch ? componentNameMatch[1].trim() : undefined
 
-    // Remove COMPONENT_TYPE and COMPONENT_NAME from html if they got included
-    html = html
-      .replace(/\n?---\n?COMPONENT_TYPE:[^\n]*/gi, '')
-      .replace(/COMPONENT_NAME:[^\n]*/gi, '')
-      .trim()
+    // Remove any operation metadata that may have leaked into HTML
+    html = cleanOperationMetadataFromHtml(html)
 
     if (!html) return null
 
@@ -98,16 +96,46 @@ export function extractStreamingHtml(content: string): string | null {
     let html = parts.slice(2).join('\n---\n')
     // Remove markdown code block markers
     html = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '')
+    // Clean operation metadata that may have leaked into HTML
+    html = cleanOperationMetadataFromHtml(html)
     return html.trim() || null
   }
 
   // Fallback: look for HTML tags
   const htmlMatch = content.match(/<(!DOCTYPE|html|section|div|header|nav|main|footer|article)[^]*$/i)
   if (htmlMatch) {
-    return htmlMatch[0]
+    return cleanOperationMetadataFromHtml(htmlMatch[0])
   }
 
   return null
+}
+
+/**
+ * Remove operation metadata that may have leaked into HTML content
+ * This handles cases where AI doesn't properly separate metadata from HTML
+ */
+export function cleanOperationMetadataFromHtml(html: string): string {
+  if (!html) return html
+  return html
+    // Remove operation block at start
+    .replace(/^---\s*\nOPERATION:\s*\w+\s*\nPOSITION:\s*\w+\s*\n---\s*\n?/i, '')
+    // Remove individual operation lines anywhere
+    .replace(/\n?---\s*\n?OPERATION:\s*\w+\s*\n?/gi, '')
+    .replace(/POSITION:\s*\w+\s*\n?---\s*\n?/gi, '')
+    .replace(/OPERATION:\s*\w+\s*\n?/gi, '')
+    .replace(/POSITION:\s*\w+\s*\n?/gi, '')
+    .replace(/TARGET:\s*[^\n]+\n?/gi, '')
+    .replace(/SELECTOR:\s*[^\n]+\n?/gi, '')
+    .replace(/COMPONENT_TYPE:\s*\w+\s*\n?/gi, '')
+    .replace(/COMPONENT_NAME:\s*[^\n]+\n?/gi, '')
+    // Remove stray --- separators
+    .replace(/^---\s*\n/gm, '')
+    .replace(/\n---\s*$/gm, '')
+    // Remove AI meta-comments that shouldn't be in HTML
+    .replace(/<!--\s*Kein Code generiert[^>]*-->/gi, '')
+    .replace(/<!--\s*No code generated[^>]*-->/gi, '')
+    .replace(/<!--\s*Bitte wähle[^>]*-->/gi, '')
+    .trim()
 }
 
 // Apply operation to existing HTML
@@ -132,18 +160,34 @@ export function applyOperation(existingHtml: string, op: ParsedOperation): strin
 
 function applyAddOperation(html: string, op: ParsedOperation): string {
   const position = op.position || 'end'
+  let contentToAdd = op.html
+
+  // SAFEGUARD: If AI gave full HTML document instead of just section, extract body content
+  if (contentToAdd.includes('<!DOCTYPE') || contentToAdd.includes('<html')) {
+    console.log('Add operation received full HTML - extracting body content only')
+    const bodyMatch = contentToAdd.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+    if (bodyMatch) {
+      contentToAdd = bodyMatch[1].trim()
+    } else {
+      // Try to extract just the sections
+      const sectionsMatch = contentToAdd.match(/<(section|header|footer|nav|main|article)[^>]*>[\s\S]*<\/\1>/gi)
+      if (sectionsMatch) {
+        contentToAdd = sectionsMatch.join('\n')
+      }
+    }
+  }
 
   if (position === 'start') {
     return html.replace(
       /(<body[^>]*>)/i,
-      `$1\n${op.html}`
+      `$1\n${contentToAdd}`
     )
   }
 
   if (position === 'end') {
     return html.replace(
       /(<\/body>)/i,
-      `${op.html}\n$1`
+      `${contentToAdd}\n$1`
     )
   }
 
@@ -156,9 +200,9 @@ function applyAddOperation(html: string, op: ParsedOperation): string {
         const elementHtml = findCompleteElement(html, match.index, match[0])
         if (elementHtml) {
           if (position === 'before') {
-            return html.replace(elementHtml, `${op.html}\n${elementHtml}`)
+            return html.replace(elementHtml, `${contentToAdd}\n${elementHtml}`)
           } else {
-            return html.replace(elementHtml, `${elementHtml}\n${op.html}`)
+            return html.replace(elementHtml, `${elementHtml}\n${contentToAdd}`)
           }
         }
       }
@@ -166,7 +210,7 @@ function applyAddOperation(html: string, op: ParsedOperation): string {
   }
 
   // Fallback: add to end
-  return html.replace(/(<\/body>)/i, `${op.html}\n$1`)
+  return html.replace(/(<\/body>)/i, `${contentToAdd}\n$1`)
 }
 
 function applyModifyOperation(html: string, op: ParsedOperation): string {
@@ -296,4 +340,126 @@ function findCompleteElement(html: string, startIndex: number, openTag: string):
   }
 
   return null
+}
+
+// ============================================
+// GLOBAL COMPONENTS EXTRACTION
+// ============================================
+
+export interface ExtractedGlobalComponents {
+  header: DetectedComponent | null
+  footer: DetectedComponent | null
+  contentHtml: string // HTML with header/footer removed
+  originalHtml: string
+}
+
+/**
+ * Extract header and footer from HTML and return content-only HTML
+ * Used after AI generation to detect global components
+ */
+export function extractGlobalComponents(html: string): ExtractedGlobalComponents {
+  let contentHtml = html
+  let header: DetectedComponent | null = null
+  let footer: DetectedComponent | null = null
+
+  // Use the existing detection from component-detection.ts
+  const detected = analyzeHtmlForComponents(html)
+
+  for (const component of detected) {
+    if (component.type === 'header' && component.confidence >= 50) {
+      header = component
+    }
+    if (component.type === 'footer' && component.confidence >= 50) {
+      footer = component
+    }
+  }
+
+  // Extract header from HTML
+  if (header) {
+    const headerMatch = html.match(/<header[^>]*>[\s\S]*?<\/header>/i)
+    if (headerMatch) {
+      // Remove header from content HTML
+      contentHtml = contentHtml.replace(headerMatch[0], '').trim()
+    }
+  }
+
+  // Extract footer from HTML
+  if (footer) {
+    const footerMatch = html.match(/<footer[^>]*>[\s\S]*?<\/footer>/i)
+    if (footerMatch) {
+      // Remove footer from content HTML
+      contentHtml = contentHtml.replace(footerMatch[0], '').trim()
+    }
+  }
+
+  // Clean up any empty lines left behind
+  contentHtml = contentHtml.replace(/\n\s*\n\s*\n/g, '\n\n')
+
+  return {
+    header,
+    footer,
+    contentHtml,
+    originalHtml: html,
+  }
+}
+
+/**
+ * Remove header and/or footer from HTML and return content only
+ * Used when global components already exist
+ */
+export function removeHeaderFooterFromHtml(
+  html: string,
+  options: { removeHeader?: boolean; removeFooter?: boolean }
+): string {
+  let result = html
+
+  if (options.removeHeader) {
+    // Remove <header>...</header>
+    result = result.replace(/<header[^>]*>[\s\S]*?<\/header>/i, '')
+    // Also remove nav at the top that might be acting as header
+    const navAtTopMatch = result.match(/^(\s*<body[^>]*>\s*)(<nav[^>]*>[\s\S]*?<\/nav>)/i)
+    if (navAtTopMatch) {
+      const navHtml = navAtTopMatch[2]
+      if (detectHeader(navHtml).isHeader) {
+        result = result.replace(navHtml, '')
+      }
+    }
+  }
+
+  if (options.removeFooter) {
+    // Remove <footer>...</footer>
+    result = result.replace(/<footer[^>]*>[\s\S]*?<\/footer>/i, '')
+  }
+
+  // Clean up empty lines
+  result = result.replace(/\n\s*\n\s*\n/g, '\n\n')
+
+  return result
+}
+
+/**
+ * Insert global header and footer into page HTML
+ * Used in editor preview to show complete page
+ */
+export function insertGlobalComponents(
+  pageHtml: string,
+  header: { html: string } | null,
+  footer: { html: string } | null
+): string {
+  let result = pageHtml
+
+  // Insert header after <body>
+  if (header?.html) {
+    const bodyMatch = result.match(/(<body[^>]*>)/i)
+    if (bodyMatch) {
+      result = result.replace(bodyMatch[0], `${bodyMatch[0]}\n${header.html}`)
+    }
+  }
+
+  // Insert footer before </body>
+  if (footer?.html) {
+    result = result.replace(/<\/body>/i, `${footer.html}\n</body>`)
+  }
+
+  return result
 }

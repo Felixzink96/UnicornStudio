@@ -42,6 +42,41 @@ class Unicorn_Studio_Global_Components {
 
         // Output collected JS in wp_footer
         add_action('wp_footer', [$this, 'output_collected_js'], 999);
+
+        // Auto-render header/footer for all themes (not just Unicorn Studio theme)
+        // Only if not using the Unicorn Studio blank theme (which handles it manually)
+        if (!$this->is_unicorn_theme_active()) {
+            // Header: Use wp_body_open (WordPress 5.2+) or fallback
+            add_action('wp_body_open', [$this, 'auto_render_header'], 1);
+
+            // Footer: Render before wp_footer scripts
+            add_action('wp_footer', [$this, 'auto_render_footer'], 1);
+        }
+    }
+
+    /**
+     * Check if Unicorn Studio blank theme is active
+     *
+     * @return bool
+     */
+    private function is_unicorn_theme_active(): bool {
+        $theme = wp_get_theme();
+        $theme_slug = $theme->get_stylesheet();
+        return strpos($theme_slug, 'unicorn-studio') !== false;
+    }
+
+    /**
+     * Auto-render header for non-Unicorn themes
+     */
+    public function auto_render_header(): void {
+        self::render_header(true);
+    }
+
+    /**
+     * Auto-render footer for non-Unicorn themes
+     */
+    public function auto_render_footer(): void {
+        self::render_footer(true);
     }
 
     /**

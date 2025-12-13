@@ -139,14 +139,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       tailwindCSS = generateFallbackCSS(extractedClasses)
     }
 
-    // 11. Generate additional custom CSS that Tailwind might not cover
-    let customTailwindCSS = ''
-    if (tailwindConfig) {
-      customTailwindCSS = generateCustomTailwindCSS(tailwindConfig)
-      console.log(`[CSS Export] Generated ${customTailwindCSS.length} bytes of additional custom CSS`)
-    }
-
-    // 12. Combine everything
+    // 11. Combine everything - NO manual CSS generation, Tailwind v4 @theme handles it all
     const fullCSS = `
 /* ==================================================================
    UNICORN STUDIO - Generated CSS
@@ -164,16 +157,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 ${cssVariables}
 
 /* ----------------------------------------------------------------
-   TAILWIND UTILITIES
+   TAILWIND UTILITIES (includes custom @theme colors/fonts)
    Compiled from ${extractedClasses.size} classes found in your content
    ---------------------------------------------------------------- */
 ${tailwindCSS}
-
-/* ----------------------------------------------------------------
-   CUSTOM TAILWIND CONFIG
-   Custom colors, fonts, animations from page config
-   ---------------------------------------------------------------- */
-${customTailwindCSS}
 `.trim()
 
     // 9. Return CSS with proper headers

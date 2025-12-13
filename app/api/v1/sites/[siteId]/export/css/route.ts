@@ -16,7 +16,7 @@ interface RouteParams {
 
 /**
  * GET /api/v1/sites/:siteId/export/css
- * Export compiled CSS (design variables + Tailwind classes)
+ * Export compiled CSS using real Tailwind v4 compiler
  * GDPR-compliant: This CSS should be hosted locally by the client
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -38,21 +38,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // 3. Fetch all data needed for CSS generation
     const supabase = createAPIClient()
 
-    const [designVarsRes, pagesRes, componentsRes, templatesRes, siteRes] = await Promise.all([
+    const [designVarsRes, siteRes] = await Promise.all([
       supabase.from('design_variables').select('*').eq('site_id', siteId).single(),
-      supabase.from('pages').select('content').eq('site_id', siteId),
-      supabase.from('cms_components').select('html, variants').eq('site_id', siteId),
-      supabase.from('templates').select('html').eq('site_id', siteId),
       supabase.from('sites').select('settings').eq('id', siteId).single(),
     ])
 
-    // 4. Generate CSS Variables from design tokens
-    const designVars = designVarsRes.data
-    const siteSettings = siteRes.data?.settings as Record<string, unknown> | null
-
-    const cssVariables = generateCSSVariables(designVars, siteSettings)
-
-    // 5. Collect all HTML content for Tailwind class extraction
+    // 4. Collect all HTML content for Tailwind class extraction
     let allHtml = ''
 
     // Pages - include both html_content and content JSON
@@ -62,16 +53,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .eq('site_id', siteId)
 
     pagesWithHtml?.forEach((page) => {
-      // Add actual HTML content
       if (page.html_content) {
         allHtml += page.html_content
       }
-      // Also add JSON content for backwards compatibility
       allHtml += JSON.stringify(page.content || {})
     })
 
     // CMS Components
-    componentsRes.data?.forEach((comp) => {
+    const { data: components } = await supabase
+      .from('cms_components')
+      .select('html, variants')
+      .eq('site_id', siteId)
+
+    components?.forEach((comp) => {
       allHtml += comp.html || ''
       if (comp.variants && Array.isArray(comp.variants)) {
         (comp.variants as Array<{ html?: string }>).forEach((v) => {
@@ -81,15 +75,32 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     })
 
     // Templates
-    templatesRes.data?.forEach((tpl) => {
+    const { data: templates } = await supabase
+      .from('templates')
+      .select('html')
+      .eq('site_id', siteId)
+
+    templates?.forEach((tpl) => {
       allHtml += tpl.html || ''
     })
 
-    // 6. Extract Tailwind classes from HTML
-    const tailwindClasses = extractTailwindClasses(allHtml)
+    // 5. Extract all CSS classes from HTML
+    const extractedClasses = extractAllClasses(allHtml)
 
-    // 7. Generate Tailwind CSS (without external CDN)
-    const tailwindCSS = generateTailwindCSS(tailwindClasses, designVars)
+    // 6. Generate CSS Variables from design tokens
+    const designVars = designVarsRes.data
+    const siteSettings = siteRes.data?.settings as Record<string, unknown> | null
+    const cssVariables = generateCSSVariables(designVars, siteSettings)
+
+    // 7. Compile Tailwind CSS using v4 API
+    let tailwindCSS = ''
+    try {
+      tailwindCSS = await compileTailwindCSS(extractedClasses)
+    } catch (tailwindError) {
+      console.error('Tailwind compilation error:', tailwindError)
+      // Fallback to basic utility generation if Tailwind compile fails
+      tailwindCSS = generateFallbackCSS(extractedClasses)
+    }
 
     // 8. Combine everything
     const fullCSS = `
@@ -97,6 +108,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
    UNICORN STUDIO - Generated CSS
    Site ID: ${siteId}
    Generated: ${new Date().toISOString()}
+   Classes found: ${extractedClasses.size}
 
    DSGVO-KONFORM: Diese Datei lokal hosten!
    Host this file locally for GDPR compliance.
@@ -113,8 +125,8 @@ ${cssVariables}
 ${generateBaseStyles()}
 
 /* ----------------------------------------------------------------
-   UTILITY CLASSES (Tailwind-compatible)
-   Only classes actually used in your content
+   TAILWIND UTILITIES
+   Compiled from ${extractedClasses.size} classes found in your content
    ---------------------------------------------------------------- */
 ${tailwindCSS}
 `.trim()
@@ -134,6 +146,82 @@ ${tailwindCSS}
 }
 
 /**
+ * Compile Tailwind CSS using v4 API
+ */
+async function compileTailwindCSS(classes: Set<string>): Promise<string> {
+  try {
+    // Dynamic import to avoid build issues
+    const { compile } = await import('tailwindcss')
+
+    // Create content with all extracted classes for Tailwind to scan
+    const htmlContent = `<div class="${Array.from(classes).join(' ')}"></div>`
+
+    // Compile using Tailwind v4 API
+    const compiler = await compile(`@import "tailwindcss";`, {
+      loadStylesheet: async (id: string, base: string) => {
+        if (id === 'tailwindcss') {
+          // Return the base Tailwind styles
+          return {
+            path: 'virtual:tailwindcss/index.css',
+            base,
+            content: `
+              @layer base, components, utilities;
+              @layer utilities {
+                @tailwind utilities;
+              }
+            `,
+          }
+        }
+        throw new Error(`Cannot load stylesheet: ${id}`)
+      },
+    })
+
+    // Build CSS from the classes
+    const css = compiler.build(Array.from(classes))
+
+    return css
+  } catch (error) {
+    console.error('Tailwind v4 compile error:', error)
+    throw error
+  }
+}
+
+/**
+ * Extract all CSS classes from HTML content
+ */
+function extractAllClasses(html: string): Set<string> {
+  const classes = new Set<string>()
+
+  // Pattern to match class attributes in HTML
+  const classPattern = /class(?:Name)?=["']([^"']+)["']/gi
+  let match
+
+  while ((match = classPattern.exec(html)) !== null) {
+    const classString = match[1]
+    classString.split(/\s+/).forEach((cls) => {
+      const trimmed = cls.trim()
+      if (trimmed && !trimmed.startsWith('{')) {
+        classes.add(trimmed)
+      }
+    })
+  }
+
+  // Also check for classes in JSON content (className properties)
+  const jsonClassPattern = /"className":\s*"([^"]+)"/gi
+  while ((match = jsonClassPattern.exec(html)) !== null) {
+    const classString = match[1]
+    classString.split(/\s+/).forEach((cls) => {
+      const trimmed = cls.trim()
+      if (trimmed) {
+        classes.add(trimmed)
+      }
+    })
+  }
+
+  return classes
+}
+
+/**
  * Generate CSS Variables from design tokens
  */
 function generateCSSVariables(
@@ -142,42 +230,36 @@ function generateCSSVariables(
 ): string {
   let css = ':root {\n'
 
-  // Default values
   const defaults = {
     colors: {
       brand: { primary: '#3b82f6', secondary: '#64748b', accent: '#f59e0b' },
       semantic: { success: '#22c55e', warning: '#f59e0b', error: '#ef4444', info: '#3b82f6' },
     },
     typography: { fontHeading: 'Inter', fontBody: 'Inter', fontMono: 'JetBrains Mono' },
-    spacing: { xs: '0.25rem', sm: '0.5rem', md: '1rem', lg: '1.5rem', xl: '2rem' },
-    borders: { sm: '0.125rem', md: '0.375rem', lg: '0.5rem', xl: '0.75rem' },
   }
 
   // Colors
   const colors = (designVars?.colors as Record<string, Record<string, string>>) || defaults.colors
 
-  // Brand colors
   if (colors.brand) {
     Object.entries(colors.brand).forEach(([key, value]) => {
       css += `  --color-${key}: ${value};\n`
     })
   }
 
-  // Semantic colors
   if (colors.semantic) {
     Object.entries(colors.semantic).forEach(([key, value]) => {
       css += `  --color-${key}: ${value};\n`
     })
   }
 
-  // Neutral colors
   if (colors.neutral) {
     Object.entries(colors.neutral).forEach(([key, value]) => {
       css += `  --color-neutral-${key}: ${value};\n`
     })
   }
 
-  // Site settings colors (legacy support)
+  // Site settings colors
   if (siteSettings?.colors) {
     const settingsColors = siteSettings.colors as Record<string, string>
     Object.entries(settingsColors).forEach(([key, value]) => {
@@ -191,44 +273,6 @@ function generateCSSVariables(
   css += `  --font-heading: ${typography.fontHeading || 'Inter'}, system-ui, sans-serif;\n`
   css += `  --font-body: ${typography.fontBody || 'Inter'}, system-ui, sans-serif;\n`
   css += `  --font-mono: ${typography.fontMono || 'JetBrains Mono'}, monospace;\n`
-
-  // Font sizes
-  const fontSizes = (typography.fontSizes as Record<string, string>) || {}
-  Object.entries(fontSizes).forEach(([key, value]) => {
-    css += `  --font-size-${key}: ${value};\n`
-  })
-
-  // Spacing
-  const spacing = (designVars?.spacing as Record<string, Record<string, string>>) || { scale: defaults.spacing }
-  css += `\n  /* Spacing */\n`
-  if (spacing.scale) {
-    Object.entries(spacing.scale).forEach(([key, value]) => {
-      css += `  --spacing-${key}: ${value};\n`
-    })
-  }
-
-  // Container widths
-  if (spacing.containerWidths) {
-    Object.entries(spacing.containerWidths).forEach(([key, value]) => {
-      css += `  --container-${key}: ${value};\n`
-    })
-  }
-
-  // Border radius
-  const borders = (designVars?.borders as Record<string, Record<string, string>>) || { radius: defaults.borders }
-  css += `\n  /* Border Radius */\n`
-  if (borders.radius) {
-    Object.entries(borders.radius).forEach(([key, value]) => {
-      css += `  --radius-${key}: ${value};\n`
-    })
-  }
-
-  // Shadows
-  const shadows = (designVars?.shadows as Record<string, string>) || {}
-  css += `\n  /* Shadows */\n`
-  Object.entries(shadows).forEach(([key, value]) => {
-    css += `  --shadow-${key}: ${value};\n`
-  })
 
   css += '}\n'
 
@@ -247,13 +291,12 @@ function generateBaseStyles(): string {
 html {
   -webkit-text-size-adjust: 100%;
   font-feature-settings: normal;
-  font-variation-settings: normal;
   tab-size: 4;
 }
 
 body {
   margin: 0;
-  line-height: inherit;
+  line-height: 1.5;
   font-family: var(--font-body);
 }
 
@@ -278,178 +321,124 @@ a {
 }
 
 /**
- * Extract Tailwind classes from HTML content
+ * Fallback CSS generator if Tailwind compilation fails
+ * This generates CSS for common Tailwind classes
  */
-function extractTailwindClasses(html: string): Set<string> {
-  const classes = new Set<string>()
-
-  // Pattern to match class attributes
-  const classPattern = /class(?:Name)?=["']([^"']+)["']/gi
-  let match
-
-  while ((match = classPattern.exec(html)) !== null) {
-    const classString = match[1]
-    classString.split(/\s+/).forEach((cls) => {
-      if (cls.trim()) {
-        classes.add(cls.trim())
-      }
-    })
-  }
-
-  // Also check for Tailwind classes in JSON content (for page builder)
-  const jsonClassPattern = /"className":\s*"([^"]+)"/gi
-  while ((match = jsonClassPattern.exec(html)) !== null) {
-    const classString = match[1]
-    classString.split(/\s+/).forEach((cls) => {
-      if (cls.trim()) {
-        classes.add(cls.trim())
-      }
-    })
-  }
-
-  return classes
-}
-
-/**
- * Generate Tailwind CSS for extracted classes
- * This is a simplified implementation - for production, use the full Tailwind compiler
- */
-function generateTailwindCSS(
-  classes: Set<string>,
-  designVars: Record<string, unknown> | null
-): string {
+function generateFallbackCSS(classes: Set<string>): string {
   const cssRules: string[] = []
 
-  // Common Tailwind class patterns
-  const patterns: Record<string, (value: string) => string> = {
-    // Layout
-    'flex': () => 'display: flex;',
-    'inline-flex': () => 'display: inline-flex;',
-    'block': () => 'display: block;',
-    'inline-block': () => 'display: inline-block;',
-    'hidden': () => 'display: none;',
-    'grid': () => 'display: grid;',
-    'inline-grid': () => 'display: inline-grid;',
-
-    // Flex
-    'flex-row': () => 'flex-direction: row;',
-    'flex-col': () => 'flex-direction: column;',
-    'flex-wrap': () => 'flex-wrap: wrap;',
-    'flex-nowrap': () => 'flex-wrap: nowrap;',
-    'items-center': () => 'align-items: center;',
-    'items-start': () => 'align-items: flex-start;',
-    'items-end': () => 'align-items: flex-end;',
-    'items-stretch': () => 'align-items: stretch;',
-    'justify-center': () => 'justify-content: center;',
-    'justify-start': () => 'justify-content: flex-start;',
-    'justify-end': () => 'justify-content: flex-end;',
-    'justify-between': () => 'justify-content: space-between;',
-    'justify-around': () => 'justify-content: space-around;',
-    'justify-evenly': () => 'justify-content: space-evenly;',
-
-    // Positioning
-    'relative': () => 'position: relative;',
-    'absolute': () => 'position: absolute;',
-    'fixed': () => 'position: fixed;',
-    'sticky': () => 'position: sticky;',
-
-    // Sizing
-    'w-full': () => 'width: 100%;',
-    'w-screen': () => 'width: 100vw;',
-    'w-auto': () => 'width: auto;',
-    'h-full': () => 'height: 100%;',
-    'h-screen': () => 'height: 100vh;',
-    'h-auto': () => 'height: auto;',
-    'min-h-screen': () => 'min-height: 100vh;',
-    'max-w-full': () => 'max-width: 100%;',
-
-    // Text
-    'text-center': () => 'text-align: center;',
-    'text-left': () => 'text-align: left;',
-    'text-right': () => 'text-align: right;',
-    'text-justify': () => 'text-align: justify;',
-    'font-bold': () => 'font-weight: 700;',
-    'font-semibold': () => 'font-weight: 600;',
-    'font-medium': () => 'font-weight: 500;',
-    'font-normal': () => 'font-weight: 400;',
-    'font-light': () => 'font-weight: 300;',
-    'italic': () => 'font-style: italic;',
-    'underline': () => 'text-decoration: underline;',
-    'line-through': () => 'text-decoration: line-through;',
-    'no-underline': () => 'text-decoration: none;',
-    'uppercase': () => 'text-transform: uppercase;',
-    'lowercase': () => 'text-transform: lowercase;',
-    'capitalize': () => 'text-transform: capitalize;',
-
-    // Background
-    'bg-transparent': () => 'background-color: transparent;',
-    'bg-white': () => 'background-color: #ffffff;',
-    'bg-black': () => 'background-color: #000000;',
-
-    // Border
-    'border': () => 'border-width: 1px;',
-    'border-0': () => 'border-width: 0;',
-    'border-2': () => 'border-width: 2px;',
-    'border-4': () => 'border-width: 4px;',
-    'border-solid': () => 'border-style: solid;',
-    'border-dashed': () => 'border-style: dashed;',
-    'border-dotted': () => 'border-style: dotted;',
-    'border-none': () => 'border-style: none;',
-
-    // Effects
-    'opacity-0': () => 'opacity: 0;',
-    'opacity-50': () => 'opacity: 0.5;',
-    'opacity-100': () => 'opacity: 1;',
-    'shadow': () => 'box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));',
-    'shadow-sm': () => 'box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));',
-    'shadow-lg': () => 'box-shadow: var(--shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.1));',
-    'shadow-xl': () => 'box-shadow: var(--shadow-xl, 0 20px 25px -5px rgb(0 0 0 / 0.1));',
-    'shadow-none': () => 'box-shadow: none;',
-
-    // Overflow
-    'overflow-hidden': () => 'overflow: hidden;',
-    'overflow-auto': () => 'overflow: auto;',
-    'overflow-scroll': () => 'overflow: scroll;',
-    'overflow-visible': () => 'overflow: visible;',
-
-    // Cursor
-    'cursor-pointer': () => 'cursor: pointer;',
-    'cursor-default': () => 'cursor: default;',
-    'cursor-not-allowed': () => 'cursor: not-allowed;',
-
-    // Transition
-    'transition': () => 'transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms;',
-    'transition-none': () => 'transition-property: none;',
+  // Common patterns
+  const patterns: Record<string, string> = {
+    'flex': 'display: flex;',
+    'inline-flex': 'display: inline-flex;',
+    'block': 'display: block;',
+    'inline-block': 'display: inline-block;',
+    'hidden': 'display: none;',
+    'grid': 'display: grid;',
+    'flex-row': 'flex-direction: row;',
+    'flex-col': 'flex-direction: column;',
+    'flex-wrap': 'flex-wrap: wrap;',
+    'items-center': 'align-items: center;',
+    'items-start': 'align-items: flex-start;',
+    'items-end': 'align-items: flex-end;',
+    'justify-center': 'justify-content: center;',
+    'justify-start': 'justify-content: flex-start;',
+    'justify-end': 'justify-content: flex-end;',
+    'justify-between': 'justify-content: space-between;',
+    'justify-around': 'justify-content: space-around;',
+    'relative': 'position: relative;',
+    'absolute': 'position: absolute;',
+    'fixed': 'position: fixed;',
+    'sticky': 'position: sticky;',
+    'w-full': 'width: 100%;',
+    'h-full': 'height: 100%;',
+    'w-screen': 'width: 100vw;',
+    'h-screen': 'height: 100vh;',
+    'min-h-screen': 'min-height: 100vh;',
+    'text-center': 'text-align: center;',
+    'text-left': 'text-align: left;',
+    'text-right': 'text-align: right;',
+    'font-bold': 'font-weight: 700;',
+    'font-semibold': 'font-weight: 600;',
+    'font-medium': 'font-weight: 500;',
+    'font-normal': 'font-weight: 400;',
+    'uppercase': 'text-transform: uppercase;',
+    'lowercase': 'text-transform: lowercase;',
+    'capitalize': 'text-transform: capitalize;',
+    'bg-white': 'background-color: #ffffff;',
+    'bg-black': 'background-color: #000000;',
+    'bg-transparent': 'background-color: transparent;',
+    'text-white': 'color: #ffffff;',
+    'text-black': 'color: #000000;',
+    'border': 'border-width: 1px;',
+    'border-0': 'border-width: 0;',
+    'rounded': 'border-radius: 0.25rem;',
+    'rounded-lg': 'border-radius: 0.5rem;',
+    'rounded-xl': 'border-radius: 0.75rem;',
+    'rounded-2xl': 'border-radius: 1rem;',
+    'rounded-full': 'border-radius: 9999px;',
+    'shadow': 'box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);',
+    'shadow-lg': 'box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);',
+    'shadow-xl': 'box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);',
+    'overflow-hidden': 'overflow: hidden;',
+    'overflow-auto': 'overflow: auto;',
+    'cursor-pointer': 'cursor: pointer;',
+    'transition': 'transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);',
+    'transition-all': 'transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);',
   }
 
-  // Process each class
+  // Spacing scale
+  const spacingScale: Record<string, string> = {
+    '0': '0', '1': '0.25rem', '2': '0.5rem', '3': '0.75rem', '4': '1rem',
+    '5': '1.25rem', '6': '1.5rem', '8': '2rem', '10': '2.5rem', '12': '3rem',
+    '16': '4rem', '20': '5rem', '24': '6rem', '32': '8rem', '40': '10rem',
+    '48': '12rem', '56': '14rem', '64': '16rem', '72': '18rem', '80': '20rem',
+    '96': '24rem',
+  }
+
+  // Font sizes
+  const fontSizes: Record<string, string> = {
+    'xs': '0.75rem', 'sm': '0.875rem', 'base': '1rem', 'lg': '1.125rem',
+    'xl': '1.25rem', '2xl': '1.5rem', '3xl': '1.875rem', '4xl': '2.25rem',
+    '5xl': '3rem', '6xl': '3.75rem', '7xl': '4.5rem', '8xl': '6rem', '9xl': '8rem',
+  }
+
+  // Colors (Tailwind default palette)
+  const colors: Record<string, Record<string, string>> = {
+    'slate': { '50': '#f8fafc', '100': '#f1f5f9', '200': '#e2e8f0', '300': '#cbd5e1', '400': '#94a3b8', '500': '#64748b', '600': '#475569', '700': '#334155', '800': '#1e293b', '900': '#0f172a', '950': '#020617' },
+    'gray': { '50': '#f9fafb', '100': '#f3f4f6', '200': '#e5e7eb', '300': '#d1d5db', '400': '#9ca3af', '500': '#6b7280', '600': '#4b5563', '700': '#374151', '800': '#1f2937', '900': '#111827', '950': '#030712' },
+    'zinc': { '50': '#fafafa', '100': '#f4f4f5', '200': '#e4e4e7', '300': '#d4d4d8', '400': '#a1a1aa', '500': '#71717a', '600': '#52525b', '700': '#3f3f46', '800': '#27272a', '900': '#18181b', '950': '#09090b' },
+    'red': { '50': '#fef2f2', '100': '#fee2e2', '200': '#fecaca', '300': '#fca5a5', '400': '#f87171', '500': '#ef4444', '600': '#dc2626', '700': '#b91c1c', '800': '#991b1b', '900': '#7f1d1d', '950': '#450a0a' },
+    'orange': { '50': '#fff7ed', '100': '#ffedd5', '200': '#fed7aa', '300': '#fdba74', '400': '#fb923c', '500': '#f97316', '600': '#ea580c', '700': '#c2410c', '800': '#9a3412', '900': '#7c2d12', '950': '#431407' },
+    'yellow': { '50': '#fefce8', '100': '#fef9c3', '200': '#fef08a', '300': '#fde047', '400': '#facc15', '500': '#eab308', '600': '#ca8a04', '700': '#a16207', '800': '#854d0e', '900': '#713f12', '950': '#422006' },
+    'green': { '50': '#f0fdf4', '100': '#dcfce7', '200': '#bbf7d0', '300': '#86efac', '400': '#4ade80', '500': '#22c55e', '600': '#16a34a', '700': '#15803d', '800': '#166534', '900': '#14532d', '950': '#052e16' },
+    'blue': { '50': '#eff6ff', '100': '#dbeafe', '200': '#bfdbfe', '300': '#93c5fd', '400': '#60a5fa', '500': '#3b82f6', '600': '#2563eb', '700': '#1d4ed8', '800': '#1e40af', '900': '#1e3a8a', '950': '#172554' },
+    'indigo': { '50': '#eef2ff', '100': '#e0e7ff', '200': '#c7d2fe', '300': '#a5b4fc', '400': '#818cf8', '500': '#6366f1', '600': '#4f46e5', '700': '#4338ca', '800': '#3730a3', '900': '#312e81', '950': '#1e1b4b' },
+    'purple': { '50': '#faf5ff', '100': '#f3e8ff', '200': '#e9d5ff', '300': '#d8b4fe', '400': '#c084fc', '500': '#a855f7', '600': '#9333ea', '700': '#7e22ce', '800': '#6b21a8', '900': '#581c87', '950': '#3b0764' },
+    'pink': { '50': '#fdf2f8', '100': '#fce7f3', '200': '#fbcfe8', '300': '#f9a8d4', '400': '#f472b6', '500': '#ec4899', '600': '#db2777', '700': '#be185d', '800': '#9d174d', '900': '#831843', '950': '#500724' },
+  }
+
   classes.forEach((cls) => {
-    // Direct match
+    // Direct pattern match
     if (patterns[cls]) {
-      cssRules.push(`.${escapeClassName(cls)} { ${patterns[cls](cls)} }`)
+      cssRules.push(`.${escapeClassName(cls)} { ${patterns[cls]} }`)
       return
     }
 
-    // Dynamic patterns
-
     // Spacing (margin, padding)
-    const spacingMatch = cls.match(/^(m|p)(t|r|b|l|x|y)?-(\d+|auto)$/)
+    const spacingMatch = cls.match(/^(m|p)(t|r|b|l|x|y)?-(\d+|auto|px)$/)
     if (spacingMatch) {
       const [, type, dir, value] = spacingMatch
       const prop = type === 'm' ? 'margin' : 'padding'
-      const rem = value === 'auto' ? 'auto' : `${parseInt(value) * 0.25}rem`
+      const size = value === 'auto' ? 'auto' : value === 'px' ? '1px' : spacingScale[value] || `${parseInt(value) * 0.25}rem`
 
       const directions: Record<string, string[]> = {
-        t: ['top'],
-        r: ['right'],
-        b: ['bottom'],
-        l: ['left'],
-        x: ['left', 'right'],
-        y: ['top', 'bottom'],
+        't': ['top'], 'r': ['right'], 'b': ['bottom'], 'l': ['left'],
+        'x': ['left', 'right'], 'y': ['top', 'bottom'],
         '': ['top', 'right', 'bottom', 'left'],
       }
 
-      const props = (directions[dir || ''] || directions['']).map((d) => `${prop}-${d}: ${rem}`).join('; ')
+      const props = (directions[dir || ''] || directions['']).map((d) => `${prop}-${d}: ${size}`).join('; ')
       cssRules.push(`.${escapeClassName(cls)} { ${props}; }`)
       return
     }
@@ -457,105 +446,66 @@ function generateTailwindCSS(
     // Gap
     const gapMatch = cls.match(/^gap-(\d+)$/)
     if (gapMatch) {
-      const rem = `${parseInt(gapMatch[1]) * 0.25}rem`
-      cssRules.push(`.${escapeClassName(cls)} { gap: ${rem}; }`)
+      const size = spacingScale[gapMatch[1]] || `${parseInt(gapMatch[1]) * 0.25}rem`
+      cssRules.push(`.${escapeClassName(cls)} { gap: ${size}; }`)
       return
     }
 
-    // Width/Height with numbers
-    const sizeMatch = cls.match(/^(w|h)-(\d+)$/)
+    // Width/Height
+    const sizeMatch = cls.match(/^(w|h|min-w|min-h|max-w|max-h)-(\d+|full|screen|auto)$/)
     if (sizeMatch) {
       const [, type, value] = sizeMatch
-      const prop = type === 'w' ? 'width' : 'height'
-      const rem = `${parseInt(value) * 0.25}rem`
-      cssRules.push(`.${escapeClassName(cls)} { ${prop}: ${rem}; }`)
+      const prop = type.replace('-', '-')
+        .replace('w', 'width')
+        .replace('h', 'height')
+      const size = value === 'full' ? '100%' : value === 'screen' ? (type.includes('w') ? '100vw' : '100vh') : value === 'auto' ? 'auto' : spacingScale[value] || `${parseInt(value) * 0.25}rem`
+      cssRules.push(`.${escapeClassName(cls)} { ${prop}: ${size}; }`)
       return
     }
 
     // Font size
-    const fontSizeMatch = cls.match(/^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl)$/)
+    const fontSizeMatch = cls.match(/^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)$/)
     if (fontSizeMatch) {
-      const sizes: Record<string, string> = {
-        xs: '0.75rem',
-        sm: '0.875rem',
-        base: '1rem',
-        lg: '1.125rem',
-        xl: '1.25rem',
-        '2xl': '1.5rem',
-        '3xl': '1.875rem',
-        '4xl': '2.25rem',
-        '5xl': '3rem',
-        '6xl': '3.75rem',
-      }
-      cssRules.push(`.${escapeClassName(cls)} { font-size: var(--font-size-${fontSizeMatch[1]}, ${sizes[fontSizeMatch[1]]}); }`)
-      return
-    }
-
-    // Border radius
-    const radiusMatch = cls.match(/^rounded(-none|-sm|-md|-lg|-xl|-2xl|-full)?$/)
-    if (radiusMatch) {
-      const radii: Record<string, string> = {
-        '': '0.25rem',
-        '-none': '0',
-        '-sm': '0.125rem',
-        '-md': '0.375rem',
-        '-lg': '0.5rem',
-        '-xl': '0.75rem',
-        '-2xl': '1rem',
-        '-full': '9999px',
-      }
-      const key = radiusMatch[1] || ''
-      cssRules.push(`.${escapeClassName(cls)} { border-radius: var(--radius${key.replace('-', '-')}, ${radii[key]}); }`)
+      cssRules.push(`.${escapeClassName(cls)} { font-size: ${fontSizes[fontSizeMatch[1]]}; }`)
       return
     }
 
     // Colors (bg, text, border)
-    const colorMatch = cls.match(/^(bg|text|border)-(primary|secondary|accent|success|warning|error|info)$/)
+    const colorMatch = cls.match(/^(bg|text|border)-(slate|gray|zinc|red|orange|yellow|green|blue|indigo|purple|pink)-(\d{2,3})$/)
     if (colorMatch) {
-      const [, type, color] = colorMatch
-      const prop = type === 'bg' ? 'background-color' : type === 'text' ? 'color' : 'border-color'
-      cssRules.push(`.${escapeClassName(cls)} { ${prop}: var(--color-${color}); }`)
-      return
-    }
-
-    // Neutral colors
-    const neutralMatch = cls.match(/^(bg|text|border)-neutral-(\d{2,3})$/)
-    if (neutralMatch) {
-      const [, type, shade] = neutralMatch
-      const prop = type === 'bg' ? 'background-color' : type === 'text' ? 'color' : 'border-color'
-      cssRules.push(`.${escapeClassName(cls)} { ${prop}: var(--color-neutral-${shade}); }`)
-      return
-    }
-
-    // Max width
-    const maxWMatch = cls.match(/^max-w-(sm|md|lg|xl|2xl|full|screen)$/)
-    if (maxWMatch) {
-      const widths: Record<string, string> = {
-        sm: '24rem',
-        md: '28rem',
-        lg: '32rem',
-        xl: '36rem',
-        '2xl': '42rem',
-        full: '100%',
-        screen: '100vw',
+      const [, type, color, shade] = colorMatch
+      const colorValue = colors[color]?.[shade]
+      if (colorValue) {
+        const prop = type === 'bg' ? 'background-color' : type === 'text' ? 'color' : 'border-color'
+        cssRules.push(`.${escapeClassName(cls)} { ${prop}: ${colorValue}; }`)
       }
-      cssRules.push(`.${escapeClassName(cls)} { max-width: var(--container-${maxWMatch[1]}, ${widths[maxWMatch[1]]}); }`)
       return
     }
 
-    // Leading (line height)
-    const leadingMatch = cls.match(/^leading-(none|tight|snug|normal|relaxed|loose|\d+)$/)
-    if (leadingMatch) {
-      const heights: Record<string, string> = {
-        none: '1',
-        tight: '1.25',
-        snug: '1.375',
-        normal: '1.5',
-        relaxed: '1.625',
-        loose: '2',
+    // Inset (top, right, bottom, left)
+    const insetMatch = cls.match(/^(top|right|bottom|left|inset)-(\d+|auto)$/)
+    if (insetMatch) {
+      const [, prop, value] = insetMatch
+      const size = value === 'auto' ? 'auto' : spacingScale[value] || `${parseInt(value) * 0.25}rem`
+      if (prop === 'inset') {
+        cssRules.push(`.${escapeClassName(cls)} { top: ${size}; right: ${size}; bottom: ${size}; left: ${size}; }`)
+      } else {
+        cssRules.push(`.${escapeClassName(cls)} { ${prop}: ${size}; }`)
       }
-      const value = heights[leadingMatch[1]] || `${parseInt(leadingMatch[1]) * 0.25}rem`
-      cssRules.push(`.${escapeClassName(cls)} { line-height: ${value}; }`)
+      return
+    }
+
+    // Z-index
+    const zMatch = cls.match(/^z-(\d+|auto)$/)
+    if (zMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { z-index: ${zMatch[1]}; }`)
+      return
+    }
+
+    // Opacity
+    const opacityMatch = cls.match(/^opacity-(\d+)$/)
+    if (opacityMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { opacity: ${parseInt(opacityMatch[1]) / 100}; }`)
       return
     }
   })
@@ -567,5 +517,5 @@ function generateTailwindCSS(
  * Escape class name for CSS selector
  */
 function escapeClassName(cls: string): string {
-  return cls.replace(/([:\[\]\/\\.])/g, '\\$1')
+  return cls.replace(/([:\[\]\/\\.\-])/g, '\\$1')
 }

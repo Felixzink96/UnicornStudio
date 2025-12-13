@@ -79,8 +79,9 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
     }
 
     // Initialize Gemini model (no JSON schema - just text streaming)
+    // Use gemini-2.0-flash-exp for faster responses, fallback to provided model
     const model = genAI.getGenerativeModel({
-      model: modelId || 'gemini-3-pro-preview',
+      model: modelId || 'gemini-2.0-flash-exp',
       systemInstruction: systemPrompt,
     })
 

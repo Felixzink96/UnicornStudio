@@ -217,7 +217,16 @@ export async function POST(request: NextRequest) {
         result.errors.push(msg)
         result.results.pages = { count: 0, success: false, error: msg }
       }
-      // No CSS sync for single page - only the page content
+
+      // Also sync CSS for styling (Tailwind classes need CSS)
+      try {
+        await sendWebhook('sync.css', {})
+        result.results.css = { success: true }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'CSS sync failed'
+        console.error('[WordPress Push] sync.css failed:', msg)
+        result.results.css = { success: false, error: msg }
+      }
     } else {
       // Full sync: tell WordPress to do a complete sync
       try {

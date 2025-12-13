@@ -122,6 +122,51 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       allHtml += tpl.html || ''
     })
 
+    // 7.5. Global Components (Header/Footer) - IMPORTANT: These must be included!
+    // Components are linked via site.global_header_id and global_footer_id
+    const { data: siteData } = await supabase
+      .from('sites')
+      .select('global_header_id, global_footer_id')
+      .eq('id', siteId)
+      .single()
+
+    if (siteData?.global_header_id) {
+      const { data: headerComp } = await supabase
+        .from('components')
+        .select('html, css, js')
+        .eq('id', siteData.global_header_id)
+        .single()
+
+      if (headerComp) {
+        allHtml += headerComp.html || ''
+        allHtml += headerComp.css || ''
+      }
+    }
+
+    if (siteData?.global_footer_id) {
+      const { data: footerComp } = await supabase
+        .from('components')
+        .select('html, css, js')
+        .eq('id', siteData.global_footer_id)
+        .single()
+
+      if (footerComp) {
+        allHtml += footerComp.html || ''
+        allHtml += footerComp.css || ''
+      }
+    }
+
+    // Also check for components with site_id (fallback)
+    const { data: siteComponents } = await supabase
+      .from('components')
+      .select('html, css, js')
+      .eq('site_id', siteId)
+
+    siteComponents?.forEach((comp) => {
+      allHtml += comp.html || ''
+      allHtml += comp.css || ''
+    })
+
     // 8. Extract all CSS classes from HTML
     const extractedClasses = extractAllClasses(allHtml)
 
@@ -356,6 +401,46 @@ async function compileTailwindCSS(classes: Set<string>, customConfig?: TailwindC
 }
 
 /**
+ * Post-process Tailwind CSS to fix empty rules for opacity colors
+ * Tailwind v4 sometimes generates empty rules for border-color/5, etc.
+ */
+function postProcessTailwindCSS(css: string, classes: string[]): string {
+  // Find classes that need fixing (opacity variants)
+  const opacityClasses = classes.filter(cls =>
+    cls.match(/^(border|bg|text)-(white|black)\/\d+$/)
+  )
+
+  for (const cls of opacityClasses) {
+    const escapedCls = cls.replace(/\//g, '\\/')
+    const emptyRulePattern = new RegExp(`\\.${escapedCls}\\s*\\{\\s*\\}`, 'g')
+
+    // Check if rule is empty
+    if (emptyRulePattern.test(css)) {
+      const match = cls.match(/^(border|bg|text)-(white|black)\/(\d+)$/)
+      if (match) {
+        const [, type, color, opacity] = match
+        const baseColor = color === 'white' ? '255, 255, 255' : '0, 0, 0'
+        const opacityValue = parseInt(opacity) / 100
+
+        let cssValue = ''
+        if (type === 'border') {
+          cssValue = `border-color: rgba(${baseColor}, ${opacityValue});`
+        } else if (type === 'bg') {
+          cssValue = `background-color: rgba(${baseColor}, ${opacityValue});`
+        } else if (type === 'text') {
+          cssValue = `color: rgba(${baseColor}, ${opacityValue});`
+        }
+
+        // Replace empty rule with actual CSS
+        css = css.replace(emptyRulePattern, `.${escapedCls} { ${cssValue} }`)
+      }
+    }
+  }
+
+  return css
+}
+
+/**
  * Extract all CSS classes from HTML content
  */
 function extractAllClasses(html: string): Set<string> {
@@ -524,6 +609,28 @@ function darkenHexColor(hex: string, percent: number): string {
  */
 function generateFallbackCSS(classes: Set<string>): string {
   const cssRules: string[] = []
+  const responsiveRules: { sm: string[]; md: string[]; lg: string[]; xl: string[]; '2xl': string[] } = {
+    sm: [], md: [], lg: [], xl: [], '2xl': []
+  }
+
+  // Helper to add rule with optional responsive prefix
+  const addRule = (prefix: string | null, selector: string, css: string) => {
+    const rule = `.${escapeClassName(selector)} { ${css} }`
+    if (prefix && prefix in responsiveRules) {
+      responsiveRules[prefix as keyof typeof responsiveRules].push(rule)
+    } else {
+      cssRules.push(rule)
+    }
+  }
+
+  // Helper to parse responsive prefix
+  const parsePrefix = (cls: string): { prefix: string | null; base: string } => {
+    const match = cls.match(/^(sm|md|lg|xl|2xl):(.+)$/)
+    if (match) {
+      return { prefix: match[1], base: match[2] }
+    }
+    return { prefix: null, base: cls }
+  }
 
   // Common patterns
   const patterns: Record<string, string> = {
@@ -706,9 +813,196 @@ function generateFallbackCSS(classes: Set<string>): string {
       cssRules.push(`.${escapeClassName(cls)} { opacity: ${parseInt(opacityMatch[1]) / 100}; }`)
       return
     }
+
+    // Border with direction (border-t, border-r, border-b, border-l)
+    const borderDirMatch = cls.match(/^border-(t|r|b|l)$/)
+    if (borderDirMatch) {
+      const dirMap: Record<string, string> = { t: 'top', r: 'right', b: 'bottom', l: 'left' }
+      cssRules.push(`.${escapeClassName(cls)} { border-${dirMap[borderDirMatch[1]]}-width: 1px; border-style: solid; }`)
+      return
+    }
+
+    // Border color with opacity (border-white/10, border-black/20, etc.)
+    const borderOpacityMatch = cls.match(/^border-(white|black)\/(\d+)$/)
+    if (borderOpacityMatch) {
+      const [, color, opacity] = borderOpacityMatch
+      const baseColor = color === 'white' ? '255, 255, 255' : '0, 0, 0'
+      const opacityValue = parseInt(opacity) / 100
+      cssRules.push(`.${escapeClassName(cls)} { border-color: rgba(${baseColor}, ${opacityValue}) !important; }`)
+      return
+    }
+
+    // Also handle color with opacity for any color (e.g., border-gray-500/50)
+    const borderColorOpacityMatch = cls.match(/^border-(slate|gray|zinc|red|orange|yellow|green|blue|indigo|purple|pink)-(\d+)\/(\d+)$/)
+    if (borderColorOpacityMatch) {
+      const [, colorName, shade, opacity] = borderColorOpacityMatch
+      const colorValue = colors[colorName]?.[shade]
+      if (colorValue) {
+        // Convert hex to rgba
+        const hex = colorValue.replace('#', '')
+        const r = parseInt(hex.substring(0, 2), 16)
+        const g = parseInt(hex.substring(2, 4), 16)
+        const b = parseInt(hex.substring(4, 6), 16)
+        const opacityValue = parseInt(opacity) / 100
+        cssRules.push(`.${escapeClassName(cls)} { border-color: rgba(${r}, ${g}, ${b}, ${opacityValue}) !important; }`)
+      }
+      return
+    }
+
+    // Text color with opacity (text-white/50, text-gray-400, etc.)
+    const textOpacityMatch = cls.match(/^text-(white|black)\/(\d+)$/)
+    if (textOpacityMatch) {
+      const [, color, opacity] = textOpacityMatch
+      const baseColor = color === 'white' ? '255, 255, 255' : '0, 0, 0'
+      const opacityValue = parseInt(opacity) / 100
+      cssRules.push(`.${escapeClassName(cls)} { color: rgba(${baseColor}, ${opacityValue}); }`)
+      return
+    }
+
+    // Tracking (letter-spacing)
+    const trackingMatch = cls.match(/^tracking-(tighter|tight|normal|wide|wider|widest)$/)
+    if (trackingMatch) {
+      const trackingMap: Record<string, string> = {
+        tighter: '-0.05em', tight: '-0.025em', normal: '0em',
+        wide: '0.025em', wider: '0.05em', widest: '0.1em'
+      }
+      cssRules.push(`.${escapeClassName(cls)} { letter-spacing: ${trackingMap[trackingMatch[1]]}; }`)
+      return
+    }
+
+    // Leading (line-height)
+    const leadingMatch = cls.match(/^leading-(\d+)$/)
+    if (leadingMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { line-height: ${parseInt(leadingMatch[1]) * 0.25}rem; }`)
+      return
+    }
+
+    // Grid columns
+    const gridColsMatch = cls.match(/^grid-cols-(\d+)$/)
+    if (gridColsMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { grid-template-columns: repeat(${gridColsMatch[1]}, minmax(0, 1fr)); }`)
+      return
+    }
+
+    // Col span
+    const colSpanMatch = cls.match(/^col-span-(\d+)$/)
+    if (colSpanMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { grid-column: span ${colSpanMatch[1]} / span ${colSpanMatch[1]}; }`)
+      return
+    }
+
+    // Space utilities (space-y-4, space-x-2, etc.)
+    const spaceMatch = cls.match(/^space-(x|y)-(\d+)$/)
+    if (spaceMatch) {
+      const [, dir, value] = spaceMatch
+      const size = spacingScale[value] || `${parseInt(value) * 0.25}rem`
+      const prop = dir === 'x' ? 'margin-left' : 'margin-top'
+      cssRules.push(`.${escapeClassName(cls)} > :not([hidden]) ~ :not([hidden]) { ${prop}: ${size}; }`)
+      return
+    }
+
+    // Max-width with size (max-w-sm, max-w-md, etc.)
+    const maxWMatch = cls.match(/^max-w-(xs|sm|md|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl)$/)
+    if (maxWMatch) {
+      const maxWMap: Record<string, string> = {
+        xs: '20rem', sm: '24rem', md: '28rem', lg: '32rem', xl: '36rem',
+        '2xl': '42rem', '3xl': '48rem', '4xl': '56rem', '5xl': '64rem', '6xl': '72rem', '7xl': '80rem'
+      }
+      cssRules.push(`.${escapeClassName(cls)} { max-width: ${maxWMap[maxWMatch[1]]}; }`)
+      return
+    }
+
+    // Handle responsive prefixes (md:, lg:, etc.) - recurse without prefix
+    const { prefix, base } = parsePrefix(cls)
+    if (prefix && base !== cls) {
+      // Generate the base rule
+      const baseRules: string[] = []
+      const tempClasses = new Set([base])
+      // Re-process the base class to get its CSS (simplified approach)
+      // For now, we'll handle common responsive patterns directly
+
+      // Common responsive patterns
+      if (patterns[base]) {
+        addRule(prefix, cls, patterns[base])
+        return
+      }
+
+      // Responsive spacing
+      const respSpacingMatch = base.match(/^(m|p)(t|r|b|l|x|y)?-(\d+|auto|px)$/)
+      if (respSpacingMatch) {
+        const [, type, dir, value] = respSpacingMatch
+        const prop = type === 'm' ? 'margin' : 'padding'
+        const size = value === 'auto' ? 'auto' : value === 'px' ? '1px' : spacingScale[value] || `${parseInt(value) * 0.25}rem`
+        const directions: Record<string, string[]> = {
+          't': ['top'], 'r': ['right'], 'b': ['bottom'], 'l': ['left'],
+          'x': ['left', 'right'], 'y': ['top', 'bottom'],
+          '': ['top', 'right', 'bottom', 'left'],
+        }
+        const props = (directions[dir || ''] || directions['']).map((d) => `${prop}-${d}: ${size}`).join('; ')
+        addRule(prefix, cls, props + ';')
+        return
+      }
+
+      // Responsive grid columns
+      const respGridMatch = base.match(/^grid-cols-(\d+)$/)
+      if (respGridMatch) {
+        addRule(prefix, cls, `grid-template-columns: repeat(${respGridMatch[1]}, minmax(0, 1fr));`)
+        return
+      }
+
+      // Responsive col-span
+      const respColSpanMatch = base.match(/^col-span-(\d+)$/)
+      if (respColSpanMatch) {
+        addRule(prefix, cls, `grid-column: span ${respColSpanMatch[1]} / span ${respColSpanMatch[1]};`)
+        return
+      }
+
+      // Responsive flex direction
+      if (base === 'flex-row') {
+        addRule(prefix, cls, 'flex-direction: row;')
+        return
+      }
+      if (base === 'flex-col') {
+        addRule(prefix, cls, 'flex-direction: column;')
+        return
+      }
+
+      // Responsive gap
+      const respGapMatch = base.match(/^gap-(\d+)$/)
+      if (respGapMatch) {
+        const size = spacingScale[respGapMatch[1]] || `${parseInt(respGapMatch[1]) * 0.25}rem`
+        addRule(prefix, cls, `gap: ${size};`)
+        return
+      }
+
+      // Responsive justify/items
+      const respJustifyMatch = base.match(/^(justify|items)-(center|start|end|between|around)$/)
+      if (respJustifyMatch) {
+        const propMap: Record<string, string> = { justify: 'justify-content', items: 'align-items' }
+        const valueMap: Record<string, string> = {
+          center: 'center', start: 'flex-start', end: 'flex-end',
+          between: 'space-between', around: 'space-around'
+        }
+        addRule(prefix, cls, `${propMap[respJustifyMatch[1]]}: ${valueMap[respJustifyMatch[2]]};`)
+        return
+      }
+    }
   })
 
-  return cssRules.join('\n')
+  // Build final CSS with media queries
+  let result = cssRules.join('\n')
+
+  const breakpoints: Record<string, string> = {
+    sm: '640px', md: '768px', lg: '1024px', xl: '1280px', '2xl': '1536px'
+  }
+
+  for (const [bp, rules] of Object.entries(responsiveRules)) {
+    if (rules.length > 0) {
+      result += `\n\n@media (min-width: ${breakpoints[bp]}) {\n  ${rules.join('\n  ')}\n}`
+    }
+  }
+
+  return result
 }
 
 /**

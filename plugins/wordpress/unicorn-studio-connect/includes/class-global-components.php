@@ -34,6 +34,12 @@ class Unicorn_Studio_Global_Components {
     private static $collected_js = '';
 
     /**
+     * Track if header/footer have been rendered to prevent duplicates
+     */
+    private static $header_rendered = false;
+    private static $footer_rendered = false;
+
+    /**
      * Initialize hooks
      */
     public function init() {
@@ -43,15 +49,12 @@ class Unicorn_Studio_Global_Components {
         // Output collected JS in wp_footer
         add_action('wp_footer', [$this, 'output_collected_js'], 999);
 
-        // Auto-render header/footer for all themes (not just Unicorn Studio theme)
-        // Only if not using the Unicorn Studio blank theme (which handles it manually)
-        if (!$this->is_unicorn_theme_active()) {
-            // Header: Use wp_body_open (WordPress 5.2+) or fallback
-            add_action('wp_body_open', [$this, 'auto_render_header'], 1);
+        // Auto-render header/footer for ALL themes
+        // Header: Use wp_body_open (WordPress 5.2+)
+        add_action('wp_body_open', [$this, 'auto_render_header'], 1);
 
-            // Footer: Render before wp_footer scripts
-            add_action('wp_footer', [$this, 'auto_render_footer'], 1);
-        }
+        // Footer: Render before wp_footer scripts
+        add_action('wp_footer', [$this, 'auto_render_footer'], 1);
     }
 
     /**
@@ -160,6 +163,12 @@ class Unicorn_Studio_Global_Components {
      * @return string|null
      */
     public static function render_header(bool $echo = true): ?string {
+        // Prevent duplicate rendering
+        if (self::$header_rendered) {
+            return null;
+        }
+        self::$header_rendered = true;
+
         // Debug logging
         if (defined('WP_DEBUG') && WP_DEBUG) {
             $all_components = self::get_components();
@@ -223,6 +232,12 @@ class Unicorn_Studio_Global_Components {
      * @return string|null
      */
     public static function render_footer(bool $echo = true): ?string {
+        // Prevent duplicate rendering
+        if (self::$footer_rendered) {
+            return null;
+        }
+        self::$footer_rendered = true;
+
         // Check if footer is hidden for this page
         if (self::is_footer_hidden()) {
             return null;

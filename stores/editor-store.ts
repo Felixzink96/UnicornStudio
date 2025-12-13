@@ -38,6 +38,29 @@ export interface TailwindCustomConfig {
 }
 
 /**
+ * Extract content between balanced braces starting at startIdx
+ * startIdx should point to the opening brace '{'
+ */
+function extractBalancedBraces(str: string, startIdx: number): string | null {
+  if (str[startIdx] !== '{') return null
+
+  let depth = 0
+  let i = startIdx
+
+  while (i < str.length) {
+    if (str[i] === '{') depth++
+    else if (str[i] === '}') {
+      depth--
+      if (depth === 0) {
+        return str.slice(startIdx + 1, i)
+      }
+    }
+    i++
+  }
+  return null
+}
+
+/**
  * Extract Tailwind config from HTML content
  * Parses the JavaScript tailwind.config = {...} from script tags
  */
@@ -97,38 +120,46 @@ function extractTailwindConfigFromHtml(html: string): TailwindCustomConfig | nul
       if (Object.keys(animation).length) config.animation = animation
     }
 
-    // Extract keyframes
-    const keyframesMatch = configScript.match(/keyframes\s*:\s*\{([\s\S]*?)\}(?=\s*,?\s*animation)/i)
-    if (keyframesMatch) {
-      const keyframes: Record<string, Record<string, Record<string, string>>> = {}
-      const kfBlock = keyframesMatch[1]
+    // Extract keyframes - use brace counting for nested objects
+    const keyframesStartMatch = configScript.match(/keyframes\s*:\s*\{/i)
+    if (keyframesStartMatch && keyframesStartMatch.index !== undefined) {
+      const startIdx = keyframesStartMatch.index + keyframesStartMatch[0].length
+      const kfBlock = extractBalancedBraces(configScript, startIdx - 1)
 
-      // Match keyframe names like scroll: { '0%': {...}, '100%': {...} }
-      const kfPattern = /['"]?([a-zA-Z]+)['"]?\s*:\s*\{([\s\S]*?)\}(?=\s*,?\s*['"]?[a-zA-Z]+['"]?\s*:|$)/g
-      let kfMatch
-      while ((kfMatch = kfPattern.exec(kfBlock)) !== null) {
-        const kfName = kfMatch[1]
-        const kfContent = kfMatch[2]
-        const frames: Record<string, Record<string, string>> = {}
+      if (kfBlock) {
+        const keyframes: Record<string, Record<string, Record<string, string>>> = {}
 
-        // Match frame percentages: '0%': { transform: '...' }
-        const framePattern = /['"](\d+%(?:,\s*\d+%)?|from|to)['"]\s*:\s*\{([^}]+)\}/g
-        let frameMatch
-        while ((frameMatch = framePattern.exec(kfContent)) !== null) {
-          const frameKey = frameMatch[1]
-          const frameContent = frameMatch[2]
-          const props: Record<string, string> = {}
+        // Match each keyframe animation: pulseGlow: { ... }, aurora: { ... }
+        const kfNamePattern = /['"]?([a-zA-Z]+)['"]?\s*:\s*\{/g
+        let kfNameMatch
+        while ((kfNameMatch = kfNamePattern.exec(kfBlock)) !== null) {
+          const kfName = kfNameMatch[1]
+          const kfStartIdx = kfNameMatch.index + kfNameMatch[0].length - 1
+          const kfContent = extractBalancedBraces(kfBlock, kfStartIdx)
 
-          const propPattern = /['"]?([a-zA-Z-]+)['"]?\s*:\s*['"]([^'"]+)['"]/g
-          let propMatch
-          while ((propMatch = propPattern.exec(frameContent)) !== null) {
-            props[propMatch[1]] = propMatch[2]
+          if (kfContent) {
+            const frames: Record<string, Record<string, string>> = {}
+
+            // Match frame percentages: '0%': { ... }, '0%, 100%': { ... }
+            const framePattern = /['"](\d+%(?:,\s*\d+%)*|from|to)['"]\s*:\s*\{([^}]+)\}/g
+            let frameMatch
+            while ((frameMatch = framePattern.exec(kfContent)) !== null) {
+              const frameKey = frameMatch[1]
+              const frameContent = frameMatch[2]
+              const props: Record<string, string> = {}
+
+              const propPattern = /['"]?([a-zA-Z-]+)['"]?\s*:\s*['"]([^'"]+)['"]/g
+              let propMatch
+              while ((propMatch = propPattern.exec(frameContent)) !== null) {
+                props[propMatch[1]] = propMatch[2]
+              }
+              if (Object.keys(props).length) frames[frameKey] = props
+            }
+            if (Object.keys(frames).length) keyframes[kfName] = frames
           }
-          if (Object.keys(props).length) frames[frameKey] = props
         }
-        if (Object.keys(frames).length) keyframes[kfName] = frames
+        if (Object.keys(keyframes).length) config.keyframes = keyframes
       }
-      if (Object.keys(keyframes).length) config.keyframes = keyframes
     }
 
     console.log('[Tailwind Config] Extracted:', config)

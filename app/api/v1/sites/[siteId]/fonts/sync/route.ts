@@ -44,19 +44,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const supabase = createAPIClient()
     const { data: designVars, error: designError } = await supabase
       .from('design_variables')
-      .select('fonts')
+      .select('typography')
       .eq('site_id', siteId)
       .single()
 
-    if (designError) {
+    if (designError && designError.code !== 'PGRST116') {
       console.error('[Fonts Sync] Error fetching design variables:', designError)
       return serverErrorResponse('Failed to fetch design variables')
     }
 
-    const fonts = designVars?.fonts as Record<string, { family?: string; name?: string; stack?: string }> | null
+    const typography = designVars?.typography as {
+      fontHeading?: string
+      fontBody?: string
+      fontMono?: string
+    } | null
 
-    if (!fonts || Object.keys(fonts).length === 0) {
-      console.log('[Fonts Sync] No fonts configured in design variables')
+    if (!typography) {
+      console.log('[Fonts Sync] No typography configured in design variables')
       return successResponse({
         success: true,
         message: 'No fonts configured',
@@ -67,13 +71,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // 4. Convert design variable fonts to DetectedFont format
     const detectedFonts: DetectedFont[] = []
+    const fontStrings = [
+      typography.fontHeading,
+      typography.fontBody,
+      typography.fontMono,
+    ].filter(Boolean) as string[]
 
-    for (const [key, value] of Object.entries(fonts)) {
-      const fontName = value?.family || value?.name || ''
-      if (!fontName) continue
-
+    for (const fontStack of fontStrings) {
       // Clean the font name (remove quotes, extract first font from stack)
-      const cleanName = fontName.split(',')[0].trim().replace(/['"]/g, '')
+      const cleanName = fontStack.split(',')[0].trim().replace(/['"]/g, '')
 
       // Skip system fonts
       if (cleanName.match(/^(system-ui|sans-serif|serif|monospace|cursive|fantasy|ui-sans-serif|ui-serif|ui-monospace)$/i)) {

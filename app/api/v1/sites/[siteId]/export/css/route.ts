@@ -530,29 +530,74 @@ function escapeClassName(cls: string): string {
 function generateCustomTailwindCSS(config: TailwindCustomConfig): string {
   const rules: string[] = []
 
-  // Generate color utilities
+  // Generate color utilities with all variants
   if (config.colors) {
     Object.entries(config.colors).forEach(([name, value]) => {
-      // Background colors
+      // Base utilities
       rules.push(`.bg-${name} { background-color: ${value}; }`)
-      // Text colors
       rules.push(`.text-${name} { color: ${value}; }`)
-      // Border colors
       rules.push(`.border-${name} { border-color: ${value}; }`)
-      // Ring colors
       rules.push(`.ring-${name} { --tw-ring-color: ${value}; }`)
-      // Divide colors
       rules.push(`.divide-${name} > :not([hidden]) ~ :not([hidden]) { border-color: ${value}; }`)
+      rules.push(`.shadow-${name} { --tw-shadow-color: ${value}; }`)
+      rules.push(`.accent-${name} { accent-color: ${value}; }`)
+      rules.push(`.caret-${name} { caret-color: ${value}; }`)
+      rules.push(`.fill-${name} { fill: ${value}; }`)
+      rules.push(`.stroke-${name} { stroke: ${value}; }`)
+      rules.push(`.outline-${name} { outline-color: ${value}; }`)
+      rules.push(`.decoration-${name} { text-decoration-color: ${value}; }`)
+
+      // Hover variants
+      rules.push(`.hover\\:bg-${name}:hover { background-color: ${value}; }`)
+      rules.push(`.hover\\:text-${name}:hover { color: ${value}; }`)
+      rules.push(`.hover\\:border-${name}:hover { border-color: ${value}; }`)
+
+      // Focus variants
+      rules.push(`.focus\\:bg-${name}:focus { background-color: ${value}; }`)
+      rules.push(`.focus\\:text-${name}:focus { color: ${value}; }`)
+      rules.push(`.focus\\:border-${name}:focus { border-color: ${value}; }`)
+      rules.push(`.focus\\:ring-${name}:focus { --tw-ring-color: ${value}; }`)
+
+      // Active variants
+      rules.push(`.active\\:bg-${name}:active { background-color: ${value}; }`)
+      rules.push(`.active\\:text-${name}:active { color: ${value}; }`)
+
+      // Group hover variants
+      rules.push(`.group:hover .group-hover\\:bg-${name} { background-color: ${value}; }`)
+      rules.push(`.group:hover .group-hover\\:text-${name} { color: ${value}; }`)
+      rules.push(`.group:hover .group-hover\\:border-${name} { border-color: ${value}; }`)
+
       // Selection
       rules.push(`.selection\\:bg-${name} ::selection { background-color: ${value}; }`)
       rules.push(`.selection\\:text-${name} ::selection { color: ${value}; }`)
-      // With opacity variants
+
+      // Opacity variants for bg
+      rules.push(`.bg-${name}\\/5 { background-color: ${value}; opacity: 0.05; }`)
+      rules.push(`.bg-${name}\\/10 { background-color: ${value}; opacity: 0.1; }`)
       rules.push(`.bg-${name}\\/20 { background-color: ${value}; opacity: 0.2; }`)
+      rules.push(`.bg-${name}\\/30 { background-color: ${value}; opacity: 0.3; }`)
       rules.push(`.bg-${name}\\/40 { background-color: ${value}; opacity: 0.4; }`)
       rules.push(`.bg-${name}\\/50 { background-color: ${value}; opacity: 0.5; }`)
+      rules.push(`.bg-${name}\\/60 { background-color: ${value}; opacity: 0.6; }`)
+      rules.push(`.bg-${name}\\/70 { background-color: ${value}; opacity: 0.7; }`)
       rules.push(`.bg-${name}\\/80 { background-color: ${value}; opacity: 0.8; }`)
-      // Shadow with color
-      rules.push(`.shadow-${name} { --tw-shadow-color: ${value}; }`)
+      rules.push(`.bg-${name}\\/90 { background-color: ${value}; opacity: 0.9; }`)
+
+      // Text opacity variants
+      rules.push(`.text-${name}\\/50 { color: ${value}; opacity: 0.5; }`)
+      rules.push(`.text-${name}\\/70 { color: ${value}; opacity: 0.7; }`)
+      rules.push(`.text-${name}\\/80 { color: ${value}; opacity: 0.8; }`)
+
+      // Border opacity variants
+      rules.push(`.border-${name}\\/20 { border-color: ${value}; opacity: 0.2; }`)
+      rules.push(`.border-${name}\\/50 { border-color: ${value}; opacity: 0.5; }`)
+
+      // Placeholder
+      rules.push(`.placeholder\\:text-${name}::placeholder { color: ${value}; }`)
+
+      // Before/After
+      rules.push(`.before\\:bg-${name}::before { background-color: ${value}; }`)
+      rules.push(`.after\\:bg-${name}::after { background-color: ${value}; }`)
     })
   }
 

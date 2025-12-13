@@ -185,11 +185,21 @@ class Unicorn_Studio_Pages {
         // Prepare content - extracts HTML and JS separately
         $prepared = $this->prepare_content($page);
 
+        // Determine post status:
+        // - For new pages: use Unicorn Studio's is_published flag
+        // - For existing pages: keep current WordPress status (don't downgrade published to draft)
+        $new_status = !empty($page['is_published']) ? 'publish' : 'draft';
+        if ($existing_page) {
+            // Keep the current WordPress status - don't change it on update
+            // This prevents published pages from being reverted to draft
+            $new_status = $existing_page->post_status;
+        }
+
         $post_data = [
             'post_title'   => $page['title'] ?? $page['name'],
             'post_name'    => $page['slug'],
             'post_content' => $prepared['html'],
-            'post_status'  => !empty($page['is_published']) ? 'publish' : 'draft',
+            'post_status'  => $new_status,
             'post_type'    => 'page',
             'meta_input'   => [
                 '_unicorn_studio_id'      => $page['id'],

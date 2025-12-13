@@ -210,6 +210,7 @@ class Unicorn_Studio_Pages {
                 '_unicorn_studio_body_classes'=> $prepared['body_classes'],
                 '_unicorn_studio_body_styles' => $prepared['body_styles'],
                 '_unicorn_studio_fonts'       => maybe_serialize($prepared['fonts']),
+                '_unicorn_studio_head_scripts'=> $prepared['head_scripts'],
                 '_unicorn_studio_content'     => maybe_serialize($page['content'] ?? []),
                 '_unicorn_studio_seo'         => maybe_serialize($page['seo'] ?? []),
                 '_unicorn_studio_sync'        => current_time('mysql'),
@@ -310,10 +311,11 @@ class Unicorn_Studio_Pages {
                 'body_classes' => '',
                 'body_styles' => '',
                 'fonts' => [],
+                'head_scripts' => '',
             ];
         }
 
-        // Extract head content (fonts) BEFORE cleaning
+        // Extract head content (fonts, Tailwind CDN + Config) BEFORE cleaning
         $head = $this->extract_head_content($html);
 
         // Extract body attributes BEFORE cleaning
@@ -347,6 +349,7 @@ class Unicorn_Studio_Pages {
             'body_classes' => $body['classes'],
             'body_styles' => $body['styles'],
             'fonts' => $head['fonts'],
+            'head_scripts' => $head['head_scripts'],
         ];
     }
 
@@ -446,14 +449,15 @@ class Unicorn_Studio_Pages {
     }
 
     /**
-     * Extract head content (fonts, meta tags, etc.)
+     * Extract head content (fonts, meta tags, Tailwind CDN + Config)
      *
      * @param string $html HTML content
-     * @return array ['fonts' => array of font URLs, 'meta' => string of meta tags]
+     * @return array ['fonts' => array of font URLs, 'meta' => string, 'head_scripts' => string]
      */
     private function extract_head_content($html) {
         $fonts = [];
         $meta = '';
+        $head_scripts = '';
 
         // Extract Google Fonts links
         $font_pattern = '/<link[^>]*href=["\']([^"\']*fonts\.googleapis\.com[^"\']*)["\'][^>]*>/i';
@@ -467,9 +471,34 @@ class Unicorn_Studio_Pages {
             $fonts = array_merge($fonts, $matches[1]);
         }
 
+        // Extract head section first
+        $head_html = '';
+        if (preg_match('/<head[^>]*>(.*?)<\/head>/is', $html, $head_match)) {
+            $head_html = $head_match[1];
+        }
+
+        // Extract Tailwind CDN script from head
+        if (preg_match('/<script[^>]*src=["\']https?:\/\/cdn\.tailwindcss\.com[^"\']*["\'][^>]*><\/script>/i', $head_html, $cdn_match)) {
+            $head_scripts .= $cdn_match[0] . "\n";
+        }
+
+        // Extract Tailwind config script (contains tailwind.config = {...})
+        // We parse this to generate CSS for custom colors, fonts, etc.
+        $tailwind_config = '';
+        if (preg_match_all('/<script(?![^>]*src=)[^>]*>(.*?)<\/script>/is', $head_html, $script_matches)) {
+            foreach ($script_matches[1] as $script_content) {
+                if (strpos($script_content, 'tailwind.config') !== false) {
+                    $tailwind_config = trim($script_content);
+                    break;
+                }
+            }
+        }
+
         return [
             'fonts' => array_unique($fonts),
             'meta' => $meta,
+            'head_scripts' => '', // Not using CDN anymore
+            'tailwind_config' => $tailwind_config,
         ];
     }
 

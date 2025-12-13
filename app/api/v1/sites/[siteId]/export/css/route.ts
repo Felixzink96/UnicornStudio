@@ -16,6 +16,14 @@ interface RouteParams {
   params: Promise<{ siteId: string }>
 }
 
+interface TailwindCustomConfig {
+  colors?: Record<string, string>
+  fontFamily?: Record<string, string[]>
+  keyframes?: Record<string, Record<string, Record<string, string>>>
+  animation?: Record<string, string>
+  backgroundImage?: Record<string, string>
+}
+
 // Cache the real Tailwind CSS source file content
 let tailwindCSSContent: string | null = null
 
@@ -41,8 +49,11 @@ function getTailwindCSSContent(): string {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    console.log('[CSS Export] Request received')
+
     // 1. Authenticate
     const auth = await authenticateAPIRequest()
+    console.log('[CSS Export] Auth result:', auth.success ? 'OK' : auth.error)
     if (!auth.success) {
       return unauthorizedResponse(auth.error)
     }
@@ -63,7 +74,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       supabase.from('sites').select('settings').eq('id', siteId).single(),
     ])
 
-    // 4. Collect all HTML content for Tailwind class extraction
+    // 4. Get Tailwind config from site settings (saved when page is saved)
+    const tailwindConfig = (siteRes.data?.settings as Record<string, unknown>)?.tailwindConfig as TailwindCustomConfig | undefined
+    if (tailwindConfig) {
+      console.log('[CSS Export] Found Tailwind custom config in site settings:', Object.keys(tailwindConfig))
+    }
+
+    // 5. Collect all HTML content for Tailwind class extraction
     let allHtml = ''
 
     // Pages - include both html_content and content JSON
@@ -79,7 +96,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       allHtml += JSON.stringify(page.content || {})
     })
 
-    // CMS Components
+    // 6. CMS Components
     const { data: components } = await supabase
       .from('cms_components')
       .select('html, variants')
@@ -94,7 +111,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     })
 
-    // Templates
+    // 7. Templates
     const { data: templates } = await supabase
       .from('templates')
       .select('html')
@@ -104,15 +121,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       allHtml += tpl.html || ''
     })
 
-    // 5. Extract all CSS classes from HTML
+    // 8. Extract all CSS classes from HTML
     const extractedClasses = extractAllClasses(allHtml)
 
-    // 6. Generate CSS Variables from design tokens
+    // 9. Generate CSS Variables from design tokens
     const designVars = designVarsRes.data
     const siteSettings = siteRes.data?.settings as Record<string, unknown> | null
     const cssVariables = generateCSSVariables(designVars, siteSettings)
 
-    // 7. Compile Tailwind CSS using v4 API
+    // 10. Compile Tailwind CSS using v4 API
     let tailwindCSS = ''
     try {
       tailwindCSS = await compileTailwindCSS(extractedClasses)
@@ -122,7 +139,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       tailwindCSS = generateFallbackCSS(extractedClasses)
     }
 
-    // 8. Combine everything
+    // 11. Generate custom Tailwind utilities from config (from site settings)
+    let customTailwindCSS = ''
+    if (tailwindConfig) {
+      customTailwindCSS = generateCustomTailwindCSS(tailwindConfig)
+      console.log(`[CSS Export] Generated ${customTailwindCSS.length} bytes of custom Tailwind CSS`)
+    }
+
+    // 12. Combine everything
     const fullCSS = `
 /* ==================================================================
    UNICORN STUDIO - Generated CSS
@@ -144,6 +168,12 @@ ${cssVariables}
    Compiled from ${extractedClasses.size} classes found in your content
    ---------------------------------------------------------------- */
 ${tailwindCSS}
+
+/* ----------------------------------------------------------------
+   CUSTOM TAILWIND CONFIG
+   Custom colors, fonts, animations from page config
+   ---------------------------------------------------------------- */
+${customTailwindCSS}
 `.trim()
 
     // 9. Return CSS with proper headers
@@ -492,4 +522,77 @@ function generateFallbackCSS(classes: Set<string>): string {
  */
 function escapeClassName(cls: string): string {
   return cls.replace(/([:\[\]\/\\.\-])/g, '\\$1')
+}
+
+/**
+ * Generate CSS utilities from custom Tailwind config (from site settings)
+ */
+function generateCustomTailwindCSS(config: TailwindCustomConfig): string {
+  const rules: string[] = []
+
+  // Generate color utilities
+  if (config.colors) {
+    Object.entries(config.colors).forEach(([name, value]) => {
+      // Background colors
+      rules.push(`.bg-${name} { background-color: ${value}; }`)
+      // Text colors
+      rules.push(`.text-${name} { color: ${value}; }`)
+      // Border colors
+      rules.push(`.border-${name} { border-color: ${value}; }`)
+      // Ring colors
+      rules.push(`.ring-${name} { --tw-ring-color: ${value}; }`)
+      // Divide colors
+      rules.push(`.divide-${name} > :not([hidden]) ~ :not([hidden]) { border-color: ${value}; }`)
+      // Selection
+      rules.push(`.selection\\:bg-${name} ::selection { background-color: ${value}; }`)
+      rules.push(`.selection\\:text-${name} ::selection { color: ${value}; }`)
+      // With opacity variants
+      rules.push(`.bg-${name}\\/20 { background-color: ${value}; opacity: 0.2; }`)
+      rules.push(`.bg-${name}\\/40 { background-color: ${value}; opacity: 0.4; }`)
+      rules.push(`.bg-${name}\\/50 { background-color: ${value}; opacity: 0.5; }`)
+      rules.push(`.bg-${name}\\/80 { background-color: ${value}; opacity: 0.8; }`)
+      // Shadow with color
+      rules.push(`.shadow-${name} { --tw-shadow-color: ${value}; }`)
+    })
+  }
+
+  // Generate font family utilities
+  if (config.fontFamily) {
+    Object.entries(config.fontFamily).forEach(([name, fonts]) => {
+      const fontStack = fonts.join(', ')
+      rules.push(`.font-${name} { font-family: ${fontStack}; }`)
+    })
+  }
+
+  // Generate keyframes
+  if (config.keyframes) {
+    Object.entries(config.keyframes).forEach(([name, frames]) => {
+      let keyframeCSS = `@keyframes ${name} {\n`
+      Object.entries(frames).forEach(([frameKey, props]) => {
+        keyframeCSS += `  ${frameKey} {\n`
+        Object.entries(props).forEach(([prop, val]) => {
+          keyframeCSS += `    ${prop}: ${val};\n`
+        })
+        keyframeCSS += `  }\n`
+      })
+      keyframeCSS += `}`
+      rules.push(keyframeCSS)
+    })
+  }
+
+  // Generate animation utilities
+  if (config.animation) {
+    Object.entries(config.animation).forEach(([name, value]) => {
+      rules.push(`.animate-${name} { animation: ${value}; }`)
+    })
+  }
+
+  // Generate background image utilities
+  if (config.backgroundImage) {
+    Object.entries(config.backgroundImage).forEach(([name, value]) => {
+      rules.push(`.bg-${name} { background-image: ${value}; }`)
+    })
+  }
+
+  return rules.join('\n')
 }

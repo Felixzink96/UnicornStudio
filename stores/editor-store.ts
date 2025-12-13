@@ -28,6 +28,174 @@ export interface WordPressConfig {
 
 export type WordPressStatus = 'current' | 'outdated' | 'error' | 'not_configured'
 
+// Tailwind Config Types
+export interface TailwindCustomConfig {
+  colors?: Record<string, string>
+  fontFamily?: Record<string, string[]>
+  keyframes?: Record<string, Record<string, Record<string, string>>>
+  animation?: Record<string, string>
+  backgroundImage?: Record<string, string>
+}
+
+/**
+ * Extract Tailwind config from HTML content
+ * Parses the JavaScript tailwind.config = {...} from script tags
+ */
+function extractTailwindConfigFromHtml(html: string): TailwindCustomConfig | null {
+  // Find script tag with tailwind.config
+  const configMatch = html.match(/<script[^>]*>([\s\S]*?tailwind\.config\s*=[\s\S]*?)<\/script>/i)
+  if (!configMatch) return null
+
+  const configScript = configMatch[1]
+
+  try {
+    const config: TailwindCustomConfig = {}
+
+    // Extract colors - handle nested objects and rgba values
+    const colorsMatch = configScript.match(/colors\s*:\s*\{([\s\S]*?)\}(?=\s*,?\s*(?:fontFamily|keyframes|animation|backgroundImage|\}))/i)
+    if (colorsMatch) {
+      const colors: Record<string, string> = {}
+      const colorsBlock = colorsMatch[1]
+      // Match 'colorName': 'value' or 'colorName': "value" - including rgba
+      const colorPattern = /['"]([a-zA-Z-]+)['"]\s*:\s*['"]([^'"]+)['"]/g
+      let match
+      while ((match = colorPattern.exec(colorsBlock)) !== null) {
+        colors[match[1]] = match[2]
+      }
+      if (Object.keys(colors).length) config.colors = colors
+    }
+
+    // Extract fontFamily
+    const fontMatch = configScript.match(/fontFamily\s*:\s*\{([\s\S]*?)\}(?=\s*,?\s*(?:colors|keyframes|animation|backgroundImage|\}))/i)
+    if (fontMatch) {
+      const fontFamily: Record<string, string[]> = {}
+      const fontBlock = fontMatch[1]
+      // Match 'fontName': ['Font1', 'fallback']
+      const fontPattern = /['"]([a-zA-Z-]+)['"]\s*:\s*\[([\s\S]*?)\]/g
+      let match
+      while ((match = fontPattern.exec(fontBlock)) !== null) {
+        const fontName = match[1]
+        const fontValues = match[2]
+          .split(',')
+          .map(f => f.trim().replace(/['"]/g, ''))
+          .filter(f => f)
+        fontFamily[fontName] = fontValues
+      }
+      if (Object.keys(fontFamily).length) config.fontFamily = fontFamily
+    }
+
+    // Extract animation values (simple key: value pairs)
+    const animationMatch = configScript.match(/animation\s*:\s*\{([\s\S]*?)\}(?=\s*,?\s*(?:colors|fontFamily|keyframes|backgroundImage|\}))/i)
+    if (animationMatch) {
+      const animation: Record<string, string> = {}
+      const animBlock = animationMatch[1]
+      const animPattern = /['"]([a-zA-Z-]+)['"]\s*:\s*['"]([^'"]+)['"]/g
+      let match
+      while ((match = animPattern.exec(animBlock)) !== null) {
+        animation[match[1]] = match[2]
+      }
+      if (Object.keys(animation).length) config.animation = animation
+    }
+
+    // Extract keyframes
+    const keyframesMatch = configScript.match(/keyframes\s*:\s*\{([\s\S]*?)\}(?=\s*,?\s*animation)/i)
+    if (keyframesMatch) {
+      const keyframes: Record<string, Record<string, Record<string, string>>> = {}
+      const kfBlock = keyframesMatch[1]
+
+      // Match keyframe names like scroll: { '0%': {...}, '100%': {...} }
+      const kfPattern = /['"]?([a-zA-Z]+)['"]?\s*:\s*\{([\s\S]*?)\}(?=\s*,?\s*['"]?[a-zA-Z]+['"]?\s*:|$)/g
+      let kfMatch
+      while ((kfMatch = kfPattern.exec(kfBlock)) !== null) {
+        const kfName = kfMatch[1]
+        const kfContent = kfMatch[2]
+        const frames: Record<string, Record<string, string>> = {}
+
+        // Match frame percentages: '0%': { transform: '...' }
+        const framePattern = /['"](\d+%(?:,\s*\d+%)?|from|to)['"]\s*:\s*\{([^}]+)\}/g
+        let frameMatch
+        while ((frameMatch = framePattern.exec(kfContent)) !== null) {
+          const frameKey = frameMatch[1]
+          const frameContent = frameMatch[2]
+          const props: Record<string, string> = {}
+
+          const propPattern = /['"]?([a-zA-Z-]+)['"]?\s*:\s*['"]([^'"]+)['"]/g
+          let propMatch
+          while ((propMatch = propPattern.exec(frameContent)) !== null) {
+            props[propMatch[1]] = propMatch[2]
+          }
+          if (Object.keys(props).length) frames[frameKey] = props
+        }
+        if (Object.keys(frames).length) keyframes[kfName] = frames
+      }
+      if (Object.keys(keyframes).length) config.keyframes = keyframes
+    }
+
+    console.log('[Tailwind Config] Extracted:', config)
+    return Object.keys(config).length ? config : null
+  } catch (error) {
+    console.error('[Tailwind Config] Failed to parse:', error)
+    return null
+  }
+}
+
+/**
+ * Save Tailwind config to site settings (merge with existing)
+ */
+async function saveTailwindConfigToSite(
+  supabase: ReturnType<typeof createClient>,
+  siteId: string,
+  config: TailwindCustomConfig
+) {
+  try {
+    // Get current site settings
+    const { data: site } = await supabase
+      .from('sites')
+      .select('settings')
+      .eq('id', siteId)
+      .single()
+
+    const currentSettings = (site?.settings as Record<string, unknown>) || {}
+    const currentTailwind = (currentSettings.tailwindConfig as TailwindCustomConfig) || {}
+
+    // Merge configs (new values override old)
+    const mergedConfig: TailwindCustomConfig = {
+      colors: { ...currentTailwind.colors, ...config.colors },
+      fontFamily: { ...currentTailwind.fontFamily, ...config.fontFamily },
+      keyframes: { ...currentTailwind.keyframes, ...config.keyframes },
+      animation: { ...currentTailwind.animation, ...config.animation },
+      backgroundImage: { ...currentTailwind.backgroundImage, ...config.backgroundImage },
+    }
+
+    // Remove empty objects
+    Object.keys(mergedConfig).forEach(key => {
+      const k = key as keyof TailwindCustomConfig
+      if (!mergedConfig[k] || Object.keys(mergedConfig[k]!).length === 0) {
+        delete mergedConfig[k]
+      }
+    })
+
+    // Save to site settings
+    const { error } = await supabase
+      .from('sites')
+      .update({
+        settings: {
+          ...currentSettings,
+          tailwindConfig: mergedConfig,
+        },
+      })
+      .eq('id', siteId)
+
+    if (error) {
+      console.error('[Tailwind Config] Failed to save:', error)
+    } else {
+      console.log('[Tailwind Config] Saved to site settings:', mergedConfig)
+    }
+  } catch (error) {
+    console.error('[Tailwind Config] Save error:', error)
+  }
+}
+
 const initialState: EditorState = {
   siteId: null,
   pageId: null,
@@ -398,6 +566,13 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           .select()
 
         console.log('Save result:', { data, error })
+
+        // Extract and save Tailwind config if present
+        const tailwindConfig = extractTailwindConfigFromHtml(state.html)
+        if (tailwindConfig && state.siteId) {
+          console.log('Found Tailwind config, saving to site settings:', tailwindConfig)
+          await saveTailwindConfigToSite(supabase, state.siteId, tailwindConfig)
+        }
 
         set((s) => {
           s.isSaving = false

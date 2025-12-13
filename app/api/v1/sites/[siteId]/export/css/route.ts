@@ -129,21 +129,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const siteSettings = siteRes.data?.settings as Record<string, unknown> | null
     const cssVariables = generateCSSVariables(designVars, siteSettings)
 
-    // 10. Compile Tailwind CSS using v4 API
+    // 10. Compile Tailwind CSS using v4 API with custom theme
     let tailwindCSS = ''
     try {
-      tailwindCSS = await compileTailwindCSS(extractedClasses)
+      tailwindCSS = await compileTailwindCSS(extractedClasses, tailwindConfig || undefined)
     } catch (tailwindError) {
       console.error('Tailwind compilation error:', tailwindError)
       // Fallback to basic utility generation if Tailwind compile fails
       tailwindCSS = generateFallbackCSS(extractedClasses)
     }
 
-    // 11. Generate custom Tailwind utilities from config (from site settings)
+    // 11. Generate additional custom CSS that Tailwind might not cover
     let customTailwindCSS = ''
     if (tailwindConfig) {
       customTailwindCSS = generateCustomTailwindCSS(tailwindConfig)
-      console.log(`[CSS Export] Generated ${customTailwindCSS.length} bytes of custom Tailwind CSS`)
+      console.log(`[CSS Export] Generated ${customTailwindCSS.length} bytes of additional custom CSS`)
     }
 
     // 12. Combine everything
@@ -191,9 +191,67 @@ ${customTailwindCSS}
 }
 
 /**
- * Compile Tailwind CSS using v4 API with REAL tailwindcss/index.css
+ * Build @theme CSS and keyframes from custom Tailwind config
  */
-async function compileTailwindCSS(classes: Set<string>): Promise<string> {
+function buildThemeCSS(config: TailwindCustomConfig): string {
+  const themeVars: string[] = []
+  const keyframesCSS: string[] = []
+
+  // Custom colors
+  if (config.colors) {
+    Object.entries(config.colors).forEach(([name, value]) => {
+      themeVars.push(`  --color-${name}: ${value};`)
+    })
+  }
+
+  // Custom font families
+  if (config.fontFamily) {
+    Object.entries(config.fontFamily).forEach(([name, fonts]) => {
+      const fontStack = fonts.map(f => f.includes(' ') ? `"${f}"` : f).join(', ')
+      themeVars.push(`  --font-family-${name}: ${fontStack};`)
+    })
+  }
+
+  // Custom animations (reference in @theme)
+  if (config.animation) {
+    Object.entries(config.animation).forEach(([name, value]) => {
+      themeVars.push(`  --animate-${name}: ${value};`)
+    })
+  }
+
+  // Build keyframes CSS (outside @theme)
+  if (config.keyframes) {
+    Object.entries(config.keyframes).forEach(([name, frames]) => {
+      let kfCSS = `@keyframes ${name} {\n`
+      Object.entries(frames).forEach(([frameKey, props]) => {
+        kfCSS += `  ${frameKey} {\n`
+        Object.entries(props).forEach(([prop, val]) => {
+          kfCSS += `    ${prop}: ${val};\n`
+        })
+        kfCSS += `  }\n`
+      })
+      kfCSS += `}`
+      keyframesCSS.push(kfCSS)
+    })
+  }
+
+  let result = ''
+
+  if (themeVars.length > 0) {
+    result += `@theme {\n${themeVars.join('\n')}\n}\n\n`
+  }
+
+  if (keyframesCSS.length > 0) {
+    result += keyframesCSS.join('\n\n')
+  }
+
+  return result
+}
+
+/**
+ * Compile Tailwind CSS using v4 API with REAL tailwindcss/index.css and custom theme
+ */
+async function compileTailwindCSS(classes: Set<string>, customConfig?: TailwindCustomConfig): Promise<string> {
   try {
     // Dynamic import to avoid build issues
     const { compile } = await import('tailwindcss')
@@ -201,11 +259,19 @@ async function compileTailwindCSS(classes: Set<string>): Promise<string> {
     // Get the REAL Tailwind CSS source file content
     const tailwindSource = getTailwindCSSContent()
 
+    // Build custom theme CSS
+    const themeCSS = customConfig ? buildThemeCSS(customConfig) : ''
+    if (themeCSS) {
+      console.log('[CSS Export] Custom theme:', themeCSS.substring(0, 200) + '...')
+    }
+
     const classArray = Array.from(classes)
     console.log(`[CSS Export] Compiling ${classArray.length} classes with Tailwind v4`)
 
-    // Compile using Tailwind v4 API with the REAL stylesheet
-    const compiler = await compile(`@import "tailwindcss";`, {
+    // Compile using Tailwind v4 API with the REAL stylesheet + custom theme
+    const cssInput = `@import "tailwindcss";\n\n${themeCSS}`
+
+    const compiler = await compile(cssInput, {
       loadStylesheet: async (id: string, base: string) => {
         if (id === 'tailwindcss') {
           // Return the REAL tailwindcss/index.css content!

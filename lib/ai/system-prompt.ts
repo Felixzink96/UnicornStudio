@@ -147,7 +147,13 @@ Analysiere diese referenzierte Seite und übernimm:
 - Container-Breiten und Grid-Strukturen
 - Die allgemeine Design-Sprache und Ästhetik
 
-Die neue Seite/Section muss visuell IDENTISCH zur referenzierten Seite aussehen - nur mit anderem Inhalt!
+⚠️ ABER KOPIERE NIEMALS:
+- <header> oder Navigation-Elemente
+- <footer> oder Copyright-Bereiche
+- "------" oder andere Trennzeichen
+- Kommentare wie "<!-- HEADER -->" oder "<!-- FOOTER -->"
+
+Die neue Seite/Section muss visuell IDENTISCH zur referenzierten Seite aussehen - nur mit anderem Inhalt und OHNE Header/Footer!
 
 GLOBAL COMPONENTS (Header & Footer):
 
@@ -330,28 +336,32 @@ Du sollst diese NICHT neu generieren!
 `
 
       if (gc.hasGlobalHeader) {
-        globalComponentsSection += `### ✅ GLOBAL HEADER EXISTIERT BEREITS
-Die Website hat einen globalen Header. Du darfst KEINEN neuen Header generieren!
-- Kein <header> Tag
-- Keine Navigation am Anfang der Seite
-- Generiere NUR Content-Sections (wie Hero, Features, Services, etc.)
+        globalComponentsSection += `### 🚫 GLOBAL HEADER EXISTIERT - NICHT GENERIEREN!
+Die Website hat bereits einen globalen Header. GENERIERE KEINEN HEADER!
+- KEIN <header> Tag
+- KEINE Navigation
+- KEINE "<!-- HEADER -->" Kommentare
+- Starte direkt mit der ersten Content-Section (z.B. Hero)
 
 `
       }
 
       if (gc.hasGlobalFooter) {
-        globalComponentsSection += `### ✅ GLOBAL FOOTER EXISTIERT BEREITS
-Die Website hat einen globalen Footer. Du darfst KEINEN neuen Footer generieren!
-- Kein <footer> Tag
-- Keine Copyright/Impressum Sections
-- Generiere NUR Content-Sections
+        globalComponentsSection += `### 🚫 GLOBAL FOOTER EXISTIERT - NICHT GENERIEREN!
+Die Website hat bereits einen globalen Footer. GENERIERE KEINEN FOOTER!
+- KEIN <footer> Tag
+- KEINE Copyright/Impressum Sections
+- KEINE "<!-- FOOTER -->" Kommentare
+- KEINE "------" Trennzeichen
+- Ende einfach mit der letzten Content-Section
 
 `
       }
 
-      globalComponentsSection += `### DEINE AUFGABE
-Generiere NUR den Content-Bereich der Seite (Sections zwischen Header und Footer).
-Header und Footer werden automatisch vom System eingefügt.
+      globalComponentsSection += `### ⚠️ DEINE AUFGABE
+Generiere NUR den Content-Bereich (Sections).
+KEIN Header, KEIN Footer - diese werden AUTOMATISCH vom System eingefügt!
+Dein Output startet mit <section> und endet mit </section>.
 `
     } else {
       // No global components yet - encourage creating them

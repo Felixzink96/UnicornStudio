@@ -9,9 +9,29 @@ import {
   forbiddenResponse,
   serverErrorResponse,
 } from '@/lib/api/responses'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 interface RouteParams {
   params: Promise<{ siteId: string }>
+}
+
+// Cache the real Tailwind CSS source file content
+let tailwindCSSContent: string | null = null
+
+function getTailwindCSSContent(): string {
+  if (tailwindCSSContent) return tailwindCSSContent
+
+  try {
+    // Read the REAL tailwindcss/index.css from node_modules
+    const tailwindPath = join(process.cwd(), 'node_modules', 'tailwindcss', 'index.css')
+    tailwindCSSContent = readFileSync(tailwindPath, 'utf-8')
+    console.log(`[CSS Export] Loaded Tailwind CSS source: ${tailwindCSSContent.length} bytes`)
+    return tailwindCSSContent
+  } catch (error) {
+    console.error('[CSS Export] Failed to load tailwindcss/index.css:', error)
+    throw new Error('Could not load Tailwind CSS source file')
+  }
 }
 
 /**
@@ -146,38 +166,38 @@ ${tailwindCSS}
 }
 
 /**
- * Compile Tailwind CSS using v4 API
+ * Compile Tailwind CSS using v4 API with REAL tailwindcss/index.css
  */
 async function compileTailwindCSS(classes: Set<string>): Promise<string> {
   try {
     // Dynamic import to avoid build issues
     const { compile } = await import('tailwindcss')
 
-    // Create content with all extracted classes for Tailwind to scan
-    const htmlContent = `<div class="${Array.from(classes).join(' ')}"></div>`
+    // Get the REAL Tailwind CSS source file content
+    const tailwindSource = getTailwindCSSContent()
 
-    // Compile using Tailwind v4 API
+    const classArray = Array.from(classes)
+    console.log(`[CSS Export] Compiling ${classArray.length} classes with Tailwind v4`)
+
+    // Compile using Tailwind v4 API with the REAL stylesheet
     const compiler = await compile(`@import "tailwindcss";`, {
       loadStylesheet: async (id: string, base: string) => {
         if (id === 'tailwindcss') {
-          // Return the base Tailwind styles
+          // Return the REAL tailwindcss/index.css content!
           return {
-            path: 'virtual:tailwindcss/index.css',
+            path: 'node_modules/tailwindcss/index.css',
             base,
-            content: `
-              @layer base, components, utilities;
-              @layer utilities {
-                @tailwind utilities;
-              }
-            `,
+            content: tailwindSource,
           }
         }
         throw new Error(`Cannot load stylesheet: ${id}`)
       },
     })
 
-    // Build CSS from the classes
-    const css = compiler.build(Array.from(classes))
+    // Build CSS from the extracted classes
+    const css = compiler.build(classArray)
+
+    console.log(`[CSS Export] Tailwind generated ${css.length} bytes of CSS`)
 
     return css
   } catch (error) {

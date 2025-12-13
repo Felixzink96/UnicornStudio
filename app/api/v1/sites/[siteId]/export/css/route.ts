@@ -140,11 +140,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 ${cssVariables}
 
 /* ----------------------------------------------------------------
-   BASE STYLES
-   ---------------------------------------------------------------- */
-${generateBaseStyles()}
-
-/* ----------------------------------------------------------------
    TAILWIND UTILITIES
    Compiled from ${extractedClasses.size} classes found in your content
    ---------------------------------------------------------------- */
@@ -297,42 +292,6 @@ function generateCSSVariables(
   css += '}\n'
 
   return css
-}
-
-/**
- * Generate base styles
- */
-function generateBaseStyles(): string {
-  return `
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-html {
-  -webkit-text-size-adjust: 100%;
-  font-feature-settings: normal;
-  tab-size: 4;
-}
-
-body {
-  margin: 0;
-  line-height: 1.5;
-  font-family: var(--font-body);
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading);
-}
-
-code, pre {
-  font-family: var(--font-mono);
-}
-
-img, video {
-  max-width: 100%;
-  height: auto;
-}
-`.trim()
 }
 
 /**

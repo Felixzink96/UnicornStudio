@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.9.4
+ * Version:           1.10.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.9.4');
+define('UNICORN_STUDIO_VERSION', '1.10.0');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -184,6 +184,18 @@ final class Unicorn_Studio {
         // Enqueue frontend CSS (priority 20 to run after theme styles)
         add_action('wp_enqueue_scripts', [$this->css, 'enqueue_styles'], 20);
 
+        // Output page-specific CSS in head
+        add_action('wp_head', [$this, 'output_page_styles'], 999);
+
+        // Output page-specific fonts in head
+        add_action('wp_head', [$this, 'output_page_fonts'], 5);
+
+        // Add body classes
+        add_filter('body_class', [$this, 'add_page_body_classes']);
+
+        // Add body inline styles
+        add_action('wp_head', [$this, 'output_body_styles'], 999);
+
         // Output page-specific JavaScript in footer
         add_action('wp_footer', [$this, 'output_page_scripts'], 999);
 
@@ -237,6 +249,161 @@ final class Unicorn_Studio {
         echo "\n<script id=\"unicorn-studio-page-js\">\n";
         echo $js;
         echo "\n</script>\n";
+    }
+
+    /**
+     * Output page-specific CSS in head
+     */
+    public function output_page_styles() {
+        if (!is_singular('page')) {
+            return;
+        }
+
+        global $post;
+        if (!$post) {
+            return;
+        }
+
+        $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
+        if (!$unicorn_id) {
+            return;
+        }
+
+        $css = get_post_meta($post->ID, '_unicorn_studio_css', true);
+        if (empty($css)) {
+            return;
+        }
+
+        echo "\n<style id=\"unicorn-studio-page-css\">\n";
+        echo $css;
+        echo "\n</style>\n";
+    }
+
+    /**
+     * Output page-specific fonts in head
+     */
+    public function output_page_fonts() {
+        if (!is_singular('page')) {
+            return;
+        }
+
+        global $post;
+        if (!$post) {
+            return;
+        }
+
+        $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
+        if (!$unicorn_id) {
+            return;
+        }
+
+        $fonts = get_post_meta($post->ID, '_unicorn_studio_fonts', true);
+        if (empty($fonts)) {
+            return;
+        }
+
+        $fonts = maybe_unserialize($fonts);
+        if (!is_array($fonts)) {
+            return;
+        }
+
+        // Output preconnect first
+        $has_google_fonts = false;
+        foreach ($fonts as $font_url) {
+            if (strpos($font_url, 'fonts.googleapis.com') !== false) {
+                $has_google_fonts = true;
+                break;
+            }
+        }
+
+        if ($has_google_fonts) {
+            echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
+            echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
+        }
+
+        // Output font stylesheets
+        foreach ($fonts as $font_url) {
+            if (strpos($font_url, 'fonts.googleapis.com/css') !== false) {
+                echo '<link rel="stylesheet" href="' . esc_url($font_url) . '">' . "\n";
+            }
+        }
+    }
+
+    /**
+     * Add body classes from Unicorn Studio page
+     */
+    public function add_page_body_classes($classes) {
+        if (!is_singular('page')) {
+            return $classes;
+        }
+
+        global $post;
+        if (!$post) {
+            return $classes;
+        }
+
+        $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
+        if (!$unicorn_id) {
+            return $classes;
+        }
+
+        $body_classes = get_post_meta($post->ID, '_unicorn_studio_body_classes', true);
+        if (!empty($body_classes)) {
+            // Split and add each class
+            $custom_classes = explode(' ', $body_classes);
+            foreach ($custom_classes as $class) {
+                $class = trim($class);
+                if (!empty($class)) {
+                    $classes[] = sanitize_html_class($class);
+                }
+            }
+        }
+
+        return $classes;
+    }
+
+    /**
+     * Output body inline styles
+     */
+    public function output_body_styles() {
+        if (!is_singular('page')) {
+            return;
+        }
+
+        global $post;
+        if (!$post) {
+            return;
+        }
+
+        $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
+        if (!$unicorn_id) {
+            return;
+        }
+
+        $body_styles = get_post_meta($post->ID, '_unicorn_studio_body_styles', true);
+        if (empty($body_styles)) {
+            return;
+        }
+
+        // Also check for CSS that might have body styles
+        $css = get_post_meta($post->ID, '_unicorn_studio_css', true);
+
+        // Extract body background-color from custom CSS if present
+        $body_bg = '';
+        if (!empty($css) && preg_match('/body\s*\{[^}]*background(?:-color)?\s*:\s*([^;]+)/i', $css, $matches)) {
+            $body_bg = trim($matches[1]);
+        }
+
+        echo "\n<style id=\"unicorn-studio-body-styles\">\n";
+        echo "body {\n";
+        if (!empty($body_styles)) {
+            echo "    " . esc_html($body_styles) . "\n";
+        }
+        if (!empty($body_bg)) {
+            echo "    background-color: " . esc_html($body_bg) . ";\n";
+        }
+        echo "}\n";
+        echo "</style>\n";
     }
 
     /**

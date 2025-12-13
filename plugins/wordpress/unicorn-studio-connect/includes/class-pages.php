@@ -202,13 +202,17 @@ class Unicorn_Studio_Pages {
             'post_status'  => $new_status,
             'post_type'    => 'page',
             'meta_input'   => [
-                '_unicorn_studio_id'      => $page['id'],
-                '_unicorn_studio_path'    => $page['path'] ?? '',
-                '_unicorn_studio_html'    => $page['html'] ?? '',
-                '_unicorn_studio_js'      => $prepared['js'], // Store extracted JS
-                '_unicorn_studio_content' => maybe_serialize($page['content'] ?? []),
-                '_unicorn_studio_seo'     => maybe_serialize($page['seo'] ?? []),
-                '_unicorn_studio_sync'    => current_time('mysql'),
+                '_unicorn_studio_id'          => $page['id'],
+                '_unicorn_studio_path'        => $page['path'] ?? '',
+                '_unicorn_studio_html'        => $page['html'] ?? '',
+                '_unicorn_studio_js'          => $prepared['js'],
+                '_unicorn_studio_css'         => $prepared['css'],
+                '_unicorn_studio_body_classes'=> $prepared['body_classes'],
+                '_unicorn_studio_body_styles' => $prepared['body_styles'],
+                '_unicorn_studio_fonts'       => maybe_serialize($prepared['fonts']),
+                '_unicorn_studio_content'     => maybe_serialize($page['content'] ?? []),
+                '_unicorn_studio_seo'         => maybe_serialize($page['seo'] ?? []),
+                '_unicorn_studio_sync'        => current_time('mysql'),
             ],
         ];
 
@@ -293,22 +297,40 @@ class Unicorn_Studio_Pages {
      * Prepare content for WordPress
      *
      * @param array $page Page data
-     * @return array ['html' => string, 'js' => string]
+     * @return array ['html' => string, 'js' => string, 'css' => string, 'body_classes' => string, 'body_styles' => string, 'fonts' => array]
      */
     private function prepare_content($page) {
         $html = $page['html'] ?? '';
 
         if (empty($html)) {
-            return ['html' => '', 'js' => ''];
+            return [
+                'html' => '',
+                'js' => '',
+                'css' => '',
+                'body_classes' => '',
+                'body_styles' => '',
+                'fonts' => [],
+            ];
         }
 
-        // Clean the HTML for WordPress
+        // Extract head content (fonts) BEFORE cleaning
+        $head = $this->extract_head_content($html);
+
+        // Extract body attributes BEFORE cleaning
+        $body = $this->extract_body_attributes($html);
+
+        // Extract custom CSS BEFORE cleaning
+        $styles = $this->extract_styles($html);
+        $html = $styles['html'];
+        $css = $styles['css'];
+
+        // Clean the HTML for WordPress (extracts body, removes CDN, etc.)
         $html = $this->clean_html_for_wordpress($html);
 
         // Extract inline scripts from HTML
-        $extracted = $this->extract_scripts($html);
-        $html = $extracted['html'];
-        $js = $extracted['js'];
+        $scripts = $this->extract_scripts($html);
+        $html = $scripts['html'];
+        $js = $scripts['js'];
 
         // Wrap in a shortcode or block that renders the HTML
         // This allows the HTML to be rendered properly
@@ -318,7 +340,14 @@ class Unicorn_Studio_Pages {
         $content .= '</div>' . "\n";
         $content .= '<!-- /wp:html -->';
 
-        return ['html' => $content, 'js' => $js];
+        return [
+            'html' => $content,
+            'js' => $js,
+            'css' => $css,
+            'body_classes' => $body['classes'],
+            'body_styles' => $body['styles'],
+            'fonts' => $head['fonts'],
+        ];
     }
 
     /**
@@ -361,6 +390,86 @@ class Unicorn_Studio_Pages {
         return [
             'html' => trim($html),
             'js' => trim($js),
+        ];
+    }
+
+    /**
+     * Extract custom CSS from style tags
+     *
+     * @param string $html HTML content
+     * @return array ['html' => string without styles, 'css' => extracted CSS]
+     */
+    private function extract_styles($html) {
+        $css = '';
+
+        // Match style tags
+        $pattern = '/<style[^>]*>(.*?)<\/style>/is';
+
+        if (preg_match_all($pattern, $html, $matches)) {
+            foreach ($matches[1] as $style) {
+                $css .= trim($style) . "\n\n";
+            }
+            // Remove style tags from HTML
+            $html = preg_replace($pattern, '', $html);
+        }
+
+        return [
+            'html' => trim($html),
+            'css' => trim($css),
+        ];
+    }
+
+    /**
+     * Extract body classes and inline styles
+     *
+     * @param string $html HTML content
+     * @return array ['classes' => string, 'styles' => string]
+     */
+    private function extract_body_attributes($html) {
+        $classes = '';
+        $styles = '';
+
+        // Match body tag with class attribute
+        if (preg_match('/<body[^>]*class=["\']([^"\']*)["\'][^>]*>/i', $html, $matches)) {
+            $classes = $matches[1];
+        }
+
+        // Match body tag with style attribute
+        if (preg_match('/<body[^>]*style=["\']([^"\']*)["\'][^>]*>/i', $html, $matches)) {
+            $styles = $matches[1];
+        }
+
+        return [
+            'classes' => trim($classes),
+            'styles' => trim($styles),
+        ];
+    }
+
+    /**
+     * Extract head content (fonts, meta tags, etc.)
+     *
+     * @param string $html HTML content
+     * @return array ['fonts' => array of font URLs, 'meta' => string of meta tags]
+     */
+    private function extract_head_content($html) {
+        $fonts = [];
+        $meta = '';
+
+        // Extract Google Fonts links
+        $font_pattern = '/<link[^>]*href=["\']([^"\']*fonts\.googleapis\.com[^"\']*)["\'][^>]*>/i';
+        if (preg_match_all($font_pattern, $html, $matches)) {
+            $fonts = array_merge($fonts, $matches[1]);
+        }
+
+        // Also get preconnect links for fonts
+        $preconnect_pattern = '/<link[^>]*rel=["\']preconnect["\'][^>]*href=["\']([^"\']*fonts\.(googleapis|gstatic)\.com[^"\']*)["\'][^>]*>/i';
+        if (preg_match_all($preconnect_pattern, $html, $matches)) {
+            $fonts = array_merge($fonts, $matches[1]);
+        }
+
+        return [
+            'fonts' => array_unique($fonts),
+            'meta' => $meta,
         ];
     }
 

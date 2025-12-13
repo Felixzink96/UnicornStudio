@@ -69,8 +69,16 @@ class Unicorn_Studio_Webhook_Handler {
         $site_id = $request->get_param('site_id');
 
         // Verify site ID matches
-        if ($site_id !== Unicorn_Studio::get_site_id()) {
-            return new WP_REST_Response(['success' => false, 'error' => 'Site ID mismatch'], 400);
+        $expected_site_id = Unicorn_Studio::get_site_id();
+        if ($site_id !== $expected_site_id) {
+            return new WP_REST_Response([
+                'success' => false,
+                'error' => 'Site ID mismatch',
+                'debug' => [
+                    'received_site_id' => $site_id,
+                    'expected_site_id' => $expected_site_id,
+                ],
+            ], 400);
         }
 
         // Log webhook
@@ -88,10 +96,20 @@ class Unicorn_Studio_Webhook_Handler {
             return new WP_REST_Response([
                 'success' => false,
                 'error'   => $result->get_error_message(),
+                'debug'   => [
+                    'event' => $event,
+                    'data'  => $data,
+                ],
             ], 500);
         }
 
-        return new WP_REST_Response(['success' => true], 200);
+        // Return detailed result for debugging
+        $response_data = ['success' => true, 'event' => $event];
+        if (is_array($result)) {
+            $response_data['result'] = $result;
+        }
+
+        return new WP_REST_Response($response_data, 200);
     }
 
     /**

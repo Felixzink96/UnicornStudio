@@ -134,8 +134,8 @@ export async function POST(request: NextRequest) {
       errors: [],
     }
 
-    // Helper function to send webhook
-    const sendWebhook = async (event: string, data: unknown) => {
+    // Helper function to send webhook - returns WordPress response for debugging
+    const sendWebhook = async (event: string, data: unknown): Promise<Record<string, unknown>> => {
       const payload = JSON.stringify({
         event,
         site_id: siteId,
@@ -155,9 +155,12 @@ export async function POST(request: NextRequest) {
         signal: AbortSignal.timeout(30000),
       })
 
+      // Parse response body
+      const responseBody = await response.json().catch(() => ({ raw: response.statusText }))
+
       if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error')
-        throw new Error(`Webhook failed: ${response.status} - ${errorText}`)
+        const errorMsg = responseBody?.error || responseBody?.message || response.statusText
+        throw new Error(`Webhook failed: ${response.status} - ${errorMsg}`)
       }
 
       // Update webhook stats if using webhook method
@@ -168,6 +171,8 @@ export async function POST(request: NextRequest) {
           http_status: response.status,
         })
       }
+
+      return responseBody as Record<string, unknown>
     }
 
     // Use simplified sync approach - tell WordPress to fetch from API
@@ -177,9 +182,34 @@ export async function POST(request: NextRequest) {
       console.log('[WordPress Push] Single page mode, pageId:', pageId)
       try {
         console.log('[WordPress Push] Sending sync.pages with pageId:', pageId)
-        await sendWebhook('sync.pages', { pageId })
-        console.log('[WordPress Push] sync.pages sent successfully')
-        result.results.pages = { count: 1, success: true }
+        const wpResponse = await sendWebhook('sync.pages', { pageId })
+        console.log('[WordPress Push] WordPress response:', JSON.stringify(wpResponse))
+
+        // Extract debug info from WordPress response
+        const wpResult = wpResponse.result as Record<string, unknown> | undefined
+        const wpDebug = wpResult?.debug as Record<string, unknown> | undefined
+
+        result.results.pages = {
+          count: 1,
+          success: wpResult?.success !== false,
+          error: wpResult?.error as string | undefined,
+        }
+
+        // Add WordPress debug info to result
+        ;(result as Record<string, unknown>).wordpress_debug = {
+          event: wpResponse.event,
+          result: wpResult,
+          debug: wpDebug,
+        }
+
+        // Check if WordPress actually updated the page
+        if (wpDebug?.wordpress_page_found === false) {
+          result.errors.push('WordPress-Seite nicht gefunden (unicorn_studio_id nicht gefunden)')
+        }
+        if (wpDebug?.step === 'page_not_found') {
+          result.errors.push('Seite nicht in API-Antwort gefunden')
+        }
+
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Page sync failed'
         console.error('[WordPress Push] sync.pages failed:', msg)

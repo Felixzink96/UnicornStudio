@@ -35,31 +35,92 @@ class Unicorn_Studio_Pages {
      * @return array Sync result
      */
     public function sync_page_by_id($page_id) {
-        error_log('[Unicorn Studio DEBUG] sync_page_by_id called with: ' . $page_id);
+        $debug = [
+            'step' => 'start',
+            'page_id_received' => $page_id,
+            'timestamp' => current_time('mysql'),
+        ];
+
+        // Validate page_id
+        if (empty($page_id)) {
+            return [
+                'success' => false,
+                'error'   => 'Keine Page ID erhalten',
+                'debug'   => array_merge($debug, [
+                    'step' => 'validation_error',
+                    'issue' => 'page_id is empty',
+                ]),
+            ];
+        }
+
+        // Get API config for debugging
+        $debug['api_config'] = [
+            'base_url' => Unicorn_Studio::get_option('api_url', 'nicht gesetzt'),
+            'site_id' => Unicorn_Studio::get_site_id() ? substr(Unicorn_Studio::get_site_id(), 0, 8) . '...' : 'nicht gesetzt',
+            'api_key_set' => !empty(Unicorn_Studio::get_api_key()),
+        ];
 
         $response = $this->api->get_page($page_id);
 
-        error_log('[Unicorn Studio DEBUG] API response: ' . print_r($response, true));
-
         if (is_wp_error($response)) {
-            error_log('[Unicorn Studio DEBUG] API error: ' . $response->get_error_message());
+            $error_data = $response->get_error_data();
             return [
                 'success' => false,
                 'error'   => $response->get_error_message(),
+                'debug'   => array_merge($debug, [
+                    'step' => 'api_error',
+                    'error_code' => $response->get_error_code(),
+                    'error_data' => is_array($error_data) ? $error_data : ['raw' => $error_data],
+                ]),
             ];
         }
+
+        $debug['api_response_keys'] = is_array($response) ? array_keys($response) : 'not_array';
+        $debug['api_response_success'] = $response['success'] ?? 'not_set';
 
         $page = $response['data'] ?? null;
         if (!$page) {
-            error_log('[Unicorn Studio DEBUG] Page not found in response');
             return [
                 'success' => false,
-                'error'   => 'Page not found',
+                'error'   => 'Seite nicht in API-Antwort gefunden. Response: ' . wp_json_encode(array_slice($response, 0, 3, true)),
+                'debug'   => array_merge($debug, [
+                    'step' => 'page_not_found_in_response',
+                    'response_keys' => is_array($response) ? array_keys($response) : 'not_array',
+                    'response_sample' => is_array($response) ? array_slice($response, 0, 5, true) : $response,
+                ]),
             ];
         }
 
-        error_log('[Unicorn Studio DEBUG] Page data received: ' . print_r($page, true));
-        return $this->sync_single_page($page);
+        $debug['page_data'] = [
+            'id' => $page['id'] ?? 'missing',
+            'name' => $page['name'] ?? 'missing',
+            'slug' => $page['slug'] ?? 'missing',
+            'title' => $page['title'] ?? 'missing',
+            'html_length' => isset($page['html']) ? strlen($page['html']) : 0,
+            'is_published' => $page['is_published'] ?? 'not_set',
+            'has_content' => !empty($page['content']),
+        ];
+
+        // Check if WordPress page exists
+        $existing = $this->get_page_by_unicorn_id($page['id']);
+        $debug['wordpress_lookup'] = [
+            'searched_unicorn_id' => $page['id'],
+            'found' => $existing ? true : false,
+            'wp_post_id' => $existing ? $existing->ID : null,
+            'wp_post_title' => $existing ? $existing->post_title : null,
+            'wp_post_status' => $existing ? $existing->post_status : null,
+        ];
+
+        $result = $this->sync_single_page($page);
+
+        // Add more context to result
+        $result['debug'] = array_merge($debug, [
+            'step' => 'completed',
+            'action_taken' => $result['action'] ?? 'unknown',
+            'resulting_post_id' => $result['post_id'] ?? null,
+        ]);
+
+        return $result;
     }
 
     /**

@@ -57,6 +57,31 @@ class Unicorn_Studio_API_Client {
     public function request($endpoint, $method = 'GET', $body = null) {
         $url = $this->base_url . '/sites/' . $this->site_id . $endpoint;
 
+        // Validate configuration
+        if (empty($this->api_key)) {
+            return new WP_Error(
+                'missing_api_key',
+                'API Key ist nicht konfiguriert. Bitte in Einstellungen setzen.',
+                ['url' => $url]
+            );
+        }
+
+        if (empty($this->site_id)) {
+            return new WP_Error(
+                'missing_site_id',
+                'Site ID ist nicht konfiguriert. Bitte in Einstellungen setzen.',
+                ['url' => $url]
+            );
+        }
+
+        if (empty($this->base_url)) {
+            return new WP_Error(
+                'missing_api_url',
+                'API URL ist nicht konfiguriert. Bitte in Einstellungen setzen.',
+                []
+            );
+        }
+
         $args = [
             'method'  => $method,
             'headers' => [
@@ -73,19 +98,72 @@ class Unicorn_Studio_API_Client {
 
         $response = wp_remote_request($url, $args);
 
+        // Network/connection errors
         if (is_wp_error($response)) {
-            return $response;
+            $wp_error_msg = $response->get_error_message();
+            return new WP_Error(
+                'connection_error',
+                sprintf(
+                    'Verbindungsfehler: %s (URL: %s) - Ist die API erreichbar?',
+                    $wp_error_msg,
+                    $url
+                ),
+                ['url' => $url, 'wp_error' => $wp_error_msg]
+            );
         }
 
         $status_code = wp_remote_retrieve_response_code($response);
-        $response_body = json_decode(wp_remote_retrieve_body($response), true);
+        $raw_body = wp_remote_retrieve_body($response);
+        $response_body = json_decode($raw_body, true);
 
+        // JSON parse error
+        if ($raw_body && $response_body === null && json_last_error() !== JSON_ERROR_NONE) {
+            return new WP_Error(
+                'invalid_json',
+                sprintf(
+                    'Ungültige JSON-Antwort von API (Status: %d, URL: %s, Body: %s)',
+                    $status_code,
+                    $url,
+                    substr($raw_body, 0, 200)
+                ),
+                ['status' => $status_code, 'url' => $url, 'raw_body' => substr($raw_body, 0, 500)]
+            );
+        }
+
+        // HTTP errors
         if ($status_code >= 400) {
             $error_message = $response_body['error']['message'] ?? __('Unbekannter Fehler', 'unicorn-studio');
+            $error_code = $response_body['error']['code'] ?? 'unknown';
+
+            // Specific error messages for common issues
+            $hint = '';
+            if ($status_code === 401) {
+                $hint = ' - API Key ungültig oder abgelaufen?';
+            } elseif ($status_code === 403) {
+                $hint = ' - Keine Berechtigung für diese Site?';
+            } elseif ($status_code === 404) {
+                $hint = ' - Endpoint oder Ressource nicht gefunden. API Version korrekt?';
+            } elseif ($status_code >= 500) {
+                $hint = ' - Serverfehler bei Unicorn Studio. Bitte später versuchen.';
+            }
+
+            $full_error = sprintf(
+                '%s%s (Status: %d, Code: %s, URL: %s)',
+                $error_message,
+                $hint,
+                $status_code,
+                $error_code,
+                $url
+            );
             return new WP_Error(
                 'unicorn_api_error',
-                $error_message,
-                ['status' => $status_code]
+                $full_error,
+                [
+                    'status' => $status_code,
+                    'url' => $url,
+                    'error_code' => $error_code,
+                    'response' => $response_body,
+                ]
             );
         }
 
@@ -374,6 +452,17 @@ class Unicorn_Studio_API_Client {
      * @return array|WP_Error
      */
     public function get_page($page_id) {
-        return $this->request('/pages/' . $page_id);
+        $endpoint = '/pages/' . $page_id;
+        $url = $this->base_url . '/sites/' . $this->site_id . $endpoint;
+        error_log('[Unicorn Studio DEBUG] get_page URL: ' . $url);
+        error_log('[Unicorn Studio DEBUG] API Key: ' . substr($this->api_key, 0, 10) . '...');
+        error_log('[Unicorn Studio DEBUG] Site ID: ' . $this->site_id);
+
+        $result = $this->request($endpoint);
+        error_log('[Unicorn Studio DEBUG] get_page result type: ' . gettype($result));
+        if (is_array($result)) {
+            error_log('[Unicorn Studio DEBUG] get_page result keys: ' . implode(', ', array_keys($result)));
+        }
+        return $result;
     }
 }

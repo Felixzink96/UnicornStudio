@@ -14,6 +14,30 @@ export interface WordPressConfig {
 
 export type WordPressStatus = 'current' | 'outdated' | 'error' | 'not_configured'
 
+export interface WordPressDebugInfo {
+  event?: string
+  result?: {
+    success?: boolean
+    action?: string
+    post_id?: number
+    error?: string
+    debug?: {
+      step?: string
+      page_id_received?: string
+      api_response_keys?: string[] | string
+      page_data?: {
+        id?: string
+        name?: string
+        slug?: string
+        html_length?: number
+      }
+      wordpress_page_found?: number | false
+      wordpress_page_title?: string | null
+    }
+  }
+  debug?: Record<string, unknown>
+}
+
 export interface PushResult {
   success: boolean
   message: string
@@ -25,6 +49,7 @@ export interface PushResult {
     css?: { success: boolean; error?: string }
   }
   errors?: string[]
+  wordpressDebug?: WordPressDebugInfo
 }
 
 interface SiteIntegrations {
@@ -171,6 +196,12 @@ export function useWordPress(siteId: string | null): UseWordPressReturn {
         const pageCount = results.pages?.count || 0
         const entryCount = results.entries?.count || 0
         const errors = data.data.errors || []
+        const wpDebug = data.data.wordpress_debug as WordPressDebugInfo | undefined
+
+        // Log debug info to console for easier debugging
+        if (wpDebug) {
+          console.log('[WordPress Push Debug]', JSON.stringify(wpDebug, null, 2))
+        }
 
         return {
           success: errors.length === 0,
@@ -179,6 +210,7 @@ export function useWordPress(siteId: string | null): UseWordPressReturn {
             : `Push mit Fehlern: ${errors.join(', ')}`,
           details: results,
           errors: errors,
+          wordpressDebug: wpDebug,
         }
       } else {
         const errorMsg = data.error?.message || 'Unbekannter Fehler'

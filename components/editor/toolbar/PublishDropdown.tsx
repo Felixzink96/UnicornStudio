@@ -233,6 +233,91 @@ export function PublishDropdown({
                     Fehler: {lastResult.errors.join(', ')}
                   </div>
                 )}
+                {/* Debug Info */}
+                {lastResult.wordpressDebug && (
+                  <details className="mt-3 text-xs">
+                    <summary className="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                      Debug Info (klicken zum öffnen)
+                    </summary>
+                    <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono overflow-auto max-h-64">
+                      {lastResult.wordpressDebug.result?.debug ? (
+                        <div className="space-y-2">
+                          {/* Status */}
+                          <div className="pb-1 border-b border-gray-300 dark:border-gray-600">
+                            <div><strong>Step:</strong> <span className={lastResult.wordpressDebug.result.debug.step === 'completed' ? 'text-green-600' : 'text-red-600'}>{lastResult.wordpressDebug.result.debug.step}</span></div>
+                            <div><strong>Page ID:</strong> {lastResult.wordpressDebug.result.debug.page_id_received}</div>
+                          </div>
+
+                          {/* API Config */}
+                          {lastResult.wordpressDebug.result.debug.api_config && (
+                            <div className="pb-1 border-b border-gray-300 dark:border-gray-600">
+                              <div className="font-bold text-gray-600 dark:text-gray-300">API Konfiguration:</div>
+                              <div><strong>URL:</strong> {lastResult.wordpressDebug.result.debug.api_config.base_url}</div>
+                              <div><strong>Site ID:</strong> {lastResult.wordpressDebug.result.debug.api_config.site_id}</div>
+                              <div><strong>API Key:</strong> {lastResult.wordpressDebug.result.debug.api_config.api_key_set ? '✓ gesetzt' : '✗ fehlt'}</div>
+                            </div>
+                          )}
+
+                          {/* Error Data */}
+                          {lastResult.wordpressDebug.result.debug.error_data && (
+                            <div className="pb-1 border-b border-gray-300 dark:border-gray-600 text-red-600">
+                              <div className="font-bold">Fehler Details:</div>
+                              <div><strong>URL:</strong> {lastResult.wordpressDebug.result.debug.error_data.url}</div>
+                              {lastResult.wordpressDebug.result.debug.error_data.status && (
+                                <div><strong>Status:</strong> {lastResult.wordpressDebug.result.debug.error_data.status}</div>
+                              )}
+                              {lastResult.wordpressDebug.result.debug.error_data.wp_error && (
+                                <div><strong>WP Error:</strong> {lastResult.wordpressDebug.result.debug.error_data.wp_error}</div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Page Data from API */}
+                          {lastResult.wordpressDebug.result.debug.page_data && (
+                            <div className="pb-1 border-b border-gray-300 dark:border-gray-600">
+                              <div className="font-bold text-gray-600 dark:text-gray-300">API Seiten-Daten:</div>
+                              <div><strong>Name:</strong> {lastResult.wordpressDebug.result.debug.page_data.name}</div>
+                              <div><strong>Slug:</strong> {lastResult.wordpressDebug.result.debug.page_data.slug}</div>
+                              <div><strong>HTML:</strong> {lastResult.wordpressDebug.result.debug.page_data.html_length} Zeichen</div>
+                              <div><strong>Veröffentlicht:</strong> {String(lastResult.wordpressDebug.result.debug.page_data.is_published)}</div>
+                            </div>
+                          )}
+
+                          {/* WordPress Lookup */}
+                          {lastResult.wordpressDebug.result.debug.wordpress_lookup && (
+                            <div className="pb-1 border-b border-gray-300 dark:border-gray-600">
+                              <div className="font-bold text-gray-600 dark:text-gray-300">WordPress Suche:</div>
+                              <div>
+                                <strong>Gefunden:</strong>{' '}
+                                <span className={lastResult.wordpressDebug.result.debug.wordpress_lookup.found ? 'text-green-600' : 'text-orange-600'}>
+                                  {lastResult.wordpressDebug.result.debug.wordpress_lookup.found ? 'Ja' : 'Nein (wird neu erstellt)'}
+                                </span>
+                              </div>
+                              {lastResult.wordpressDebug.result.debug.wordpress_lookup.wp_post_id && (
+                                <>
+                                  <div><strong>WP Post ID:</strong> {lastResult.wordpressDebug.result.debug.wordpress_lookup.wp_post_id}</div>
+                                  <div><strong>WP Titel:</strong> {lastResult.wordpressDebug.result.debug.wordpress_lookup.wp_post_title}</div>
+                                  <div><strong>WP Status:</strong> {lastResult.wordpressDebug.result.debug.wordpress_lookup.wp_post_status}</div>
+                                </>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Result */}
+                          <div>
+                            <div className="font-bold text-gray-600 dark:text-gray-300">Ergebnis:</div>
+                            <div><strong>Aktion:</strong> {lastResult.wordpressDebug.result.debug.action_taken || lastResult.wordpressDebug.result?.action || 'unbekannt'}</div>
+                            <div><strong>Post ID:</strong> {lastResult.wordpressDebug.result.debug.resulting_post_id || lastResult.wordpressDebug.result?.post_id || 'keine'}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <pre className="whitespace-pre-wrap break-all">
+                          {JSON.stringify(lastResult.wordpressDebug, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  </details>
+                )}
               </div>
             </div>
             <button

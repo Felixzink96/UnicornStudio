@@ -24,15 +24,42 @@ export interface WordPressDebugInfo {
     debug?: {
       step?: string
       page_id_received?: string
+      timestamp?: string
       api_response_keys?: string[] | string
+      api_response_success?: boolean | string
+      api_config?: {
+        base_url?: string
+        site_id?: string
+        api_key_set?: boolean
+      }
+      error_code?: string
+      error_data?: {
+        url?: string
+        status?: number
+        wp_error?: string
+        raw_body?: string
+        [key: string]: unknown
+      }
       page_data?: {
         id?: string
         name?: string
         slug?: string
+        title?: string
         html_length?: number
+        is_published?: boolean | string
+        has_content?: boolean
+      }
+      wordpress_lookup?: {
+        searched_unicorn_id?: string
+        found?: boolean
+        wp_post_id?: number | null
+        wp_post_title?: string | null
+        wp_post_status?: string | null
       }
       wordpress_page_found?: number | false
       wordpress_page_title?: string | null
+      action_taken?: string
+      resulting_post_id?: number | null
     }
   }
   debug?: Record<string, unknown>

@@ -16,7 +16,7 @@ import { detectFontsFromHtml, type DetectedFont } from '@/lib/fonts/font-detecto
 import { DesignSystemDialog } from '@/components/design/DesignSystemDialog'
 import { GlobalComponentsDialog } from '@/components/design/GlobalComponentsDialog'
 import { getDesignVariables, updateDesignVariables } from '@/lib/supabase/queries/design-variables'
-import { extractGlobalComponents, removeHeaderFooterFromHtml } from '@/lib/ai/html-operations'
+import { extractGlobalComponents, removeHeaderFooterFromHtml, sanitizeHtmlForGlobalComponents } from '@/lib/ai/html-operations'
 import type { DetectedComponent } from '@/types/global-components'
 import {
   Send,
@@ -401,10 +401,14 @@ export function ChatPanel() {
                     setPendingFinalHtml(finalHtml)
                     setGlobalComponentsDialogOpen(true)
                   } else if ((hasNewHeader && currentGlobalHeader) || (hasNewFooter && currentGlobalFooter)) {
-                    // Global components already exist - just add info message
-                    // DON'T remove header/footer here - that should happen when applying!
-                    console.log('Global components already exist - will be handled on apply')
-                    displayMessage += '\n\n_Hinweis: Globale Header/Footer sind bereits vorhanden und werden automatisch verwendet._'
+                    // Global components already exist - REMOVE them from generated HTML!
+                    // FAILSAFE: This prevents duplicate header/footer
+                    console.log('Global components exist - sanitizing HTML to remove duplicates')
+                    finalHtml = sanitizeHtmlForGlobalComponents(finalHtml, {
+                      hasGlobalHeader: !!currentGlobalHeader,
+                      hasGlobalFooter: !!currentGlobalFooter,
+                    })
+                    displayMessage += '\n\n_Hinweis: Globale Header/Footer sind bereits vorhanden. Doppelte Elemente wurden automatisch entfernt._'
                   }
                 } else {
                   console.log('Failed to parse operation format')

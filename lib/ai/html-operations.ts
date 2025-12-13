@@ -113,49 +113,80 @@ export function extractStreamingHtml(content: string): string | null {
 /**
  * Remove operation metadata that may have leaked into HTML content
  * This handles cases where AI doesn't properly separate metadata from HTML
+ *
+ * CRITICAL: This is the main failsafe against AI artifacts in HTML!
  */
 export function cleanOperationMetadataFromHtml(html: string): string {
   if (!html) return html
   return html
+    // === MESSAGE BLOCKS (CRITICAL - often leak into HTML) ===
+    .replace(/^MESSAGE:.*$/gm, '')
+    .replace(/MESSAGE:[\s\S]*?(?=\n---|\n\n|$)/g, '')
+    // Remove MESSAGE...--- blocks that may span multiple lines (using [\s\S] instead of 's' flag)
+    .replace(/MESSAGE:[\s\S]*?---/g, '')
+
+    // === OPERATION METADATA ===
     // Remove operation block at start
     .replace(/^---\s*\nOPERATION:\s*\w+\s*\nPOSITION:\s*\w+\s*\n---\s*\n?/i, '')
     // Remove individual operation lines anywhere
     .replace(/\n?---\s*\n?OPERATION:\s*\w+\s*\n?/gi, '')
     .replace(/POSITION:\s*\w+\s*\n?---\s*\n?/gi, '')
-    .replace(/OPERATION:\s*\w+\s*\n?/gi, '')
-    .replace(/POSITION:\s*\w+\s*\n?/gi, '')
-    .replace(/TARGET:\s*[^\n]+\n?/gi, '')
-    .replace(/SELECTOR:\s*[^\n]+\n?/gi, '')
-    .replace(/COMPONENT_TYPE:\s*\w+\s*\n?/gi, '')
-    .replace(/COMPONENT_NAME:\s*[^\n]+\n?/gi, '')
-    // Remove stray --- separators
+    .replace(/^OPERATION:\s*\w+\s*$/gm, '')
+    .replace(/^POSITION:\s*\w+\s*$/gm, '')
+    .replace(/^TARGET:\s*[^\n]+$/gm, '')
+    .replace(/^SELECTOR:\s*[^\n]+$/gm, '')
+    .replace(/^COMPONENT_TYPE:\s*\w+\s*$/gm, '')
+    .replace(/^COMPONENT_NAME:\s*[^\n]+$/gm, '')
+
+    // === SEPARATORS ===
+    // Remove stray --- separators (3 or more dashes)
+    .replace(/^-{3,}\s*$/gm, '')
+    .replace(/\n-{3,}\n/g, '\n')
     .replace(/^---\s*\n/gm, '')
     .replace(/\n---\s*$/gm, '')
-    // Remove AI meta-comments that shouldn't be in HTML
+
+    // === AI META-COMMENTS ===
     .replace(/<!--\s*Kein Code generiert[^>]*-->/gi, '')
     .replace(/<!--\s*No code generated[^>]*-->/gi, '')
     .replace(/<!--\s*Bitte wähle[^>]*-->/gi, '')
+    .replace(/<!--\s*HEADER[^>]*-->/gi, '')
+    .replace(/<!--\s*FOOTER[^>]*-->/gi, '')
+    .replace(/<!--\s*(STORY|TEAM|ABOUT|CONTACT|SERVICES|FEATURES)\s*SECTION\s*-->/gi, '')
+    .replace(/<!--\s*-->/g, '') // Empty comments
+
+    // === CLEANUP ===
+    // Remove excessive whitespace
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
 // Apply operation to existing HTML
 export function applyOperation(existingHtml: string, op: ParsedOperation): string {
+  let result: string
+
   switch (op.operation) {
     case 'replace_all':
-      return op.html
+      result = op.html
+      break
 
     case 'add':
-      return applyAddOperation(existingHtml, op)
+      result = applyAddOperation(existingHtml, op)
+      break
 
     case 'modify':
-      return applyModifyOperation(existingHtml, op)
+      result = applyModifyOperation(existingHtml, op)
+      break
 
     case 'delete':
-      return applyDeleteOperation(existingHtml, op)
+      result = applyDeleteOperation(existingHtml, op)
+      break
 
     default:
-      return existingHtml
+      result = existingHtml
   }
+
+  // FAILSAFE: Always clean the result to remove any AI artifacts
+  return cleanOperationMetadataFromHtml(result)
 }
 
 function applyAddOperation(html: string, op: ParsedOperation): string {
@@ -435,6 +466,50 @@ export function removeHeaderFooterFromHtml(
   result = result.replace(/\n\s*\n\s*\n/g, '\n\n')
 
   return result
+}
+
+/**
+ * FAILSAFE: Sanitize AI-generated HTML when global components exist
+ * Removes any header/footer/separators that AI might have generated despite instructions
+ */
+export function sanitizeHtmlForGlobalComponents(
+  html: string,
+  options: { hasGlobalHeader: boolean; hasGlobalFooter: boolean }
+): string {
+  let result = html
+
+  // 1. Remove "------" separators (AI sometimes adds these)
+  result = result.replace(/^-{3,}\s*$/gm, '')
+  result = result.replace(/\n-{3,}\n/g, '\n')
+
+  // 2. Remove header/footer placeholder comments
+  result = result.replace(/<!--\s*HEADER[^>]*-->/gi, '')
+  result = result.replace(/<!--\s*FOOTER[^>]*-->/gi, '')
+  result = result.replace(/<!--\s*NAVIGATION[^>]*-->/gi, '')
+
+  // 3. Remove empty section comments
+  result = result.replace(/<!--\s*(STORY|TEAM|ABOUT|CONTACT|SERVICES|FEATURES)\s*SECTION\s*-->\s*/gi, '')
+
+  // 4. Remove actual <header> and <footer> tags if global components exist
+  if (options.hasGlobalHeader) {
+    // Remove <header>...</header> including all content
+    result = result.replace(/<header[^>]*>[\s\S]*?<\/header>\s*/gi, '')
+    // Remove standalone nav at very start that acts as header
+    result = result.replace(/^(\s*<body[^>]*>\s*)(<nav[^>]*class="[^"]*fixed[^"]*"[^>]*>[\s\S]*?<\/nav>\s*)/i, '$1')
+  }
+
+  if (options.hasGlobalFooter) {
+    // Remove <footer>...</footer> including all content
+    result = result.replace(/\s*<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+  }
+
+  // 5. Clean up multiple empty lines
+  result = result.replace(/\n\s*\n\s*\n+/g, '\n\n')
+
+  // 6. Clean up empty space before </body>
+  result = result.replace(/\n\s*\n\s*(<\/body>)/gi, '\n$1')
+
+  return result.trim()
 }
 
 /**

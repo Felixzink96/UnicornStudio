@@ -15,7 +15,7 @@ import type {
   DetectedGlobalComponents,
   GlobalComponentData,
 } from '@/types/editor'
-import { insertGlobalComponents, removeHeaderFooterFromHtml } from '@/lib/ai/html-operations'
+import { insertGlobalComponents, removeHeaderFooterFromHtml, sanitizeHtmlForGlobalComponents } from '@/lib/ai/html-operations'
 
 const MAX_HISTORY = 50
 
@@ -661,12 +661,23 @@ export const useEditorStore = create<EditorState & EditorActions>()(
 
       try {
         const supabase = createClient()
-        console.log('Updating page with html length:', state.html.length)
+
+        // FAILSAFE: Sanitize HTML before saving to remove any duplicate header/footer
+        let htmlToSave = state.html
+        if (state.globalHeader || state.globalFooter) {
+          console.log('Sanitizing HTML before save (global components exist)')
+          htmlToSave = sanitizeHtmlForGlobalComponents(htmlToSave, {
+            hasGlobalHeader: !!state.globalHeader,
+            hasGlobalFooter: !!state.globalFooter,
+          })
+        }
+
+        console.log('Updating page with html length:', htmlToSave.length)
 
         const { data, error } = await supabase
           .from('pages')
           .update({
-            html_content: state.html,
+            html_content: htmlToSave,
             updated_at: new Date().toISOString(),
           })
           .eq('id', state.pageId)

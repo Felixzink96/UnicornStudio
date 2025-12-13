@@ -144,7 +144,12 @@ export async function POST(request: Request) {
     }
 
     // Load global components info to tell AI if header/footer already exist
-    let globalComponents: GlobalComponentsForAI | undefined
+    // FAILSAFE: Always initialize with defaults (never undefined!)
+    const globalComponents: GlobalComponentsForAI = {
+      hasGlobalHeader: false,
+      hasGlobalFooter: false,
+    }
+
     if (siteId) {
       try {
         const { data: site } = await supabase
@@ -154,14 +159,13 @@ export async function POST(request: Request) {
           .single()
 
         if (site) {
-          globalComponents = {
-            hasGlobalHeader: !!site.global_header_id,
-            hasGlobalFooter: !!site.global_footer_id,
-          }
+          globalComponents.hasGlobalHeader = !!site.global_header_id
+          globalComponents.hasGlobalFooter = !!site.global_footer_id
           console.log('Global components status:', globalComponents)
         }
       } catch (error) {
         console.log('Could not load global components info:', error)
+        // globalComponents stays with defaults (false, false)
       }
     }
 
@@ -183,12 +187,31 @@ export async function POST(request: Request) {
     let userMessage = `ANFRAGE: ${prompt}\n\n`
 
     // Add referenced pages as style guide
+    // FAILSAFE: Remove header/footer from referenced pages if global components exist
     if (referencedPages && referencedPages.length > 0) {
       userMessage += `REFERENZIERTE SEITEN (nutze diese als Style-Guide!):\n`
       for (const page of referencedPages) {
-        userMessage += `\n--- @${page.name} ---\n\`\`\`html\n${page.html}\n\`\`\`\n`
+        let pageHtml = page.html
+
+        // Strip header/footer from referenced pages to prevent AI from copying them
+        if (globalComponents.hasGlobalHeader || globalComponents.hasGlobalFooter) {
+          // Remove <header>...</header> tags
+          if (globalComponents.hasGlobalHeader) {
+            pageHtml = pageHtml.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '<!-- HEADER ENTFERNT - GLOBAL VORHANDEN -->')
+            // Also remove fixed navs at the start that act as headers
+            pageHtml = pageHtml.replace(/(<body[^>]*>\s*)(<nav[^>]*class="[^"]*fixed[^"]*"[^>]*>[\s\S]*?<\/nav>)/gi, '$1<!-- NAV ENTFERNT -->')
+          }
+
+          // Remove <footer>...</footer> tags
+          if (globalComponents.hasGlobalFooter) {
+            pageHtml = pageHtml.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '<!-- FOOTER ENTFERNT - GLOBAL VORHANDEN -->')
+          }
+        }
+
+        userMessage += `\n--- @${page.name} ---\n\`\`\`html\n${pageHtml}\n\`\`\`\n`
       }
-      userMessage += `\nÜBERNIMM DAS DESIGN DIESER SEITE(N) EXAKT für die neue Seite/Section!\n\n`
+      userMessage += `\nÜBERNIMM DAS DESIGN DIESER SEITE(N) EXAKT für die neue Seite/Section!\n`
+      userMessage += `⚠️ WICHTIG: Header und Footer sind global und wurden entfernt - generiere NUR Content-Sections!\n\n`
     }
 
     if (hasExistingContent) {

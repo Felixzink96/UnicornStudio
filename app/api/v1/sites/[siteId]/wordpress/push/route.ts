@@ -43,7 +43,16 @@ interface PushResult {
     pages?: { count: number; success: boolean; error?: string }
     taxonomies?: { count: number; success: boolean; error?: string }
     css?: { success: boolean; error?: string }
-    global_components?: { count: number; success: boolean; error?: string }
+    global_components?: {
+      count: number
+      success: boolean
+      error?: string
+      menus_found?: number
+      header_had_placeholder?: boolean
+      header_placeholder_replaced?: boolean
+      footer_had_placeholder?: boolean
+      footer_placeholder_replaced?: boolean
+    }
     site_identity?: { success: boolean; error?: string }
   }
   errors: string[]

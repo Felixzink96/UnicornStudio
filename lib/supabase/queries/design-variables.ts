@@ -207,6 +207,25 @@ export async function resetDesignVariables(
 }
 
 /**
+ * Convert hex color to RGB values (space-separated for Tailwind)
+ */
+function hexToRgb(hex: string): string | null {
+  // Remove # if present
+  const cleanHex = hex.replace('#', '')
+
+  // Parse hex
+  const result = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(cleanHex)
+  if (!result) return null
+
+  const r = parseInt(result[1], 16)
+  const g = parseInt(result[2], 16)
+  const b = parseInt(result[3], 16)
+
+  // Return space-separated RGB for Tailwind's rgb() syntax
+  return `${r} ${g} ${b}`
+}
+
+/**
  * Generate CSS from design variables
  */
 export function generateCSS(variables: DesignVariables): string {
@@ -214,12 +233,20 @@ export function generateCSS(variables: DesignVariables): string {
 
   let css = ':root {\n'
 
-  // Colors
+  // Colors - output BOTH hex AND rgb versions for Tailwind opacity support
   if (variables.colors) {
     for (const [category, colors] of Object.entries(variables.colors)) {
       if (colors && typeof colors === 'object') {
         for (const [key, value] of Object.entries(colors)) {
-          if (value) css += `  --color-${category}-${key}: ${value};\n`
+          if (value) {
+            // Original hex value (for simple usage)
+            css += `  --color-${category}-${key}: ${value};\n`
+            // RGB version (for opacity usage with Tailwind)
+            const rgb = hexToRgb(value)
+            if (rgb) {
+              css += `  --color-${category}-${key}-rgb: ${rgb};\n`
+            }
+          }
         }
       }
     }
@@ -293,6 +320,29 @@ export function generateCSS(variables: DesignVariables): string {
     }
   }
 
+  // Gradients
+  if (variables.gradients) {
+    for (const [key, gradient] of Object.entries(variables.gradients)) {
+      if (gradient && gradient.enabled) {
+        const direction = gradient.direction.replace('to-', 'to ')
+        const via = gradient.via ? `, ${gradient.via}` : ''
+        css += `  --gradient-${key}: linear-gradient(${direction}, ${gradient.from}${via}, ${gradient.to});\n`
+        css += `  --gradient-${key}-from: ${gradient.from};\n`
+        css += `  --gradient-${key}-to: ${gradient.to};\n`
+        if (gradient.via) {
+          css += `  --gradient-${key}-via: ${gradient.via};\n`
+        }
+      }
+    }
+  }
+
+  // Custom Colors
+  if (variables.customColors) {
+    for (const [key, value] of Object.entries(variables.customColors)) {
+      if (value) css += `  --color-custom-${key}: ${value};\n`
+    }
+  }
+
   css += '}\n'
 
   return css
@@ -328,4 +378,55 @@ export function generateTailwindConfig(variables: DesignVariables): object {
       },
     },
   }
+}
+
+/**
+ * Generate Tailwind CDN config script for inline use
+ * This creates a <script> tag that configures Tailwind with custom colors
+ */
+export function generateTailwindCDNConfig(variables: DesignVariables): string {
+  if (!variables) return ''
+
+  const colors: Record<string, string> = {}
+
+  // Brand colors -> primary, secondary, accent
+  if (variables.colors?.brand) {
+    if (variables.colors.brand.primary) colors['primary'] = variables.colors.brand.primary
+    if (variables.colors.brand.primaryHover) colors['primary-hover'] = variables.colors.brand.primaryHover
+    if (variables.colors.brand.secondary) colors['secondary'] = variables.colors.brand.secondary
+    if (variables.colors.brand.accent) colors['accent'] = variables.colors.brand.accent
+  }
+
+  // Neutral colors -> background, foreground, muted, border
+  if (variables.colors?.neutral) {
+    if (variables.colors.neutral.background) colors['background'] = variables.colors.neutral.background
+    if (variables.colors.neutral.foreground) colors['foreground'] = variables.colors.neutral.foreground
+    if (variables.colors.neutral.muted) colors['muted'] = variables.colors.neutral.muted
+    if (variables.colors.neutral.border) colors['border-color'] = variables.colors.neutral.border
+  }
+
+  // Custom colors
+  if (variables.customColors) {
+    for (const [key, value] of Object.entries(variables.customColors)) {
+      if (value) colors[key] = value
+    }
+  }
+
+  // Build config object
+  const config = {
+    theme: {
+      extend: {
+        colors,
+        fontFamily: {
+          heading: variables.typography?.fontHeading ? [variables.typography.fontHeading, 'sans-serif'] : undefined,
+          body: variables.typography?.fontBody ? [variables.typography.fontBody, 'sans-serif'] : undefined,
+          mono: variables.typography?.fontMono ? [variables.typography.fontMono, 'monospace'] : undefined,
+        },
+      },
+    },
+  }
+
+  return `<script>
+tailwind.config = ${JSON.stringify(config, null, 2)}
+</script>`
 }

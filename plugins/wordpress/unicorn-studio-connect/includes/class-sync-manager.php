@@ -42,6 +42,10 @@ class Unicorn_Studio_Sync_Manager {
             'css'               => null,
             'fonts'             => null,
             'global_components' => null,
+            'site_identity'     => null,
+            'menus'             => null,
+            'sitemap'           => null,
+            'robots'            => null,
             'started_at'        => current_time('mysql'),
             'errors'            => [],
         ];
@@ -72,12 +76,24 @@ class Unicorn_Studio_Sync_Manager {
         }
 
         // 6. Sync Fonts (GDPR-compliant local hosting)
-        if (Unicorn_Studio::get_option('sync_css', true)) {
+        if (Unicorn_Studio::get_option('sync_fonts', true)) {
             $results['fonts'] = $this->sync_fonts();
         }
 
         // 7. Sync Global Components (Header/Footer)
         $results['global_components'] = $this->sync_global_components();
+
+        // 8. Sync Site Identity (Logo, Favicon, Tagline)
+        $results['site_identity'] = $this->sync_site_identity();
+
+        // 9. Sync Menus
+        $results['menus'] = $this->sync_menus();
+
+        // 10. Sync Sitemap
+        $results['sitemap'] = $this->sync_sitemap();
+
+        // 11. Sync robots.txt
+        $results['robots'] = $this->sync_robots();
 
         // Update last sync time
         update_option('unicorn_studio_last_sync', current_time('mysql'));
@@ -307,6 +323,130 @@ class Unicorn_Studio_Sync_Manager {
     }
 
     /**
+     * Sync Site Identity (Logo, Favicon, Tagline, OG Image)
+     *
+     * @return array|WP_Error
+     */
+    public function sync_site_identity() {
+        $response = $this->api->request('/site-identity');
+
+        if (is_wp_error($response)) {
+            // Site identity endpoint might not exist yet - not critical
+            return [
+                'success' => true,
+                'skipped' => true,
+                'message' => 'Site identity endpoint not available',
+            ];
+        }
+
+        $data = $response['data'] ?? [];
+
+        // Sync using the Site Identity class
+        Unicorn_Studio_Site_Identity::sync($data);
+
+        return [
+            'success'   => true,
+            'has_logo'  => !empty($data['logo_url']),
+            'has_favicon' => !empty($data['favicon_url']),
+        ];
+    }
+
+    /**
+     * Sync Menus from Unicorn Studio
+     *
+     * @return array|WP_Error
+     */
+    public function sync_menus() {
+        $response = $this->api->get_menus();
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        // Response format: { data: [...] } or array directly
+        $menus = [];
+        if (isset($response['data']) && is_array($response['data'])) {
+            $menus = $response['data'];
+        } elseif (is_array($response) && !isset($response['data'])) {
+            $menus = $response;
+        }
+
+        // Store menus in option
+        update_option('unicorn_studio_menus', $menus);
+        update_option('unicorn_studio_menus_last_sync', current_time('mysql'));
+
+        return [
+            'success' => true,
+            'count'   => count($menus),
+            'menus'   => array_map(function($menu) {
+                return [
+                    'name' => $menu['name'] ?? '',
+                    'slug' => $menu['slug'] ?? '',
+                    'position' => $menu['position'] ?? $menu['menu_position'] ?? 'custom',
+                    'items_count' => $menu['itemCount'] ?? $menu['item_count'] ?? 0,
+                ];
+            }, $menus),
+        ];
+    }
+
+    /**
+     * Sync Sitemap from Unicorn Studio
+     *
+     * @return array|WP_Error
+     */
+    public function sync_sitemap() {
+        $response = $this->api->get_sitemap();
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        // Save sitemap.xml to uploads folder
+        $upload_dir = wp_upload_dir();
+        $sitemap_path = $upload_dir['basedir'] . '/unicorn-studio/sitemap.xml';
+
+        // Ensure directory exists
+        wp_mkdir_p(dirname($sitemap_path));
+
+        // Write sitemap file
+        $result = file_put_contents($sitemap_path, $response);
+
+        if ($result === false) {
+            return new WP_Error('sitemap_write_error', 'Could not write sitemap.xml');
+        }
+
+        update_option('unicorn_studio_sitemap_last_sync', current_time('mysql'));
+
+        return [
+            'success' => true,
+            'path'    => $sitemap_path,
+            'size'    => size_format($result),
+        ];
+    }
+
+    /**
+     * Sync robots.txt
+     *
+     * @return array|WP_Error
+     */
+    public function sync_robots() {
+        $robots_content = $this->api->get_robots_txt();
+
+        if (is_wp_error($robots_content)) {
+            return $robots_content;
+        }
+
+        // Store robots.txt content in option (WordPress handles virtual robots.txt)
+        update_option('unicorn_studio_robots_txt', $robots_content);
+        update_option('unicorn_studio_robots_last_sync', current_time('mysql'));
+
+        return [
+            'success' => true,
+            'content' => $robots_content,
+        ];
+    }
+
+    /**
      * AJAX handler for sync
      */
     public function ajax_sync() {
@@ -346,6 +486,22 @@ class Unicorn_Studio_Sync_Manager {
             case 'components':
             case 'global_components':
                 $result = $this->sync_global_components();
+                break;
+
+            case 'site_identity':
+                $result = $this->sync_site_identity();
+                break;
+
+            case 'menus':
+                $result = $this->sync_menus();
+                break;
+
+            case 'sitemap':
+                $result = $this->sync_sitemap();
+                break;
+
+            case 'robots':
+                $result = $this->sync_robots();
                 break;
 
             case 'all':

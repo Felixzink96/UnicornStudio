@@ -15,6 +15,8 @@ import type {
   DetectedGlobalComponents,
   GlobalComponentData,
 } from '@/types/editor'
+import type { MenuWithItems, MenuItem } from '@/types/menu'
+import type { DesignVariables } from '@/types/cms'
 import { insertGlobalComponents, removeHeaderFooterFromHtml, sanitizeHtmlForGlobalComponents } from '@/lib/ai/html-operations'
 
 const MAX_HISTORY = 50
@@ -233,7 +235,12 @@ async function saveTailwindConfigToSite(
   }
 }
 
-const initialState: EditorState = {
+// Extended state with menus
+interface EditorStateWithMenus extends EditorState {
+  menus: MenuWithItems[]
+}
+
+const initialState: EditorStateWithMenus = {
   siteId: null,
   pageId: null,
   html: '',
@@ -261,6 +268,8 @@ const initialState: EditorState = {
   globalFooter: null,
   detectedGlobalComponents: null,
   showGlobalComponentsDialog: false,
+  // Menus for placeholder replacement
+  menus: [],
 }
 
 /**
@@ -311,7 +320,7 @@ function darkenColor(hex: string, percent: number): string {
   return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)
 }
 
-export const useEditorStore = create<EditorState & EditorActions>()(
+export const useEditorStore = create<EditorStateWithMenus & EditorActions>()(
   immer((set, get) => ({
     ...initialState,
 
@@ -322,40 +331,75 @@ export const useEditorStore = create<EditorState & EditorActions>()(
     initialize: async (siteId: string, pageId: string) => {
       const supabase = createClient()
 
-      // Load site data
-      const { data: site } = await supabase
-        .from('sites')
-        .select('*')
-        .eq('id', siteId)
-        .single()
-
-      // Load page data
-      const { data: page } = await supabase
-        .from('pages')
-        .select('*')
-        .eq('id', pageId)
-        .single()
-
-      // Load all pages for this site
-      const { data: pages } = await supabase
-        .from('pages')
-        .select('*')
-        .eq('site_id', siteId)
-        .order('created_at')
-
-      // Load chat history
-      const { data: chatHistory } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('page_id', pageId)
-        .order('created_at')
-
-      // Load design variables and apply CSS variables
-      const { data: designVars } = await supabase
-        .from('design_variables')
-        .select('*')
-        .eq('site_id', siteId)
-        .single()
+      // Load ALL data in parallel for maximum performance
+      const [
+        { data: site },
+        { data: page },
+        { data: pages },
+        { data: chatHistory },
+        { data: designVars },
+        { data: menusData },
+      ] = await Promise.all([
+        // Site with global component IDs
+        supabase
+          .from('sites')
+          .select('*, global_header_id, global_footer_id')
+          .eq('id', siteId)
+          .single(),
+        // Current page
+        supabase
+          .from('pages')
+          .select('*')
+          .eq('id', pageId)
+          .single(),
+        // All pages for this site
+        supabase
+          .from('pages')
+          .select('*')
+          .eq('site_id', siteId)
+          .order('created_at'),
+        // Chat history
+        supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('page_id', pageId)
+          .order('created_at'),
+        // Design variables
+        supabase
+          .from('design_variables')
+          .select('*')
+          .eq('site_id', siteId)
+          .single(),
+        // Menus with items for placeholder replacement
+        // Note: menus table not in generated types yet
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from('menus')
+          .select(`
+            id,
+            name,
+            slug,
+            position,
+            settings,
+            menu_items (
+              id,
+              menu_id,
+              parent_id,
+              link_type,
+              page_id,
+              external_url,
+              anchor,
+              content_type_slug,
+              label,
+              icon,
+              description,
+              target,
+              position,
+              pages:page_id (slug, name)
+            )
+          `)
+          .eq('site_id', siteId),
+      ])
 
       // Apply design tokens as CSS variables
       if (designVars && typeof window !== 'undefined') {
@@ -366,7 +410,8 @@ export const useEditorStore = create<EditorState & EditorActions>()(
 
       set((state) => {
         state.siteId = siteId
-        state.designVariables = designVars || null
+        // Cast from database types to DesignVariables
+        state.designVariables = (designVars as unknown as DesignVariables) || null
         state.pageId = pageId
         state.html = htmlContent
         state.originalHtml = htmlContent
@@ -402,12 +447,127 @@ export const useEditorStore = create<EditorState & EditorActions>()(
           generatedHtml: m.generated_html || undefined,
           model: m.model || undefined,
           tokensUsed: m.tokens_used || undefined,
+          // is_applied may not exist in schema, use type assertion
+          isApplied: (m as unknown as { is_applied?: boolean }).is_applied || false,
           timestamp: new Date(m.created_at || Date.now()),
         }))
+        // Process menus for placeholder replacement
+        // Type for raw menu item from database
+        type RawMenuItem = {
+          id: string
+          menu_id: string
+          parent_id: string | null
+          link_type: string
+          page_id: string | null
+          external_url: string | null
+          anchor: string | null
+          content_type_slug: string | null
+          label: string
+          icon: string | null
+          description: string | null
+          target: string
+          position: number
+          pages: { slug: string; name: string } | null
+        }
+        // Type for raw menu from database
+        type RawMenu = {
+          id: string
+          name: string
+          slug: string
+          position: string
+          settings: Record<string, unknown> | null
+          menu_items: RawMenuItem[]
+        }
+        state.menus = ((menusData || []) as RawMenu[]).map((menu) => {
+          const rawItems = (menu.menu_items || []) as RawMenuItem[]
+          const items: MenuItem[] = rawItems.map((item) => ({
+            id: item.id,
+            menuId: item.menu_id,
+            parentId: item.parent_id,
+            linkType: item.link_type as MenuItem['linkType'],
+            pageId: item.page_id || undefined,
+            externalUrl: item.external_url || undefined,
+            anchor: item.anchor || undefined,
+            contentTypeSlug: item.content_type_slug || undefined,
+            label: item.label,
+            icon: item.icon || undefined,
+            description: item.description || undefined,
+            target: (item.target || '_self') as '_self' | '_blank',
+            position: item.position,
+            createdAt: '',
+            updatedAt: '',
+            // Resolved data
+            pageSlug: item.pages?.slug,
+            pageName: item.pages?.name,
+          }))
+          return {
+            id: menu.id,
+            siteId,
+            name: menu.name,
+            slug: menu.slug,
+            description: undefined,
+            position: menu.position as MenuWithItems['position'],
+            settings: (menu.settings || {}) as MenuWithItems['settings'],
+            createdAt: '',
+            updatedAt: '',
+            items,
+          }
+        })
+        console.log('[Menus] Loaded:', state.menus.length, 'menus')
       })
 
-      // Load global components after setting state
-      await get().loadGlobalComponents()
+      // Load global components in parallel (not separately)
+      if (site?.global_header_id || site?.global_footer_id) {
+        const componentQueries = []
+
+        if (site.global_header_id) {
+          componentQueries.push(
+            supabase
+              .from('components')
+              .select('id, name, html, css, js')
+              .eq('id', site.global_header_id)
+              .single()
+              .then(({ data }) => ({ type: 'header', data }))
+          )
+        }
+
+        if (site.global_footer_id) {
+          componentQueries.push(
+            supabase
+              .from('components')
+              .select('id, name, html, css, js')
+              .eq('id', site.global_footer_id)
+              .single()
+              .then(({ data }) => ({ type: 'footer', data }))
+          )
+        }
+
+        const components = await Promise.all(componentQueries)
+
+        set((state) => {
+          for (const comp of components) {
+            if (comp.data) {
+              const componentData = {
+                id: comp.data.id,
+                name: comp.data.name,
+                html: comp.data.html || '',
+                css: comp.data.css || undefined,
+                js: comp.data.js || undefined,
+              }
+              if (comp.type === 'header') {
+                state.globalHeader = componentData
+              } else {
+                state.globalFooter = componentData
+              }
+            }
+          }
+        })
+
+        console.log('[Global Components] Loaded:', {
+          globalHeader: get().globalHeader ? { id: get().globalHeader?.id } : null,
+          globalFooter: get().globalFooter ? { id: get().globalFooter?.id } : null,
+        })
+      }
     },
 
     reset: () => {
@@ -564,6 +724,7 @@ export const useEditorStore = create<EditorState & EditorActions>()(
             generated_html: updates.generatedHtml || null,
             model: updates.model || null,
             tokens_used: updates.tokensUsed || null,
+            is_applied: updates.isApplied || false,
           }).select().then(({ data, error }) => {
             if (error) {
               console.error('Error saving assistant message:', error.message)
@@ -606,6 +767,51 @@ export const useEditorStore = create<EditorState & EditorActions>()(
       if (state.pageId) {
         const supabase = createClient()
         supabase.from('chat_messages').delete().eq('id', id).then(() => {})
+      }
+    },
+
+    setMessageApplied: (id: string, isApplied: boolean) => {
+      const state = get()
+
+      // Find the message
+      const msgIndex = state.messages.findIndex((m) => m.id === id)
+      if (msgIndex === -1) return
+
+      const msg = state.messages[msgIndex]
+
+      // Update local state immediately
+      set((s) => {
+        s.messages[msgIndex].isApplied = isApplied
+      })
+
+      // Update in DB - use content match as fallback if ID is not a UUID
+      const isUUID = (testId: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(testId)
+
+      const supabase = createClient()
+
+      if (isUUID(id)) {
+        // ID is a UUID, update directly by ID
+        // Note: is_applied may not be in generated types
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase.from('chat_messages') as any)
+          .update({ is_applied: isApplied })
+          .eq('id', id)
+          .then(({ error }: { error: Error | null }) => {
+            if (error) console.error('Error updating is_applied by ID:', error.message)
+            else console.log('is_applied updated by ID:', id)
+          })
+      } else if (state.pageId && msg.content) {
+        // ID is local, find by page_id + content (unique enough)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase.from('chat_messages') as any)
+          .update({ is_applied: isApplied })
+          .eq('page_id', state.pageId)
+          .eq('content', msg.content)
+          .eq('role', 'assistant')
+          .then(({ error }: { error: Error | null }) => {
+            if (error) console.error('Error updating is_applied by content:', error.message)
+            else console.log('is_applied updated by content match')
+          })
       }
     },
 

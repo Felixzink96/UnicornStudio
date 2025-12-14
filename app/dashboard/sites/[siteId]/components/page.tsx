@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { ArrowLeft, Puzzle, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { ComponentLibrary } from '@/components/components-library/ComponentLibrary'
 import type { CMSComponent } from '@/types/cms'
 
@@ -81,10 +82,10 @@ export default async function ComponentsPage({ params, searchParams }: Component
           </p>
         </div>
         <Link href={`/dashboard/sites/${siteId}/components/new`}>
-          <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-purple-600 text-white hover:bg-purple-700 h-9 px-4 py-2">
+          <Button className="bg-purple-600 hover:bg-purple-700">
             <Plus className="h-4 w-4 mr-2" />
             Neue Component
-          </button>
+          </Button>
         </Link>
       </div>
 

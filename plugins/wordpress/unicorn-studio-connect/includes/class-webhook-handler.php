@@ -268,6 +268,13 @@ class Unicorn_Studio_Webhook_Handler {
                 return unicorn_studio()->css->sync_css();
 
             // ========================================
+            // Site Identity Event
+            // ========================================
+            case 'site_identity.updated':
+                // Sync Logo, Favicon, Tagline, OG Image
+                return Unicorn_Studio_Site_Identity::sync($data);
+
+            // ========================================
             // Unknown Event
             // ========================================
             default:

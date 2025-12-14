@@ -1,5 +1,108 @@
 import type { ComponentPosition, DetectedComponent } from '@/types/global-components'
 import { analyzeHtmlForComponents, detectHeader, detectFooter } from './component-detection'
+import type { DesignVariables } from '@/types/cms'
+
+/**
+ * Convert hex color to RGB values (space-separated for Tailwind opacity)
+ */
+function hexToRgb(hex: string): string | null {
+  const cleanHex = hex.replace('#', '')
+  const result = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(cleanHex)
+  if (!result) return null
+  return `${parseInt(result[1], 16)} ${parseInt(result[2], 16)} ${parseInt(result[3], 16)}`
+}
+
+/**
+ * Inject CSS variables from design variables into HTML
+ * Outputs BOTH hex and RGB versions of colors for Tailwind opacity support
+ */
+export function injectCSSVariables(html: string, designVariables: DesignVariables | null): string {
+  if (!designVariables) return html
+
+  let css = ':root {\n'
+
+  // Brand colors - output BOTH hex and RGB versions
+  if (designVariables.colors?.brand) {
+    const brand = designVariables.colors.brand as Record<string, string>
+    for (const [key, value] of Object.entries(brand)) {
+      if (value) {
+        css += `  --color-brand-${key}: ${value};\n`
+        const rgb = hexToRgb(value)
+        if (rgb) css += `  --color-brand-${key}-rgb: ${rgb};\n`
+      }
+    }
+  }
+
+  // Neutral colors - output BOTH hex and RGB versions
+  if (designVariables.colors?.neutral) {
+    const neutral = designVariables.colors.neutral as Record<string, string>
+    for (const [key, value] of Object.entries(neutral)) {
+      if (value) {
+        css += `  --color-neutral-${key}: ${value};\n`
+        const rgb = hexToRgb(value)
+        if (rgb) css += `  --color-neutral-${key}-rgb: ${rgb};\n`
+      }
+    }
+  }
+
+  // Custom colors - output BOTH hex and RGB versions
+  if (designVariables.customColors) {
+    for (const [key, value] of Object.entries(designVariables.customColors)) {
+      if (value) {
+        css += `  --color-custom-${key}: ${value};\n`
+        const rgb = hexToRgb(value)
+        if (rgb) css += `  --color-custom-${key}-rgb: ${rgb};\n`
+      }
+    }
+  }
+
+  // Typography
+  if (designVariables.typography) {
+    if (designVariables.typography.fontHeading) {
+      css += `  --font-heading: '${designVariables.typography.fontHeading}', sans-serif;\n`
+    }
+    if (designVariables.typography.fontBody) {
+      css += `  --font-body: '${designVariables.typography.fontBody}', sans-serif;\n`
+    }
+    if (designVariables.typography.fontMono) {
+      css += `  --font-mono: '${designVariables.typography.fontMono}', monospace;\n`
+    }
+  }
+
+  // Gradients
+  if (designVariables.gradients) {
+    for (const [key, gradient] of Object.entries(designVariables.gradients)) {
+      if (gradient && gradient.enabled) {
+        const direction = gradient.direction?.replace('to-', 'to ') || 'to right'
+        const via = gradient.via ? `, ${gradient.via}` : ''
+        css += `  --gradient-${key}: linear-gradient(${direction}, ${gradient.from}${via}, ${gradient.to});\n`
+        css += `  --gradient-${key}-from: ${gradient.from};\n`
+        css += `  --gradient-${key}-to: ${gradient.to};\n`
+        if (gradient.via) {
+          css += `  --gradient-${key}-via: ${gradient.via};\n`
+        }
+      }
+    }
+  }
+
+  css += '}\n'
+
+  const styleTag = `<style id="design-variables">\n${css}</style>`
+
+  // Check if already has design variables
+  if (html.includes('id="design-variables"')) {
+    // Replace existing
+    return html.replace(/<style id="design-variables">[\s\S]*?<\/style>/i, styleTag)
+  }
+
+  // Insert in <head> before closing
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${styleTag}\n</head>`)
+  }
+
+  // Fallback: insert at beginning
+  return styleTag + '\n' + html
+}
 
 // Types for HTML operations
 export interface ParsedOperation {

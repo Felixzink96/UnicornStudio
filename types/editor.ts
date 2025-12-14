@@ -2,6 +2,8 @@
 // AI-FIRST EDITOR TYPES
 // ============================================
 
+import type { DesignVariables } from './cms'
+
 export type ViewMode = 'preview' | 'design' | 'code'
 export type Breakpoint = 'desktop' | 'tablet' | 'mobile'
 
@@ -22,6 +24,14 @@ export interface ChatMessage {
   timestamp: Date
   createdAt?: Date
   isStreaming?: boolean
+  isApplied?: boolean         // Whether this AI response has been applied to the page
+  // Reference Updates (fuer @-Referenzen)
+  hasReferenceUpdates?: boolean
+  referenceUpdates?: unknown[]  // ReferenceUpdate[] - any um zirkulaere Imports zu vermeiden
+  // Gemini Tool Outputs
+  searchSources?: Array<{ title: string; uri: string }>  // Google Search results
+  executableCode?: string     // Python code that was executed
+  codeResult?: string         // Output from code execution
 }
 
 // ============================================
@@ -148,7 +158,7 @@ export interface EditorState {
 
   // Context
   siteContext: SiteContext | null
-  designVariables: Record<string, unknown> | null
+  designVariables: DesignVariables | null
   pages: PageData[]
   currentPage: PageData | null
 
@@ -192,6 +202,7 @@ export interface EditorActions {
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void
   updateMessage: (id: string, updates: Partial<ChatMessage>) => void
   deleteMessage: (id: string) => void
+  setMessageApplied: (id: string, isApplied: boolean) => void
   setGenerating: (isGenerating: boolean) => void
   clearMessages: () => void
 

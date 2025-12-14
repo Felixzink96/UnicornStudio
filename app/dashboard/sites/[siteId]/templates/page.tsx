@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { ArrowLeft, LayoutTemplate, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { TemplatesList } from '@/components/templates/TemplatesList'
 import type { Template, TemplateType } from '@/types/cms'
 
@@ -64,10 +65,10 @@ export default async function TemplatesPage({ params, searchParams }: TemplatesP
           </p>
         </div>
         <Link href={`/dashboard/sites/${siteId}/templates/new`}>
-          <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-purple-600 text-white hover:bg-purple-700 h-9 px-4 py-2">
+          <Button className="bg-purple-600 hover:bg-purple-700">
             <Plus className="h-4 w-4 mr-2" />
             Neues Template
-          </button>
+          </Button>
         </Link>
       </div>
 

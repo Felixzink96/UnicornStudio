@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { ArrowLeft, Search, Puzzle, ChevronRight, Palette } from 'lucide-react'
+import { ArrowLeft, Search, Puzzle, ChevronRight, Palette, Globe } from 'lucide-react'
 
 interface SettingsPageProps {
   params: Promise<{ siteId: string }>
@@ -24,6 +24,12 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
   }
 
   const settingsLinks = [
+    {
+      title: 'Site Identity',
+      description: 'Logo, Favicon, Tagline und Social Image',
+      href: `/dashboard/sites/${siteId}/settings/identity`,
+      icon: Globe,
+    },
     {
       title: 'Design System',
       description: 'Farben, Schriften und Abstande fur konsistente Generierung',

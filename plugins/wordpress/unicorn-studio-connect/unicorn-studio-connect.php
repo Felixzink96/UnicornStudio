@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.17.0
+ * Version:           1.21.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.17.0');
+define('UNICORN_STUDIO_VERSION', '1.21.0');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -79,6 +79,9 @@ final class Unicorn_Studio {
     public $template_loader;
     public $global_components;
     public $admin_bar;
+    public $site_identity;
+    public $seo;
+    public $menus;
 
     /**
      * Get single instance
@@ -136,6 +139,9 @@ final class Unicorn_Studio {
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-template-loader.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-global-components.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-admin-bar.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-menus.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-site-identity.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-seo-manager.php';
 
         // Initialize components
         $this->api = new Unicorn_Studio_API_Client();
@@ -156,6 +162,10 @@ final class Unicorn_Studio {
         $this->template_loader = new Unicorn_Studio_Template_Loader();
         $this->global_components = new Unicorn_Studio_Global_Components();
         $this->global_components->init();
+        $this->site_identity = new Unicorn_Studio_Site_Identity();
+        $this->seo = new Unicorn_Studio_SEO_Manager($this->api);
+        $this->seo->init();
+        $this->menus = Unicorn_Studio_Menus::get_instance();
 
         // Admin bar / floating button (frontend only)
         if (!is_admin()) {
@@ -209,6 +219,57 @@ final class Unicorn_Studio {
         // AJAX handlers
         add_action('wp_ajax_unicorn_studio_sync', [$this->sync, 'ajax_sync']);
         add_action('wp_ajax_unicorn_studio_test_connection', [$this->api, 'ajax_test_connection']);
+
+        // Custom robots.txt content (priority 999 to override Yoast etc.)
+        add_filter('robots_txt', [$this, 'custom_robots_txt'], 999, 2);
+
+        // Sitemap rewrite rule
+        add_action('init', [$this, 'register_sitemap_rewrite']);
+        add_action('template_redirect', [$this, 'serve_sitemap']);
+    }
+
+    /**
+     * Custom robots.txt content from Unicorn Studio
+     */
+    public function custom_robots_txt($output, $public) {
+        $custom_robots = get_option('unicorn_studio_robots_txt', '');
+        if (!empty($custom_robots)) {
+            return $custom_robots;
+        }
+        return $output;
+    }
+
+    /**
+     * Register sitemap rewrite rule
+     */
+    public function register_sitemap_rewrite() {
+        add_rewrite_rule('^sitemap\.xml$', 'index.php?unicorn_sitemap=1', 'top');
+        add_rewrite_tag('%unicorn_sitemap%', '1');
+    }
+
+    /**
+     * Serve sitemap.xml from uploads folder
+     */
+    public function serve_sitemap() {
+        if (get_query_var('unicorn_sitemap') !== '1') {
+            return;
+        }
+
+        $upload_dir = wp_upload_dir();
+        $sitemap_path = $upload_dir['basedir'] . '/unicorn-studio/sitemap.xml';
+
+        if (file_exists($sitemap_path)) {
+            header('Content-Type: application/xml; charset=utf-8');
+            header('X-Robots-Tag: noindex');
+            readfile($sitemap_path);
+            exit;
+        }
+
+        // Fallback: Generate sitemap dynamically if not cached
+        status_header(404);
+        echo '<?xml version="1.0" encoding="UTF-8"?>';
+        echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>';
+        exit;
     }
 
     /**
@@ -443,6 +504,7 @@ register_activation_hook(__FILE__, function() {
         'sync_pages' => true,
         'sync_media' => true,
         'sync_css' => true,
+        'sync_fonts' => true,
         'field_backend' => 'acf',
         'cpt_prefix' => 'us_',
     ]);

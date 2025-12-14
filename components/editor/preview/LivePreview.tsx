@@ -1,14 +1,35 @@
 'use client'
 
-import { useRef, useEffect, useCallback, useMemo } from 'react'
+import { useRef, useEffect, useCallback, useMemo, useState } from 'react'
 import { useEditorStore } from '@/stores/editor-store'
 import type { SelectedElement, Breakpoint } from '@/types/editor'
 import { insertGlobalComponents } from '@/lib/ai/html-operations'
+import { injectMenusIntoHtml } from '@/lib/menus/render-menu'
+import { darkenHex } from '@/lib/design/style-extractor'
+
+// Helper: Convert hex to RGB string (space-separated for CSS)
+function hexToRgb(hex: string): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  if (!result) return '0 0 0'
+  return `${parseInt(result[1], 16)} ${parseInt(result[2], 16)} ${parseInt(result[3], 16)}`
+}
 
 const BREAKPOINT_WIDTHS: Record<Breakpoint, string> = {
   desktop: '100%',
   tablet: '768px',
   mobile: '375px',
+}
+
+// Debounce hook for smooth preview updates during streaming
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(timer)
+  }, [value, delay])
+
+  return debouncedValue
 }
 
 export function LivePreview() {
@@ -21,11 +42,100 @@ export function LivePreview() {
   const updateHtml = useEditorStore((s) => s.updateHtml)
   const globalHeader = useEditorStore((s) => s.globalHeader)
   const globalFooter = useEditorStore((s) => s.globalFooter)
+  const menus = useEditorStore((s) => s.menus)
+  const designVariables = useEditorStore((s) => s.designVariables)
 
-  // Combine page HTML with global header/footer for preview
+  // Debounce HTML updates during streaming (150ms delay)
+  const debouncedHtml = useDebouncedValue(html, 150)
+
+  // Generate CSS variables from design tokens
+  const designTokensCss = useMemo(() => {
+    if (!designVariables) return ''
+
+    const colors = designVariables.colors as Record<string, Record<string, string>> | undefined
+    const typography = designVariables.typography as { fontHeading?: string; fontBody?: string } | undefined
+
+    let css = ':root {\n'
+
+    // Brand colors
+    if (colors?.brand) {
+      if (colors.brand.primary) {
+        css += `  --color-brand-primary: ${colors.brand.primary};\n`
+        css += `  --color-brand-primary-rgb: ${hexToRgb(colors.brand.primary)};\n`
+        // Generate hover color (10% darker)
+        const hoverColor = darkenHex(colors.brand.primary, 10)
+        css += `  --color-brand-primaryHover: ${hoverColor};\n`
+        css += `  --color-brand-primaryHover-rgb: ${hexToRgb(hoverColor)};\n`
+      }
+      if (colors.brand.secondary) {
+        css += `  --color-brand-secondary: ${colors.brand.secondary};\n`
+        css += `  --color-brand-secondary-rgb: ${hexToRgb(colors.brand.secondary)};\n`
+      }
+      if (colors.brand.accent) {
+        css += `  --color-brand-accent: ${colors.brand.accent};\n`
+        css += `  --color-brand-accent-rgb: ${hexToRgb(colors.brand.accent)};\n`
+      }
+    }
+
+    // Neutral colors
+    if (colors?.neutral) {
+      const neutralMap: Record<string, string> = {
+        '50': 'background',
+        '100': 'muted',
+        '200': 'border',
+        '900': 'foreground'
+      }
+      Object.entries(neutralMap).forEach(([key, name]) => {
+        if (colors.neutral[key]) {
+          css += `  --color-neutral-${name}: ${colors.neutral[key]};\n`
+          css += `  --color-neutral-${name}-rgb: ${hexToRgb(colors.neutral[key])};\n`
+        }
+      })
+    }
+
+    // Fonts
+    if (typography?.fontHeading) {
+      css += `  --font-heading: '${typography.fontHeading}', sans-serif;\n`
+    }
+    if (typography?.fontBody) {
+      css += `  --font-body: '${typography.fontBody}', sans-serif;\n`
+    }
+
+    css += '}\n'
+    return css
+  }, [designVariables])
+
+  // Combine page HTML with global header/footer and inject menus
   const previewHtml = useMemo(() => {
-    return insertGlobalComponents(html, globalHeader, globalFooter)
-  }, [html, globalHeader, globalFooter])
+    // First insert global components (header/footer)
+    let htmlWithComponents = insertGlobalComponents(debouncedHtml, globalHeader, globalFooter)
+
+    // Inject design tokens CSS if not present in HTML
+    if (designTokensCss && !htmlWithComponents.includes('--color-brand-primary')) {
+      // Check if there's already a :root or <style> in head
+      if (htmlWithComponents.includes('</head>')) {
+        htmlWithComponents = htmlWithComponents.replace(
+          '</head>',
+          `<style id="unicorn-design-tokens">\n${designTokensCss}</style>\n</head>`
+        )
+      } else if (htmlWithComponents.includes('<body')) {
+        // No head, inject before body
+        htmlWithComponents = htmlWithComponents.replace(
+          '<body',
+          `<style id="unicorn-design-tokens">\n${designTokensCss}</style>\n<body`
+        )
+      }
+    }
+
+    // Then replace {{menu:slug}} placeholders with actual menu HTML
+    if (menus && menus.length > 0) {
+      return injectMenusIntoHtml(htmlWithComponents, menus, {
+        containerClass: 'flex items-center gap-6',
+        linkClass: 'text-sm transition-colors hover:opacity-80',
+      })
+    }
+    return htmlWithComponents
+  }, [debouncedHtml, globalHeader, globalFooter, menus, designTokensCss])
 
   const getHtmlWithScript = useCallback((html: string): string => {
     if (viewMode !== 'design') return html

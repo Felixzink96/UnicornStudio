@@ -15,15 +15,23 @@ import {
   Eye,
   Layers,
   Brain,
+  Settings,
+  Globe,
+  ExternalLink,
+  Terminal,
 } from 'lucide-react'
 import type { ChatMessage as ChatMessageType } from '@/types/editor'
-import { removeHeaderFooterFromHtml, extractGlobalComponents } from '@/lib/ai/html-operations'
+import type { DesignVariables } from '@/types/cms'
+import { removeHeaderFooterFromHtml, extractGlobalComponents, injectCSSVariables } from '@/lib/ai/html-operations'
+import type { ReferenceUpdate, ComponentUpdate } from '@/lib/ai/reference-operations'
+import { createClient } from '@/lib/supabase/client'
 
 interface ChatMessageProps {
   message: ChatMessageType
+  onOpenSetup?: (prompt: string) => void
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, onOpenSetup }: ChatMessageProps) {
   const [copied, setCopied] = useState(false)
   const [showCode, setShowCode] = useState(false)
   const [showThinking, setShowThinking] = useState(false)
@@ -31,6 +39,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const applyGeneratedHtml = useEditorStore((s) => s.applyGeneratedHtml)
   const html = useEditorStore((s) => s.html)
   const deleteMessage = useEditorStore((s) => s.deleteMessage)
+  const setMessageApplied = useEditorStore((s) => s.setMessageApplied)
   const save = useEditorStore((s) => s.save)
   const designVariables = useEditorStore((s) => s.designVariables)
   const globalHeader = useEditorStore((s) => s.globalHeader)
@@ -41,7 +50,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
     if (!designVariables) return ''
 
     const colors = designVariables.colors as Record<string, Record<string, string>> | undefined
-    const typography = designVariables.typography as Record<string, string> | undefined
+    // Typography has nested objects, use unknown intermediate cast
+    const typography = designVariables.typography as unknown as Record<string, string | Record<string, string>> | undefined
 
     const vars: string[] = []
 
@@ -82,7 +92,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
   }, [designVariables])
 
   // Track if user has manually applied this message
-  const [applyState, setApplyState] = useState<'idle' | 'applying' | 'applied'>('idle')
+  // Initialize based on isApplied from database
+  const [applyState, setApplyState] = useState<'idle' | 'applying' | 'applied'>(
+    message.isApplied ? 'applied' : 'idle'
+  )
 
   // Extract HTML from content (for streaming preview)
   // New format: MESSAGE: ... --- OPERATION: ... --- <html>
@@ -157,7 +170,163 @@ export function ChatMessage({ message }: ChatMessageProps) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Handle applying Reference Updates (Header, Footer, Sections, Tokens, etc.)
+  const handleApplyReferenceUpdates = async () => {
+    if (!message.referenceUpdates || applyState === 'applying') return
+
+    setApplyState('applying')
+
+    try {
+      const supabase = createClient()
+      const updates = message.referenceUpdates as ReferenceUpdate[]
+
+      for (const update of updates) {
+        switch (update.type) {
+          case 'component': {
+            // Update Header/Footer in database
+            const componentUpdate = update as ComponentUpdate
+            console.log('Applying COMPONENT_UPDATE:', componentUpdate.id)
+
+            const { error } = await supabase
+              .from('components')
+              .update({
+                html: componentUpdate.html,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', componentUpdate.id)
+
+            if (error) {
+              console.error('Error updating component:', error)
+              throw error
+            }
+
+            // Reload global components in editor store
+            const loadGlobalComponents = useEditorStore.getState().loadGlobalComponents
+            await loadGlobalComponents()
+            break
+          }
+
+          case 'section': {
+            // Update section in current page HTML
+            const sectionUpdate = update as { type: 'section'; id: string; selector: string; html: string }
+            console.log('Applying SECTION_UPDATE:', sectionUpdate.selector)
+
+            // Replace section in current HTML
+            const currentHtml = useEditorStore.getState().html
+            const selectorRegex = new RegExp(
+              `<(section|div|article)[^>]*id=["']${sectionUpdate.id}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
+              'gi'
+            )
+            const newHtml = currentHtml.replace(selectorRegex, sectionUpdate.html)
+
+            if (newHtml !== currentHtml) {
+              applyGeneratedHtml(newHtml)
+              await new Promise(resolve => setTimeout(resolve, 50))
+              await save()
+            }
+            break
+          }
+
+          case 'token': {
+            // Update design token in database
+            const tokenUpdate = update as { type: 'token'; id: string; value: string }
+            console.log('Applying TOKEN_UPDATE:', tokenUpdate.id, tokenUpdate.value)
+
+            // Parse token ID to get category and key
+            // Format: "color-brand-primary" or "font-heading"
+            const parts = tokenUpdate.id.split('-')
+            const tokenType = parts[0] // color, font, spacing, etc.
+            const category = parts[1] // brand, neutral, heading, body, etc.
+            const key = parts.slice(2).join('-') || category
+
+            const siteId = useEditorStore.getState().siteId
+            if (!siteId) break
+
+            // Get current design variables
+            const { data: currentVars } = await supabase
+              .from('design_variables')
+              .select('*')
+              .eq('site_id', siteId)
+              .single()
+
+            if (currentVars) {
+              let updateData: Record<string, unknown> = {}
+
+              if (tokenType === 'color') {
+                const colors = (currentVars.colors as Record<string, Record<string, string>>) || {}
+                if (!colors[category]) colors[category] = {}
+                colors[category][key] = tokenUpdate.value
+                updateData = { colors }
+              } else if (tokenType === 'font') {
+                const typography = (currentVars.typography as Record<string, string>) || {}
+                typography[`font${category.charAt(0).toUpperCase()}${category.slice(1)}`] = tokenUpdate.value
+                updateData = { typography }
+              }
+
+              const { data: updatedVars } = await supabase
+                .from('design_variables')
+                .update(updateData)
+                .eq('site_id', siteId)
+                .select()
+                .single()
+
+              // Update store with new design variables
+              if (updatedVars) {
+                // Cast from database Json types to DesignVariables
+                useEditorStore.setState({ designVariables: updatedVars as unknown as DesignVariables })
+
+                // Update HTML with new CSS variables
+                const currentHtml = useEditorStore.getState().html
+                // Cast to DesignVariables - injectCSSVariables handles null checks internally
+                const newHtml = injectCSSVariables(currentHtml, updatedVars as DesignVariables)
+                if (newHtml !== currentHtml) {
+                  applyGeneratedHtml(newHtml)
+                  await new Promise(resolve => setTimeout(resolve, 50))
+                  await save()
+                }
+              }
+            }
+            break
+          }
+
+          case 'menu': {
+            // Menu updates would require more complex handling
+            console.log('MENU_UPDATE not yet implemented:', update)
+            break
+          }
+
+          case 'entry': {
+            // Entry updates
+            const entryUpdate = update as { type: 'entry'; id: string; data: Record<string, unknown> }
+            console.log('Applying ENTRY_UPDATE:', entryUpdate.id)
+
+            await supabase
+              .from('entries')
+              .update({
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                data: entryUpdate.data as any,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', entryUpdate.id)
+            break
+          }
+        }
+      }
+
+      setApplyState('applied')
+    } catch (error) {
+      console.error('Apply reference updates error:', error)
+      setApplyState('idle')
+    }
+  }
+
   const handleApply = async () => {
+    // Check if this is a Reference Update
+    if (message.hasReferenceUpdates && message.referenceUpdates) {
+      return handleApplyReferenceUpdates()
+    }
+
+    // Normal page HTML apply
     const htmlToApply = message.generatedHtml || streamingHtml
     if (!htmlToApply || applyState === 'applying') return
 
@@ -206,6 +375,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
       await new Promise(resolve => setTimeout(resolve, 50))
       await save()
 
+      // Mark message as applied in database
+      setMessageApplied(message.id, true)
       setApplyState('applied')
     } catch (error) {
       console.error('Apply error:', error)
@@ -287,8 +458,37 @@ export function ChatMessage({ message }: ChatMessageProps) {
   }
 
   // Assistant Message
+  // For Reference Updates, extract preview HTML from the first component/section update
+  const referencePreviewHtml = useMemo(() => {
+    if (!message.hasReferenceUpdates || !message.referenceUpdates) return null
+    const updates = message.referenceUpdates as ReferenceUpdate[]
+    for (const update of updates) {
+      if (update.type === 'component' && (update as ComponentUpdate).html) {
+        return (update as ComponentUpdate).html
+      }
+      if (update.type === 'section' && (update as { html: string }).html) {
+        return (update as { html: string }).html
+      }
+    }
+    return null
+  }, [message.hasReferenceUpdates, message.referenceUpdates])
+
+  // Extract non-HTML reference updates (tokens, menus, entries)
+  const nonHtmlUpdates = useMemo(() => {
+    if (!message.hasReferenceUpdates || !message.referenceUpdates) return null
+    const updates = message.referenceUpdates as ReferenceUpdate[]
+
+    const tokens = updates.filter(u => u.type === 'token') as Array<{ type: 'token'; id: string; value: string }>
+    const menus = updates.filter(u => u.type === 'menu')
+    const entries = updates.filter(u => u.type === 'entry')
+
+    if (tokens.length === 0 && menus.length === 0 && entries.length === 0) return null
+
+    return { tokens, menus, entries }
+  }, [message.hasReferenceUpdates, message.referenceUpdates])
+
   // Use previewHtml (just the new section) if available, otherwise fall back to generatedHtml
-  const rawPreviewHtml = message.previewHtml || message.generatedHtml || streamingHtml
+  const rawPreviewHtml = referencePreviewHtml || message.previewHtml || message.generatedHtml || streamingHtml
 
   // Check if this is a partial update (just a section) vs full page
   const isPartialUpdate = rawPreviewHtml && !rawPreviewHtml.includes('<!DOCTYPE') && !rawPreviewHtml.includes('<html')
@@ -348,28 +548,145 @@ ${rawPreviewHtml}
         ) : (
           <>
             {/* Text Content (ohne HTML) */}
-            {textContent && (
-              <div className="overflow-hidden" style={{ wordBreak: 'break-word' }}>
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => (
-                      <p className="text-sm text-zinc-700 leading-relaxed mb-2 last:mb-0">
-                        {children}
-                      </p>
-                    ),
-                    strong: ({ children }) => (
-                      <strong className="font-semibold text-zinc-900">{children}</strong>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="text-sm text-zinc-700 mb-2 pl-4 list-disc space-y-1">
-                        {children}
-                      </ul>
-                    ),
-                    li: ({ children }) => <li>{children}</li>,
-                  }}
-                >
-                  {textContent}
-                </ReactMarkdown>
+            {textContent && (() => {
+              // Parse setup-button tag
+              const setupButtonMatch = textContent.match(/<setup-button prompt="([^"]+)">([^<]+)<\/setup-button>/)
+              const cleanText = textContent.replace(/<setup-button[^>]*>[^<]*<\/setup-button>/, '').trim()
+
+              return (
+                <div className="overflow-hidden" style={{ wordBreak: 'break-word' }}>
+                  {cleanText && (
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => (
+                          <p className="text-sm text-zinc-700 leading-relaxed mb-2 last:mb-0">
+                            {children}
+                          </p>
+                        ),
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-zinc-900">{children}</strong>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="text-sm text-zinc-700 mb-2 pl-4 list-disc space-y-1">
+                            {children}
+                          </ul>
+                        ),
+                        li: ({ children }) => <li>{children}</li>,
+                      }}
+                    >
+                      {cleanText}
+                    </ReactMarkdown>
+                  )}
+
+                  {/* Setup Button */}
+                  {setupButtonMatch && onOpenSetup && (
+                    <button
+                      onClick={() => onOpenSetup(decodeURIComponent(setupButtonMatch[1]))}
+                      className="mt-3 flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <Settings className="h-4 w-4" />
+                      {setupButtonMatch[2]}
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Non-HTML Reference Updates (Tokens, Menus, Entries) */}
+            {nonHtmlUpdates && !rawPreviewHtml && !message.isStreaming && (
+              <div className="border border-purple-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                {/* Card Header */}
+                <div className="flex items-center justify-between px-3 py-2 bg-purple-50 border-b border-purple-200">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-purple-500" />
+                    <span className="text-xs text-purple-700 font-medium">
+                      {nonHtmlUpdates.tokens.length > 0 ? 'Design Token Update' :
+                       nonHtmlUpdates.menus.length > 0 ? 'Menu Update' : 'Entry Update'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Token Updates Preview */}
+                {nonHtmlUpdates.tokens.length > 0 && (
+                  <div className="p-4 space-y-3">
+                    {nonHtmlUpdates.tokens.map((token, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        <div className="flex-shrink-0">
+                          {/* Color Preview */}
+                          {token.value.startsWith('#') || token.value.startsWith('rgb') ? (
+                            <div
+                              className="w-12 h-12 rounded-lg border-2 border-white shadow-md"
+                              style={{ backgroundColor: token.value }}
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-zinc-100 flex items-center justify-center">
+                              <span className="text-xs text-zinc-500">Aa</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-zinc-800">
+                            {token.id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </div>
+                          <div className="text-xs text-zinc-500 font-mono truncate">
+                            {token.value}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
+                            Neu
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Menu Updates Preview */}
+                {nonHtmlUpdates.menus.length > 0 && (
+                  <div className="p-4">
+                    <p className="text-sm text-zinc-600">
+                      {nonHtmlUpdates.menus.length} Menü-Änderung(en)
+                    </p>
+                  </div>
+                )}
+
+                {/* Entry Updates Preview */}
+                {nonHtmlUpdates.entries.length > 0 && (
+                  <div className="p-4">
+                    <p className="text-sm text-zinc-600">
+                      {nonHtmlUpdates.entries.length} Eintrag-Änderung(en)
+                    </p>
+                  </div>
+                )}
+
+                {/* Apply Button */}
+                <div className="px-3 py-2 bg-purple-50 border-t border-purple-200">
+                  {applyState === 'applied' ? (
+                    <button
+                      disabled
+                      className="w-full py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-emerald-500 text-white cursor-default"
+                    >
+                      <Check className="h-4 w-4" />
+                      Gespeichert
+                    </button>
+                  ) : applyState === 'applying' ? (
+                    <button
+                      disabled
+                      className="w-full py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-purple-400 text-white cursor-wait"
+                    >
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Wird gespeichert...
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleApply}
+                      className="w-full py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-purple-500 text-white hover:bg-purple-600"
+                    >
+                      Änderungen speichern
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -384,6 +701,22 @@ ${rawPreviewHtml}
                       <div className="flex items-center gap-2">
                         <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
                         <span className="text-xs text-blue-600 font-medium">Schreibt Code...</span>
+                      </div>
+                    ) : message.hasReferenceUpdates ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-purple-500" />
+                        <span className="text-xs text-purple-700 font-medium">
+                          {(() => {
+                            const updates = message.referenceUpdates as ReferenceUpdate[]
+                            const types = [...new Set(updates.map(u => u.type))]
+                            if (types.includes('component')) return 'Component Update'
+                            if (types.includes('section')) return 'Section Update'
+                            if (types.includes('token')) return 'Token Update'
+                            if (types.includes('menu')) return 'Menu Update'
+                            if (types.includes('entry')) return 'Entry Update'
+                            return 'Referenz Update'
+                          })()}
+                        </span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5">
@@ -492,9 +825,13 @@ ${rawPreviewHtml}
                     ) : (
                       <button
                         onClick={handleApply}
-                        className="w-full py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600"
+                        className={`w-full py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 ${
+                          message.hasReferenceUpdates
+                            ? 'bg-purple-500 text-white hover:bg-purple-600'
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
                       >
-                        Anwenden
+                        {message.hasReferenceUpdates ? 'Änderungen speichern' : 'Anwenden'}
                       </button>
                     )}
                   </div>
@@ -524,6 +861,53 @@ ${rawPreviewHtml}
                     <p className="text-xs text-purple-800/80 whitespace-pre-wrap leading-relaxed">
                       {message.thinking}
                     </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Google Search Sources */}
+            {message.searchSources && message.searchSources.length > 0 && !message.isStreaming && (
+              <div className="border border-green-200 rounded-xl overflow-hidden bg-green-50/30">
+                <div className="px-3 py-2 flex items-center gap-2 bg-green-100/50">
+                  <Globe className="h-4 w-4 text-green-600" />
+                  <span className="text-xs font-medium text-green-700">Quellen aus Google Search</span>
+                </div>
+                <div className="px-3 py-2 flex flex-wrap gap-2">
+                  {message.searchSources.map((source, idx) => (
+                    <a
+                      key={idx}
+                      href={source.uri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-green-700 bg-green-100 hover:bg-green-200 rounded-md transition-colors"
+                    >
+                      <span className="truncate max-w-40">{source.title}</span>
+                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Code Execution Output */}
+            {message.executableCode && !message.isStreaming && (
+              <div className="border border-amber-200 rounded-xl overflow-hidden bg-amber-50/30">
+                <div className="px-3 py-2 flex items-center gap-2 bg-amber-100/50">
+                  <Terminal className="h-4 w-4 text-amber-600" />
+                  <span className="text-xs font-medium text-amber-700">Python Code ausgeführt</span>
+                </div>
+                <div className="bg-zinc-900 p-3 max-h-40 overflow-auto">
+                  <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">
+                    {message.executableCode}
+                  </pre>
+                </div>
+                {message.codeResult && (
+                  <div className="px-3 py-2 border-t border-amber-200 bg-amber-50">
+                    <div className="text-xs text-amber-700 font-medium mb-1">Output:</div>
+                    <pre className="text-xs text-zinc-700 font-mono whitespace-pre-wrap bg-white rounded p-2 border border-amber-200">
+                      {message.codeResult}
+                    </pre>
                   </div>
                 )}
               </div>

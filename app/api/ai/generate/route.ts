@@ -1,9 +1,16 @@
 import { GoogleGenAI } from '@google/genai'
-import { buildSystemPrompt, type DesignTokensForAI, type GlobalComponentsForAI } from '@/lib/ai/system-prompt'
+import { buildSystemPrompt, type DesignTokensForAI, type GlobalComponentsForAI, type SiteIdentityForAI } from '@/lib/ai/system-prompt'
 import { createClient } from '@/lib/supabase/server'
 import { darkenHex } from '@/lib/design/style-extractor'
+import { getOrCreateCache } from '@/lib/ai/cache-manager'
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! })
+
+// Extract URLs from prompt for URL Context tool
+function extractUrls(prompt: string): string[] {
+  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi
+  return prompt.match(urlRegex) || []
+}
 
 // Extract style summary from HTML to reduce token usage
 // Instead of sending full page HTML (~10k tokens), send compact summary (~500 tokens)
@@ -83,7 +90,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { prompt, existingHtml, context, selectedElement, model: modelId, referencedPages, thinkingEnabled } = body as {
+    const { prompt, existingHtml, context, selectedElement, model: modelId, referencedPages, references, thinkingEnabled, googleSearchEnabled, codeExecutionEnabled } = body as {
       prompt: string
       existingHtml?: string
       context?: {
@@ -97,7 +104,19 @@ export async function POST(request: Request) {
       selectedElement?: { outerHTML: string; selector?: string }
       model?: string
       referencedPages?: Array<{ name: string; html: string }>
+      // NEU: Aufgelöste Referenzen mit IDs für gezielte Updates
+      references?: {
+        pages?: Array<{ id: string; name: string; slug: string; isHome: boolean; html?: string }>
+        menus?: Array<{ id: string; name: string; slug: string; position: string; items: Array<{ id: string; label: string; url: string; linkType: string; pageId?: string; children?: Array<{ id: string; label: string; url: string }> }> }>
+        components?: Array<{ id: string; name: string; position: string; html: string; css?: string; js?: string }>
+        sections?: Array<{ id: string; selector: string; tagName: string; html: string }>
+        entries?: Array<{ id: string; title: string; slug: string; contentType: string; contentTypeId: string; data: Record<string, unknown> }>
+        tokens?: Array<{ id: string; name: string; displayName: string; type: string; value: string; category: string }>
+      }
       thinkingEnabled?: boolean
+      // Gemini Tools
+      googleSearchEnabled?: boolean
+      codeExecutionEnabled?: boolean
     }
 
     // Load design tokens from database if siteId is provided
@@ -116,30 +135,66 @@ export async function POST(request: Request) {
         const colors = variables?.colors as Record<string, Record<string, string>> | null
         const typography = variables?.typography as Record<string, string> | null
 
-        // Check if site has custom design tokens (not default)
-        // Database default is #3b82f6 (blue-500)
-        const defaultPrimary = '#3b82f6'
-        if (variables && colors?.brand?.primary && colors.brand.primary !== defaultPrimary) {
+        // ALWAYS send design tokens if we have design_variables for this site
+        // This ensures AI uses our token classes (bg-primary, text-foreground, etc.)
+        // instead of hardcoded Tailwind colors
+        if (variables) {
           designTokens = {
             colors: {
-              primary: colors.brand.primary,
-              primaryHover: darkenHex(colors.brand.primary, 10),
-              secondary: colors.brand.secondary || '#64748b',
-              accent: colors.brand.accent || colors.brand.secondary || '#f59e0b',
-              background: colors.neutral?.['50'] || '#ffffff',
-              foreground: colors.neutral?.['900'] || '#0f172a',
-              muted: colors.neutral?.['100'] || '#f1f5f9',
-              border: colors.neutral?.['200'] || '#e2e8f0',
+              primary: colors?.brand?.primary || '#3b82f6',
+              primaryHover: darkenHex(colors?.brand?.primary || '#3b82f6', 10),
+              secondary: colors?.brand?.secondary || '#64748b',
+              accent: colors?.brand?.accent || '#f59e0b',
+              background: colors?.neutral?.['50'] || '#ffffff',
+              foreground: colors?.neutral?.['900'] || '#0f172a',
+              muted: colors?.neutral?.['100'] || '#f1f5f9',
+              border: colors?.neutral?.['200'] || '#e2e8f0',
             },
             fonts: {
               heading: typography?.fontHeading || 'Inter',
               body: typography?.fontBody || 'Inter',
             },
           }
+          console.log('Design tokens loaded for AI:', designTokens.colors.primary, designTokens.colors.accent)
+        } else {
+          // No design_variables record, use defaults but still tell AI to use token classes
+          designTokens = {
+            colors: {
+              primary: '#3b82f6',
+              primaryHover: '#2563eb',
+              secondary: '#64748b',
+              accent: '#f59e0b',
+              background: '#ffffff',
+              foreground: '#0f172a',
+              muted: '#f1f5f9',
+              border: '#e2e8f0',
+            },
+            fonts: {
+              heading: 'Inter',
+              body: 'Inter',
+            },
+          }
+          console.log('Using default design tokens for AI')
         }
       } catch (error) {
-        // No design tokens found, continue without them
-        console.log('No custom design tokens for site:', siteId)
+        // No design tokens found, use defaults
+        console.log('No design_variables for site, using defaults:', siteId)
+        designTokens = {
+          colors: {
+            primary: '#3b82f6',
+            primaryHover: '#2563eb',
+            secondary: '#64748b',
+            accent: '#f59e0b',
+            background: '#ffffff',
+            foreground: '#0f172a',
+            muted: '#f1f5f9',
+            border: '#e2e8f0',
+          },
+          fonts: {
+            heading: 'Inter',
+            body: 'Inter',
+          },
+        }
       }
     }
 
@@ -150,18 +205,39 @@ export async function POST(request: Request) {
       hasGlobalFooter: false,
     }
 
+    // Site Identity for Logo in Header
+    let siteIdentity: SiteIdentityForAI | undefined
+
     if (siteId) {
       try {
         const { data: site } = await supabase
           .from('sites')
-          .select('global_header_id, global_footer_id')
+          .select('name, global_header_id, global_footer_id, logo_url, logo_dark_url, tagline')
           .eq('id', siteId)
           .single()
 
         if (site) {
           globalComponents.hasGlobalHeader = !!site.global_header_id
           globalComponents.hasGlobalFooter = !!site.global_footer_id
+          // Include IDs so AI can use COMPONENT_UPDATE format
+          if (site.global_header_id) {
+            globalComponents.headerId = site.global_header_id
+          }
+          if (site.global_footer_id) {
+            globalComponents.footerId = site.global_footer_id
+          }
           console.log('Global components status:', globalComponents)
+
+          // Load Site Identity for AI (Logo, Tagline)
+          if (site.logo_url) {
+            siteIdentity = {
+              logoUrl: site.logo_url,
+              logoDarkUrl: site.logo_dark_url,
+              siteName: site.name,
+              tagline: site.tagline,
+            }
+            console.log('Site identity loaded for AI:', siteIdentity.logoUrl)
+          }
         }
       } catch (error) {
         console.log('Could not load global components info:', error)
@@ -178,6 +254,7 @@ export async function POST(request: Request) {
       fonts: context?.fonts,
       designTokens,
       globalComponents,
+      siteIdentity,
     })
 
     // Determine if page has content
@@ -185,6 +262,126 @@ export async function POST(request: Request) {
 
     // Build user message
     let userMessage = `ANFRAGE: ${prompt}\n\n`
+
+    // NEU: Referenzierte Elemente hinzufügen (mit IDs für Updates)
+    const hasReferences = references && (
+      references.components?.length ||
+      references.menus?.length ||
+      references.sections?.length ||
+      references.tokens?.length ||
+      references.entries?.length
+    )
+
+    if (hasReferences) {
+      userMessage += `## REFERENZIERTE ELEMENTE (AENDERE NUR DIESE!)\n\n`
+      userMessage += `Der User hat spezifische Elemente referenziert. Aendere NUR diese Elemente!\n\n`
+
+      // Components (Header/Footer)
+      if (references.components && references.components.length > 0) {
+        for (const comp of references.components) {
+          userMessage += `### @${comp.name} (${comp.position.toUpperCase()} - ID: ${comp.id})\n`
+          userMessage += `\`\`\`html\n${comp.html}\n\`\`\`\n\n`
+        }
+      }
+
+      // Sections
+      if (references.sections && references.sections.length > 0) {
+        for (const section of references.sections) {
+          userMessage += `### @${section.id} (SECTION - Selector: ${section.selector})\n`
+          userMessage += `\`\`\`html\n${section.html}\n\`\`\`\n\n`
+        }
+      }
+
+      // Menus
+      if (references.menus && references.menus.length > 0) {
+        for (const menu of references.menus) {
+          userMessage += `### @${menu.name} (MENU - ID: ${menu.id})\n`
+          userMessage += `Position: ${menu.position}\n`
+          userMessage += `Items:\n`
+          for (const item of menu.items) {
+            userMessage += `  - ${item.label} -> ${item.url}\n`
+            if (item.children) {
+              for (const child of item.children) {
+                userMessage += `    - ${child.label} -> ${child.url}\n`
+              }
+            }
+          }
+          userMessage += `\n`
+        }
+      }
+
+      // Design Tokens
+      if (references.tokens && references.tokens.length > 0) {
+        userMessage += `### DESIGN TOKENS\n`
+        userMessage += `⚠️ WICHTIG: Bei Änderungen an Design Tokens KEIN HTML generieren!\n`
+        userMessage += `Verwende NUR das TOKEN_UPDATE Format um den Wert zu ändern.\n\n`
+        for (const token of references.tokens) {
+          userMessage += `- @${token.displayName} (${token.type}): ${token.value} [ID: ${token.id}]\n`
+        }
+        userMessage += `\n`
+      }
+
+      // Entries
+      if (references.entries && references.entries.length > 0) {
+        for (const entry of references.entries) {
+          userMessage += `### @${entry.title} (${entry.contentType} - ID: ${entry.id})\n`
+          userMessage += `Daten: ${JSON.stringify(entry.data, null, 2)}\n\n`
+        }
+      }
+
+      // Antwort-Format für Referenz-Updates
+      userMessage += `## ANTWORT-FORMAT FUER REFERENZ-UPDATES\n\n`
+      userMessage += `Verwende folgendes Format wenn du referenzierte Elemente aenderst:\n\n`
+      userMessage += `\`\`\`
+MESSAGE: Beschreibung der Aenderung
+---
+COMPONENT_UPDATE:
+id: "component-id"
+type: "header" oder "footer"
+---
+<neues html>
+---
+\`\`\`
+
+Fuer Sections:
+\`\`\`
+SECTION_UPDATE:
+selector: "#section-id"
+---
+<neues section html>
+---
+\`\`\`
+
+Fuer Design Tokens:
+\`\`\`
+TOKEN_UPDATE:
+id: "token-id"
+value: "neuer-wert"
+---
+\`\`\`
+
+Fuer Menu-Aenderungen:
+\`\`\`
+MENU_UPDATE:
+id: "menu-id"
+action: "add" | "remove" | "reorder" | "update"
+items:
+  - label: "Label"
+    page: "@SeitenName"
+---
+\`\`\`
+
+Fuer Entry-Aenderungen:
+\`\`\`
+ENTRY_UPDATE:
+id: "entry-id"
+data:
+  field: "neuer wert"
+---
+\`\`\`
+
+Du kannst MEHRERE Updates in einer Antwort zurueckgeben wenn mehrere Elemente referenziert wurden!\n\n`
+    }
 
     // Add referenced pages as style guide
     // FAILSAFE: Remove header/footer from referenced pages if global components exist
@@ -264,27 +461,77 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
     // Always use the model selected by user in chat
     const selectedModel = modelId || 'gemini-2.0-flash'
 
+    // Build Gemini Tools array based on request settings
+    const tools: Array<Record<string, unknown>> = []
+
+    // URL Context: Auto-detect URLs in prompt
+    const detectedUrls = extractUrls(prompt)
+    if (detectedUrls.length > 0) {
+      tools.push({ urlContext: {} })
+      console.log('URL Context enabled for:', detectedUrls)
+    }
+
+    // Google Search Grounding
+    if (googleSearchEnabled) {
+      tools.push({ googleSearch: {} })
+      console.log('Google Search enabled')
+    }
+
+    // Code Execution (Python)
+    if (codeExecutionEnabled) {
+      tools.push({ codeExecution: {} })
+      console.log('Code Execution enabled')
+    }
+
     // Build generation config
     const config: Record<string, unknown> = {
-      temperature: 1.2,       // Hoch = sehr kreativ
-      topP: 0.85,             // Fokussiert aber nicht zu eingeschränkt
-      topK: 40,               // Standard Token-Auswahl
+      temperature: 1.8,       // Kreativ aber noch konsistent
+      topP: 0.92,             // Etwas fokussierter für bessere Konsistenz
+      topK: 64,               // Größere Token-Auswahl für Kreativität
       maxOutputTokens: 65536, // Maximum für große Seiten
+    }
+
+    // Add tools if any are enabled
+    if (tools.length > 0) {
+      config.tools = tools
     }
 
     // Add thinking config if enabled
     if (thinkingEnabled) {
       config.thinkingConfig = {
         includeThoughts: true,
-        thinkingBudget: 8192,
+        thinkingBudget: 24576,  // HIGH - Mehr Zeit zum Nachdenken für bessere Kreativität
       }
+    }
+
+    // Try to use cached system prompt for cost savings (up to 75% cheaper)
+    // Only for models that support explicit caching (Gemini 2.5)
+    let cachedContentName: string | null = null
+    const supportsExplicitCaching = selectedModel.includes('gemini-2.5') || selectedModel.includes('gemini-2.0')
+
+    if (supportsExplicitCaching) {
+      cachedContentName = await getOrCreateCache(genAI, selectedModel, systemPrompt)
+    }
+
+    // Use systemInstruction for better implicit caching on Gemini 3
+    // This keeps the system prompt separate and cacheable
+    if (cachedContentName) {
+      // Use explicit cache (Gemini 2.5)
+      config.cachedContent = cachedContentName
+      console.log(`[AI] Using cached system prompt: ${cachedContentName}`)
+    } else {
+      // Use systemInstruction for implicit caching (Gemini 3 Pro)
+      // This is the recommended way for Gemini 3 - system prompt is cached automatically
+      config.systemInstruction = systemPrompt
+      console.log(`[AI] Using systemInstruction for implicit caching`)
     }
 
     // Generate with streaming using new SDK
     const response = await genAI.models.generateContentStream({
       model: selectedModel,
       contents: [
-        { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userMessage }] }
+        // Only user message - system prompt is now in config
+        { role: 'user', parts: [{ text: userMessage }] }
       ],
       config: Object.keys(config).length > 0 ? config : undefined,
     })
@@ -308,15 +555,52 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
               usageMetadata = chunk.usageMetadata
             }
 
+            // Handle Google Search grounding metadata
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const candidate = chunk.candidates?.[0] as any
+            if (candidate?.groundingMetadata) {
+              const gm = candidate.groundingMetadata
+              const searchData = JSON.stringify({
+                type: 'search_results',
+                queries: gm.webSearchQueries || [],
+                sources: gm.groundingChunks?.map((c: { web?: { title?: string; uri?: string } }) => ({
+                  title: c.web?.title || 'Unknown',
+                  uri: c.web?.uri || '',
+                })) || [],
+              })
+              controller.enqueue(encoder.encode(`data: ${searchData}\n\n`))
+            }
+
             // Check for thought parts when thinking is enabled
             if (chunk.candidates?.[0]?.content?.parts) {
               for (const part of chunk.candidates[0].content.parts) {
-                if (part.thought && part.text) {
-                  // Send thinking content
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const anyPart = part as any
+
+                // Handle thinking content
+                if (anyPart.thought && part.text) {
                   const thinkingData = JSON.stringify({ type: 'thinking', content: part.text })
                   controller.enqueue(encoder.encode(`data: ${thinkingData}\n\n`))
-                } else if (part.text) {
-                  // Send regular content
+                }
+                // Handle executable code from Code Execution tool
+                else if (anyPart.executableCode?.code) {
+                  const codeData = JSON.stringify({
+                    type: 'executable_code',
+                    language: anyPart.executableCode.language || 'python',
+                    code: anyPart.executableCode.code,
+                  })
+                  controller.enqueue(encoder.encode(`data: ${codeData}\n\n`))
+                }
+                // Handle code execution results
+                else if (anyPart.codeExecutionResult?.output) {
+                  const resultData = JSON.stringify({
+                    type: 'code_result',
+                    output: anyPart.codeExecutionResult.output,
+                  })
+                  controller.enqueue(encoder.encode(`data: ${resultData}\n\n`))
+                }
+                // Handle regular text content
+                else if (part.text) {
                   const data = JSON.stringify({ type: 'text', content: part.text })
                   controller.enqueue(encoder.encode(`data: ${data}\n\n`))
                 }

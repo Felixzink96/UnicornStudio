@@ -8,16 +8,28 @@ import {
   parseOperationFormat,
   extractStreamingHtml,
   applyOperation,
+  injectCSSVariables,
 } from '@/lib/ai/html-operations'
+import {
+  parseReferenceUpdates,
+  type ReferenceUpdate,
+  type ParseResult,
+} from '@/lib/ai/reference-operations'
 import { detectComponentType, detectPromptIntent } from '@/lib/ai/component-detection'
 import { createClient } from '@/lib/supabase/client'
-import { extractStylesFromHtml, suggestDesignTokens, type SuggestedTokens } from '@/lib/design/style-extractor'
-import { detectFontsFromHtml, type DetectedFont } from '@/lib/fonts/font-detector'
+import { type SuggestedTokens } from '@/lib/design/style-extractor'
+import { type DetectedFont } from '@/lib/fonts/font-detector'
 import { DesignSystemDialog } from '@/components/design/DesignSystemDialog'
 import { GlobalComponentsDialog } from '@/components/design/GlobalComponentsDialog'
+import { SiteSetupModal, type SiteSetupData } from '@/components/design/SiteSetupModal'
+import { createPagesOnly, createHeaderMenu, createFooterMenu, createPagesFromSuggestions } from '@/lib/menus/setup-menus'
 import { getDesignVariables, updateDesignVariables } from '@/lib/supabase/queries/design-variables'
 import { extractGlobalComponents, removeHeaderFooterFromHtml, sanitizeHtmlForGlobalComponents } from '@/lib/ai/html-operations'
 import type { DetectedComponent } from '@/types/global-components'
+import { ReferenceDropdown, ReferenceBadge } from './ReferenceDropdown'
+import type { Reference, ReferenceGroup, SelectedReference, ReferenceDataForAI } from '@/lib/references/reference-types'
+import { REFERENCE_CATEGORIES } from '@/lib/references/reference-types'
+import { loadAllReferences, resolveReferencesForAI, searchReferences } from '@/lib/references/reference-resolver'
 import {
   Send,
   Sparkles,
@@ -29,6 +41,9 @@ import {
   X,
   Brain,
   ChevronUp,
+  Globe,
+  Code,
+  Link,
 } from 'lucide-react'
 
 export function ChatPanel() {
@@ -55,15 +70,31 @@ export function ChatPanel() {
   const [detectedFooter, setDetectedFooter] = useState<DetectedComponent | null>(null)
   const [pendingFinalHtml, setPendingFinalHtml] = useState<string | null>(null)
 
+  // Site Setup Modal State (NEU: Unified Setup)
+  const [siteSetupModalOpen, setSiteSetupModalOpen] = useState(false)
+  const [siteSetupPrompt, setSiteSetupPrompt] = useState('')
+
   // Thinking Mode State
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [currentThinking, setCurrentThinking] = useState('')
 
-  // @-Mention State
-  const [showPageSuggestions, setShowPageSuggestions] = useState(false)
-  const [mentionFilter, setMentionFilter] = useState('')
+  // Gemini Tools State
+  const [googleSearchEnabled, setGoogleSearchEnabled] = useState(false)
+  const [codeExecutionEnabled, setCodeExecutionEnabled] = useState(false)
+  const [detectedUrls, setDetectedUrls] = useState<string[]>([])
+
+  // @-Reference System State (erweitert für alle Referenz-Typen)
+  const [showReferenceDropdown, setShowReferenceDropdown] = useState(false)
+  const [referenceSearchQuery, setReferenceSearchQuery] = useState('')
+  const [referenceDropdownPosition, setReferenceDropdownPosition] = useState({ top: 0, left: 0 })
+  const [selectedReferences, setSelectedReferences] = useState<Reference[]>([])
   const [mentionStartPos, setMentionStartPos] = useState(-1)
-  const [suggestionIndex, setSuggestionIndex] = useState(0)
+
+  // Pending Reference Updates State (fuer Preview vor dem Speichern)
+  const [pendingReferenceUpdates, setPendingReferenceUpdates] = useState<ReferenceUpdate[]>([])
+  const [referenceUpdateMessage, setReferenceUpdateMessage] = useState<string>('')
+
+  // Legacy Page Reference State (für Rückwärtskompatibilität)
   const [referencedPageIds, setReferencedPageIds] = useState<string[]>([])
 
   const messages = useEditorStore((s) => s.messages)
@@ -77,18 +108,12 @@ export function ChatPanel() {
   const globalFooter = useEditorStore((s) => s.globalFooter)
   const loadGlobalComponents = useEditorStore((s) => s.loadGlobalComponents)
 
-  // Filter pages for suggestions (show all pages)
-  const filteredPages = useMemo(() => {
-    if (!mentionFilter) return pages
-    return pages.filter(p =>
-      p.name.toLowerCase().includes(mentionFilter.toLowerCase())
-    )
-  }, [pages, mentionFilter])
-
-  // Get referenced page objects
+  // Get referenced page objects (für Rückwärtskompatibilität + AI-Daten)
   const referencedPages = useMemo(() => {
-    return pages.filter(p => referencedPageIds.includes(p.id))
-  }, [pages, referencedPageIds])
+    // Aus selectedReferences die Pages extrahieren
+    const pageRefs = selectedReferences.filter(r => r.category === 'page')
+    return pages.filter(p => pageRefs.some(ref => ref.id === p.id))
+  }, [pages, selectedReferences])
 
   const addMessage = useEditorStore((s) => s.addMessage)
   const updateMessage = useEditorStore((s) => s.updateMessage)
@@ -150,37 +175,6 @@ export function ChatPanel() {
 
   // Store current prompt for component detection
   const currentPromptRef = useRef('')
-
-  // Check and show design dialog if needed
-  const checkAndShowDesignDialog = async (siteId: string, generatedHtml: string) => {
-    try {
-      // Get existing design variables
-      const variables = await getDesignVariables(siteId)
-
-      // Check if primary color is still default (not customized)
-      // Database default is #3b82f6 (blue-500)
-      const defaultPrimary = '#3b82f6'
-      const currentPrimary = variables.colors?.brand?.primary
-      const hasCustomTokens = currentPrimary && currentPrimary !== defaultPrimary
-
-      console.log('[Design Dialog] Check:', { currentPrimary, defaultPrimary, hasCustomTokens })
-
-      if (!hasCustomTokens) {
-        // Extract styles from generated HTML
-        const extracted = extractStylesFromHtml(generatedHtml)
-        const tokens = suggestDesignTokens(extracted)
-        const fonts = detectFontsFromHtml(generatedHtml)
-
-        console.log('[Design Dialog] Showing dialog with tokens:', tokens)
-
-        setSuggestedTokens(tokens)
-        setDetectedFonts(fonts)
-        setDesignDialogOpen(true)
-      }
-    } catch (error) {
-      console.error('Error checking design tokens:', error)
-    }
-  }
 
   // Handle saving design tokens from dialog
   const handleSaveDesignTokens = async (tokens: SuggestedTokens, downloadFonts: boolean) => {
@@ -271,26 +265,153 @@ export function ChatPanel() {
     }
   }
 
-  const handleSend = async (promptOverride?: string) => {
+  // Build enhanced prompt with setup data for AI - INKL. Header/Footer Generierung
+  const buildEnhancedPromptWithHeaderFooter = (originalPrompt: string, setupData: SiteSetupData): string => {
+    const selectedPages = setupData.pages.filter(p => p.selected)
+    const headerMenuItems = setupData.headerSettings.menuItems.map(m => m.name).join(', ')
+    const footerMenuItems = setupData.footerSettings.menuItems.map(m => m.name).join(', ')
+
+    const headerStyleDesc = setupData.headerSettings.style === 'simple'
+      ? 'Standard Layout (Logo links, Navigation rechts)'
+      : setupData.headerSettings.style === 'centered'
+      ? 'Zentriertes Layout (Logo und Navigation mittig übereinander)'
+      : 'Mega Menu Layout (mit Dropdown-Panels für Unterseiten)'
+
+    return `${originalPrompt}
+
+--- WEBSITE SETUP (vom User konfiguriert) ---
+Website-Name: ${setupData.siteName}
+Website-Typ: ${setupData.siteType}
+
+SEITEN die verlinkt werden müssen:
+${selectedPages.map(p => `- "${p.name}" -> href="/${p.slug}"`).join('\n')}
+
+=== HEADER ANFORDERUNGEN ===
+Erstelle einen hochwertigen, modernen Header mit folgenden Vorgaben:
+- Stil: ${headerStyleDesc}
+- Navigation-Links: ${headerMenuItems}
+- Links müssen zu den echten Seiten verlinken (siehe oben)
+${setupData.headerSettings.showCta ? `- CTA-Button: "${setupData.headerSettings.ctaText}" verlinkt zu "/${setupData.headerSettings.ctaPage}"` : '- Kein CTA-Button'}
+${setupData.headerSettings.sticky ? '- Header soll sticky sein (fixed beim Scrollen)' : '- Header ist nicht sticky'}
+- Mobile: Burger-Menu für kleine Bildschirme
+
+=== FOOTER ANFORDERUNGEN ===
+Erstelle einen passenden Footer mit:
+- Links zu: ${footerMenuItems}
+- Links müssen zu den echten Seiten verlinken
+${setupData.footerSettings.showCopyright ? `- Copyright-Text: "${setupData.footerSettings.copyrightText}"` : ''}
+
+=== DESIGN-SYSTEM ===
+
+GRUNDFARBEN (CSS-Variablen - für Buttons, Text, Backgrounds):
+- bg-[var(--color-brand-primary)] (${setupData.tokens.colors.primary})
+- hover:bg-[var(--color-brand-primaryHover)] (${setupData.tokens.colors.primaryHover})
+- bg-[var(--color-brand-secondary)] (${setupData.tokens.colors.secondary})
+- bg-[var(--color-brand-accent)] (${setupData.tokens.colors.accent})
+- bg-[var(--color-neutral-background)] (${setupData.tokens.colors.background})
+- text-[var(--color-neutral-foreground)] (${setupData.tokens.colors.foreground})
+- bg-[var(--color-neutral-muted)] (${setupData.tokens.colors.muted})
+- border-[var(--color-neutral-border)] (${setupData.tokens.colors.border})
+${Object.keys(setupData.customColors).length > 0 ? `
+CUSTOM:
+${Object.entries(setupData.customColors).map(([key, value]) => `- bg-[var(--color-custom-${key})] (${value})`).join('\n')}` : ''}
+
+KREATIVE FREIHEIT (für besondere Design-Elemente):
+- Eigene Gradients für Hero-Bereiche, Dekorationen
+- Kreative Schatten und Glows
+- Spezielle Hover-Effekte und Animationen
+- Dekorative Blobs, Patterns, Overlays
+
+SCHRIFTEN:
+- style="font-family: var(--font-heading)" (${setupData.tokens.fonts.heading})
+- style="font-family: var(--font-body)" (${setupData.tokens.fonts.body})
+${setupData.tokens.fonts.mono ? `- style="font-family: var(--font-mono)" (${setupData.tokens.fonts.mono})` : ''}
+
+=== ICONS ===
+⚠️ KEINE EMOJIS! Verwende IMMER inline SVG Icons.
+
+Erstelle ein EINZIGARTIGES Premium-Design: Grundfarben konsistent, aber kreative Extras für WOW-Effekt!
+
+WICHTIG: Generiere die KOMPLETTE Seite mit Header, Main Content und Footer.
+Der Header und Footer werden automatisch erkannt und als wiederverwendbare Komponenten gespeichert.`
+  }
+
+  // Store enhanced prompt for API (not shown in chat)
+  const enhancedPromptRef = useRef<string | null>(null)
+
+  // Handle send with setup data (after setup modal)
+  const handleSendWithSetup = async (enhancedPrompt: string, originalPrompt: string) => {
+    // Mark that design tokens are now set
+    setHasCheckedDesignTokens(true)
+    // Store enhanced prompt for API call
+    enhancedPromptRef.current = enhancedPrompt
+    // Show original prompt in chat, but use enhanced prompt for API
+    await handleSend(originalPrompt, true)
+  }
+
+  // Check if site needs setup (no custom design tokens yet)
+  const checkIfNeedsSetup = async (): Promise<boolean> => {
+    if (!siteId) return false
+
+    try {
+      const variables = await getDesignVariables(siteId)
+      const defaultPrimary = '#3b82f6'
+      const currentPrimary = variables.colors?.brand?.primary
+      const hasCustomTokens = currentPrimary && currentPrimary !== defaultPrimary
+      return !hasCustomTokens
+    } catch {
+      return false
+    }
+  }
+
+  const handleSend = async (promptOverride?: string, skipSetup?: boolean) => {
     const promptToSend = promptOverride || input.trim()
     if (!promptToSend || isGenerating) return
+
+    // NEU: Prüfe ob Setup nötig ist (nur bei erstem Prompt ohne Custom Tokens)
+    // skipSetup = true wenn wir vom Setup Modal kommen
+    if (!skipSetup && !hasCheckedDesignTokens && siteId) {
+      const needsSetup = await checkIfNeedsSetup()
+      if (needsSetup) {
+        setHasCheckedDesignTokens(true)
+        setInput('')
+
+        // Zeige Chat-Nachricht mit Setup-Button
+        addMessage({ role: 'user', content: promptToSend })
+        addMessage({
+          role: 'assistant',
+          content: `Ich habe deine Anfrage analysiert und Vorschläge für Seiten, Farben und Schriften vorbereitet.
+
+<setup-button prompt="${encodeURIComponent(promptToSend)}">Website Setup öffnen</setup-button>`,
+        })
+
+        // Speichere Prompt für späteren Zugriff
+        setSiteSetupPrompt(promptToSend)
+
+        return // Stoppe hier - Generierung erfolgt nach Setup
+      }
+      setHasCheckedDesignTokens(true)
+    }
 
     // Store prompt for later use in component detection
     currentPromptRef.current = promptToSend
 
-    // Prepare referenced pages data
-    const referencedPagesData = referencedPages.map(p => ({
-      name: p.name,
-      html: p.htmlContent || ''
-    }))
+    // Kopiere selectedReferences bevor sie geloescht werden
+    const currentReferences = [...selectedReferences]
+
+    // Prepare all references for display
+    const referenceDisplayParts = currentReferences.map(ref => {
+      const config = REFERENCE_CATEGORIES[ref.category]
+      return `@${ref.displayName}`
+    })
 
     setInput('')
-    setReferencedPageIds([]) // Clear references after sending
+    setSelectedReferences([]) // Clear all references after sending
     setGenerating(true)
 
-    // Show referenced pages in user message
-    const displayContent = referencedPagesData.length > 0
-      ? `${promptToSend}\n\n[Style-Referenz: ${referencedPagesData.map(p => `@${p.name}`).join(', ')}]`
+    // Show all references in user message
+    const displayContent = currentReferences.length > 0
+      ? `${promptToSend}\n\n[Referenzen: ${referenceDisplayParts.join(', ')}]`
       : promptToSend
 
     addMessage({ role: 'user', content: displayContent })
@@ -300,17 +421,44 @@ export function ChatPanel() {
       // Reset thinking content for new request
       setCurrentThinking('')
 
+      // Referenzen auflösen (mit IDs und vollstaendigen Daten)
+      let resolvedReferences: ReferenceDataForAI | undefined
+      if (currentReferences.length > 0 && siteId) {
+        resolvedReferences = await resolveReferencesForAI(
+          siteId,
+          currentReferences.map(r => ({ category: r.category, id: r.id })),
+          html // Aktuelles Seiten-HTML fuer Sections
+        )
+        console.log('Resolved references for AI:', resolvedReferences)
+      }
+
+      // Prepare referenced pages data (fuer Rueckwaertskompatibilitaet - nur Pages)
+      const referencedPagesData = referencedPages.map(p => ({
+        name: p.name,
+        html: p.htmlContent || ''
+      }))
+
+      // Use enhanced prompt for API if available (from setup modal), otherwise use display prompt
+      const apiPrompt = enhancedPromptRef.current || promptToSend
+      // Clear the enhanced prompt ref after using it
+      enhancedPromptRef.current = null
+
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: promptToSend,
+          prompt: apiPrompt,
           existingHtml: html,
           context: siteContext || {},
           selectedElement: selectedElement,
           model: selectedModel.id,
           referencedPages: referencedPagesData.length > 0 ? referencedPagesData : undefined,
+          // NEU: Aufgelöste Referenzen mit IDs
+          references: resolvedReferences,
           thinkingEnabled,
+          // Gemini Tools
+          googleSearchEnabled,
+          codeExecutionEnabled,
         }),
       })
 
@@ -321,6 +469,10 @@ export function ChatPanel() {
 
       const decoder = new TextDecoder()
       let fullContent = ''
+      // Track tool outputs during streaming
+      let searchSources: Array<{ title: string; uri: string }> = []
+      let executableCode = ''
+      let codeResult = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -339,6 +491,25 @@ export function ChatPanel() {
                 setCurrentThinking(prev => prev + data.content)
               }
 
+              // Handle Google Search results
+              if (data.type === 'search_results') {
+                if (data.sources && data.sources.length > 0) {
+                  searchSources = data.sources
+                  console.log('Search sources received:', searchSources)
+                }
+              }
+
+              // Handle Code Execution
+              if (data.type === 'executable_code') {
+                executableCode = data.code
+                console.log('Executable code received:', executableCode.substring(0, 100))
+              }
+
+              if (data.type === 'code_result') {
+                codeResult = data.output
+                console.log('Code result received:', codeResult.substring(0, 100))
+              }
+
               if (data.type === 'text') {
                 fullContent += data.content
 
@@ -353,6 +524,10 @@ export function ChatPanel() {
                     // Show streaming HTML in preview
                     generatedHtml: streamingHtml || undefined,
                     isStreaming: true,
+                    // Include tool outputs as they come in
+                    searchSources: searchSources.length > 0 ? searchSources : undefined,
+                    executableCode: executableCode || undefined,
+                    codeResult: codeResult || undefined,
                   })
                 }
               }
@@ -360,7 +535,42 @@ export function ChatPanel() {
               if (data.type === 'done') {
                 console.log('Full AI response:', fullContent)
 
-                // Parse the complete response
+                // NEU: Zuerst auf Reference Updates pruefen
+                const refParseResult = parseReferenceUpdates(fullContent)
+                console.log('Reference updates parsed:', refParseResult)
+
+                // Wenn Reference Updates vorhanden, diese separat behandeln
+                if (refParseResult.hasReferenceUpdates) {
+                  console.log('Has reference updates, storing for preview')
+                  setPendingReferenceUpdates(refParseResult.updates)
+                  setReferenceUpdateMessage(refParseResult.message)
+
+                  // Update message mit Info ueber pending updates
+                  const msgs = useEditorStore.getState().messages
+                  const lastMsg = msgs[msgs.length - 1]
+                  const thinkingContent = currentThinking
+
+                  if (lastMsg?.role === 'assistant') {
+                    updateMessage(lastMsg.id, {
+                      content: refParseResult.message || fullContent,
+                      // Kein generatedHtml da es Reference Updates sind
+                      generatedHtml: undefined,
+                      thinking: thinkingContent || undefined,
+                      isStreaming: false,
+                      tokensUsed: data.usage?.output_tokens || 0,
+                      model: selectedModel.name,
+                      // NEU: Markiere als Reference Update
+                      hasReferenceUpdates: true,
+                      referenceUpdates: refParseResult.updates,
+                    })
+                  }
+
+                  setGenerating(false)
+                  setCurrentThinking('')
+                  return // Stoppe hier - Updates werden via Preview/Apply behandelt
+                }
+
+                // Normaler Flow: Parse als Operation
                 const parsed = parseOperationFormat(fullContent)
                 console.log('Parsed operation:', parsed)
 
@@ -414,6 +624,13 @@ export function ChatPanel() {
                   console.log('Failed to parse operation format')
                 }
 
+                // Inject CSS variables from design variables
+                const designVars = useEditorStore.getState().designVariables
+                if (designVars) {
+                  finalHtml = injectCSSVariables(finalHtml, designVars)
+                  console.log('Injected CSS variables from design variables')
+                }
+
                 // Update message with final result (including thinking)
                 const msgs = useEditorStore.getState().messages
                 const lastMsg = msgs[msgs.length - 1]
@@ -434,20 +651,18 @@ export function ChatPanel() {
                     // Show only output tokens (what AI generated), not total (includes our prompt)
                     tokensUsed: data.usage?.output_tokens || 0,
                     model: selectedModel.name,
+                    // Include tool outputs
+                    searchSources: searchSources.length > 0 ? searchSources : undefined,
+                    executableCode: executableCode || undefined,
+                    codeResult: codeResult || undefined,
                   })
                 }
 
                 // Don't auto-apply - user must click "Anwenden" button
                 // applyGeneratedHtml(finalHtml)
 
-                // Check if we should show Design System Dialog
-                // Only show once per session and only if site has no custom tokens
-                if (siteId && !hasCheckedDesignTokens && parsed && parsed.html) {
-                  setHasCheckedDesignTokens(true)
-
-                  // Check if site already has custom design tokens
-                  checkAndShowDesignDialog(siteId, finalHtml)
-                }
+                // Setup Modal wird jetzt VOR der Generierung geöffnet,
+                // nicht mehr danach. Der Check und das Öffnen erfolgt in handleSend().
               }
 
               if (data.type === 'error') throw new Error(data.message)
@@ -480,70 +695,74 @@ export function ChatPanel() {
 
     setInput(value)
 
+    // Detect URLs for URL Context tool
+    const urls = value.match(/https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi) || []
+    setDetectedUrls(urls)
+
     // Check for @-mention
     const textBeforeCursor = value.slice(0, cursorPos)
-    const atMatch = textBeforeCursor.match(/@(\w*)$/)
+    const atMatch = textBeforeCursor.match(/@([\w-]*)$/)
 
     if (atMatch) {
-      setShowPageSuggestions(true)
-      setMentionFilter(atMatch[1])
+      // Berechne Position für das Dropdown
+      if (textareaRef.current) {
+        const rect = textareaRef.current.getBoundingClientRect()
+        // Dropdown oberhalb des Inputs positionieren
+        setReferenceDropdownPosition({
+          top: -10, // Wird relativ zum Container positioniert
+          left: 0,
+        })
+      }
+      setShowReferenceDropdown(true)
+      setReferenceSearchQuery(atMatch[1])
       setMentionStartPos(cursorPos - atMatch[0].length)
-      setSuggestionIndex(0)
     } else {
-      setShowPageSuggestions(false)
-      setMentionFilter('')
+      setShowReferenceDropdown(false)
+      setReferenceSearchQuery('')
       setMentionStartPos(-1)
     }
   }
 
-  // Insert selected page mention
-  const insertPageMention = (page: { id: string; name: string }) => {
+  // Handle reference selection from dropdown
+  const handleReferenceSelect = (reference: Reference) => {
     if (mentionStartPos === -1) return
 
-    // Add page to references
-    if (!referencedPageIds.includes(page.id)) {
-      setReferencedPageIds([...referencedPageIds, page.id])
+    // Add reference if not already selected
+    if (!selectedReferences.some(r => r.id === reference.id && r.category === reference.category)) {
+      setSelectedReferences([...selectedReferences, reference])
     }
 
-    // Remove the @... from input and close suggestions
+    // Remove the @... from input and close dropdown
     const beforeMention = input.slice(0, mentionStartPos)
     const afterMention = input.slice(textareaRef.current?.selectionStart || mentionStartPos)
     setInput(beforeMention + afterMention)
 
-    setShowPageSuggestions(false)
-    setMentionFilter('')
+    setShowReferenceDropdown(false)
+    setReferenceSearchQuery('')
     setMentionStartPos(-1)
 
     // Focus back to textarea
     textareaRef.current?.focus()
   }
 
-  // Remove a referenced page
-  const removeReferencedPage = (pageId: string) => {
-    setReferencedPageIds(referencedPageIds.filter(id => id !== pageId))
+  // Remove a selected reference
+  const removeReference = (referenceToRemove: Reference) => {
+    setSelectedReferences(selectedReferences.filter(
+      r => !(r.id === referenceToRemove.id && r.category === referenceToRemove.category)
+    ))
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Handle suggestion navigation
-    if (showPageSuggestions && filteredPages.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setSuggestionIndex((prev) => (prev + 1) % filteredPages.length)
-        return
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setSuggestionIndex((prev) => (prev - 1 + filteredPages.length) % filteredPages.length)
-        return
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault()
-        insertPageMention(filteredPages[suggestionIndex])
-        return
-      }
+    // Handle reference dropdown (keyboard navigation handled in ReferenceDropdown)
+    if (showReferenceDropdown) {
       if (e.key === 'Escape') {
         e.preventDefault()
-        setShowPageSuggestions(false)
+        setShowReferenceDropdown(false)
+        return
+      }
+      // Arrow keys and Enter are handled by ReferenceDropdown component
+      if (['ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {
+        // Let the dropdown handle these
         return
       }
     }
@@ -618,7 +837,13 @@ export function ChatPanel() {
                     <ThinkingDisplay content={currentThinking} isComplete={!!message.content} />
                   </div>
                 )}
-                <ChatMessage message={message} />
+                <ChatMessage
+                  message={message}
+                  onOpenSetup={(prompt) => {
+                    setSiteSetupPrompt(prompt)
+                    setSiteSetupModalOpen(true)
+                  }}
+                />
               </div>
             )
           })}
@@ -627,24 +852,37 @@ export function ChatPanel() {
 
       {/* Input Area */}
       <div className="border-t border-zinc-100 p-4 bg-white">
-        {/* Referenced Pages Badges */}
-        {referencedPages.length > 0 && (
+        {/* URL Detection Badge */}
+        {detectedUrls.length > 0 && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <Link className="h-4 w-4 text-blue-600" />
+            <span className="text-xs text-blue-700">
+              {detectedUrls.length} URL{detectedUrls.length > 1 ? 's' : ''} erkannt - Design wird analysiert
+            </span>
+            <div className="flex-1" />
+            <div className="flex flex-wrap gap-1 max-w-xs">
+              {detectedUrls.slice(0, 3).map((url, i) => (
+                <span key={i} className="text-xs text-blue-600 truncate max-w-32">
+                  {new URL(url).hostname}
+                </span>
+              ))}
+              {detectedUrls.length > 3 && (
+                <span className="text-xs text-blue-500">+{detectedUrls.length - 3}</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Selected References Badges */}
+        {selectedReferences.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-2">
-            <span className="text-xs text-zinc-500">Referenz:</span>
-            {referencedPages.map((page) => (
-              <span
-                key={page.id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full"
-              >
-                <FileText className="h-3 w-3" />
-                @{page.name}
-                <button
-                  onClick={() => removeReferencedPage(page.id)}
-                  className="hover:bg-blue-200 rounded-full p-0.5 -mr-0.5 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
+            <span className="text-xs text-zinc-500">Referenzen:</span>
+            {selectedReferences.map((ref) => (
+              <ReferenceBadge
+                key={`${ref.category}-${ref.id}`}
+                reference={ref}
+                onRemove={() => removeReference(ref)}
+              />
             ))}
           </div>
         )}
@@ -662,34 +900,18 @@ export function ChatPanel() {
             className="w-full px-4 py-3 pr-24 text-sm bg-zinc-50 border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white placeholder:text-zinc-400 disabled:opacity-50 transition-colors"
           />
 
-          {/* Page Suggestions Dropdown */}
-          {showPageSuggestions && filteredPages.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-1 w-full max-h-48 overflow-y-auto bg-white border border-zinc-200 rounded-lg shadow-lg z-50">
-              <div className="p-1.5 border-b border-zinc-100">
-                <span className="text-xs text-zinc-500 px-2">Seite als Style-Referenz wählen:</span>
-              </div>
-              {filteredPages.map((page, index) => (
-                <button
-                  key={page.id}
-                  onClick={() => insertPageMention(page)}
-                  className={`w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-zinc-50 transition-colors cursor-pointer ${
-                    index === suggestionIndex ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <FileText className="h-4 w-4 text-zinc-400" />
-                  <div>
-                    <div className="text-sm font-medium text-zinc-800">@{page.name}</div>
-                    <div className="text-xs text-zinc-500">/{page.slug || 'home'}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* No pages message */}
-          {showPageSuggestions && filteredPages.length === 0 && (
-            <div className="absolute bottom-full left-0 mb-1 w-full bg-white border border-zinc-200 rounded-lg shadow-lg z-50 p-3">
-              <span className="text-sm text-zinc-500">Keine anderen Seiten vorhanden</span>
+          {/* Reference Dropdown */}
+          {showReferenceDropdown && siteId && (
+            <div className="absolute bottom-full left-0 mb-1 w-full z-50">
+              <ReferenceDropdown
+                siteId={siteId}
+                currentPageHtml={html}
+                isOpen={showReferenceDropdown}
+                searchQuery={referenceSearchQuery}
+                position={{ top: 0, left: 0 }}
+                onSelect={handleReferenceSelect}
+                onClose={() => setShowReferenceDropdown(false)}
+              />
             </div>
           )}
 
@@ -702,7 +924,7 @@ export function ChatPanel() {
             </button>
             <button
               onClick={() => handleSend()}
-              disabled={(!input.trim() && referencedPages.length === 0) || isGenerating}
+              disabled={(!input.trim() && selectedReferences.length === 0) || isGenerating}
               className="p-2 bg-blue-500 hover:bg-blue-600 disabled:bg-zinc-200 disabled:cursor-not-allowed text-white disabled:text-zinc-400 rounded-lg transition-colors cursor-pointer"
             >
               {isGenerating ? (
@@ -776,6 +998,32 @@ export function ChatPanel() {
                 <Brain className="h-4 w-4" />
               </button>
             )}
+
+            {/* Google Search Toggle */}
+            <button
+              onClick={() => setGoogleSearchEnabled(!googleSearchEnabled)}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                googleSearchEnabled
+                  ? 'text-green-700 bg-green-100 hover:bg-green-200'
+                  : 'text-zinc-500 bg-zinc-100 hover:bg-zinc-200'
+              }`}
+              title={googleSearchEnabled ? 'Google Search aktiv' : 'Google Search aktivieren'}
+            >
+              <Globe className="h-4 w-4" />
+            </button>
+
+            {/* Code Execution Toggle */}
+            <button
+              onClick={() => setCodeExecutionEnabled(!codeExecutionEnabled)}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                codeExecutionEnabled
+                  ? 'text-amber-700 bg-amber-100 hover:bg-amber-200'
+                  : 'text-zinc-500 bg-zinc-100 hover:bg-zinc-200'
+              }`}
+              title={codeExecutionEnabled ? 'Code Execution aktiv' : 'Code Execution aktivieren (Python)'}
+            >
+              <Code className="h-4 w-4" />
+            </button>
           </div>
 
           {/* Token/Character Count */}
@@ -870,6 +1118,194 @@ export function ChatPanel() {
           setDetectedFooter(null)
           setPendingFinalHtml(null)
           setGlobalComponentsDialogOpen(false)
+        }}
+      />
+
+      {/* Site Setup Modal (NEU: Unified Setup VOR Generierung) */}
+      <SiteSetupModal
+        open={siteSetupModalOpen}
+        onOpenChange={setSiteSetupModalOpen}
+        initialPrompt={siteSetupPrompt}
+        onGenerate={async (data: SiteSetupData, originalPrompt: string) => {
+          if (!siteId) return
+
+          try {
+            // 1. Design-Tokens speichern
+            const designUpdate: Parameters<typeof updateDesignVariables>[1] = {
+              colors: {
+                brand: {
+                  primary: data.tokens.colors.primary,
+                  primaryHover: data.tokens.colors.primaryHover,
+                  secondary: data.tokens.colors.secondary,
+                  accent: data.tokens.colors.accent,
+                },
+                neutral: {
+                  background: data.tokens.colors.background,
+                  foreground: data.tokens.colors.foreground,
+                  muted: data.tokens.colors.muted,
+                  border: data.tokens.colors.border,
+                },
+                semantic: {
+                  success: '#22c55e',
+                  warning: '#f59e0b',
+                  error: '#ef4444',
+                  info: '#3b82f6',
+                },
+              },
+              typography: {
+                fontHeading: data.tokens.fonts.heading,
+                fontBody: data.tokens.fonts.body,
+                fontMono: data.tokens.fonts.mono,
+              },
+              spacing: {
+                scale: {
+                  xs: '0.5rem',
+                  sm: '1rem',
+                  md: '1.5rem',
+                  lg: '2rem',
+                  xl: data.tokens.spacing.section,
+                  '2xl': '4rem',
+                  '3xl': '6rem',
+                  section: data.tokens.spacing.section,
+                  container: data.tokens.spacing.container,
+                  'card-gap': data.tokens.spacing.cardGap,
+                },
+                containerWidths: {
+                  sm: '640px',
+                  md: '768px',
+                  lg: '1024px',
+                  xl: data.tokens.spacing.container,
+                  '2xl': '1536px',
+                },
+              },
+              borders: {
+                radius: {
+                  none: '0',
+                  sm: '0.125rem',
+                  md: data.tokens.radii.default,
+                  lg: data.tokens.radii.lg,
+                  xl: '1rem',
+                  '2xl': '1.5rem',
+                  full: '9999px',
+                  default: data.tokens.radii.default,
+                },
+              },
+            }
+
+            // Add gradient if enabled
+            if (data.gradient.enabled) {
+              designUpdate.gradients = {
+                primary: {
+                  from: data.gradient.from,
+                  to: data.gradient.to,
+                  via: data.gradient.via,
+                  direction: data.gradient.direction,
+                  enabled: true,
+                },
+              }
+            }
+
+            // Add custom colors if any
+            if (Object.keys(data.customColors).length > 0) {
+              designUpdate.customColors = data.customColors
+            }
+
+            const savedDesignVars = await updateDesignVariables(siteId, designUpdate)
+
+            // Update store with new design variables
+            useEditorStore.setState({ designVariables: savedDesignVars })
+
+            // 1b. Logo und Tagline speichern (Site Identity)
+            const supabase = createClient()
+            let logoUrl: string | null = null
+
+            // Logo hochladen falls vorhanden
+            if (data.logoFile) {
+              const fileExt = data.logoFile.name.split('.').pop()
+              const fileName = `${siteId}/logo-${Date.now()}.${fileExt}`
+
+              const { error: uploadError } = await supabase.storage
+                .from('site-assets')
+                .upload(fileName, data.logoFile, { cacheControl: '3600', upsert: true })
+
+              if (!uploadError) {
+                const { data: urlData } = supabase.storage.from('site-assets').getPublicUrl(fileName)
+                logoUrl = urlData.publicUrl
+              } else {
+                console.warn('Logo upload failed:', uploadError.message)
+              }
+            }
+
+            // Site Identity updaten (Logo, Tagline, Default robots.txt)
+            const siteUpdate: { logo_url?: string; tagline?: string; robots_txt?: string; name?: string } = {}
+            if (logoUrl) siteUpdate.logo_url = logoUrl
+            if (data.tagline) siteUpdate.tagline = data.tagline
+            if (data.siteName) siteUpdate.name = data.siteName
+
+            // Default robots.txt setzen falls nicht vorhanden
+            siteUpdate.robots_txt = `User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://your-domain.com/sitemap.xml
+
+# Disallow admin areas
+Disallow: /wp-admin/
+Disallow: /wp-includes/`
+
+            if (Object.keys(siteUpdate).length > 0) {
+              await supabase.from('sites').update(siteUpdate).eq('id', siteId)
+            }
+
+            // 2. Seiten erstellen
+            const pageIdMap = await createPagesFromSuggestions(siteId, data.pages)
+
+            // 3. Menus erstellen mit den erstellten Seiten
+            const headerPages = data.pages.filter(p => p.selected && p.inHeader && !p.isLegalPage)
+            const footerPages = data.pages.filter(p => p.selected && p.inFooter)
+
+            const headerItems = headerPages.map(p => ({
+              label: p.name,
+              slug: p.slug,
+              pageId: pageIdMap.get(p.slug),
+            }))
+
+            const footerItems = footerPages.map(p => ({
+              label: p.name,
+              slug: p.slug,
+              pageId: pageIdMap.get(p.slug),
+            }))
+
+            // Header-Menu erstellen
+            await createHeaderMenu(siteId, headerItems)
+            // Footer-Menu erstellen
+            await createFooterMenu(siteId, footerItems)
+
+            console.log('Site Setup - Pages and Menus created:', {
+              pages: data.pages.filter(p => p.selected).length,
+              headerMenuItems: headerItems.length,
+              footerMenuItems: footerItems.length,
+            })
+
+            // 3. JETZT generieren - KI erstellt Header/Footer MIT
+            // Der Prompt enthält alle Setup-Infos inkl. Header/Footer Anforderungen
+            const enhancedPrompt = buildEnhancedPromptWithHeaderFooter(originalPrompt, data)
+            setSiteSetupModalOpen(false)
+
+            // Starte Generierung - Original-Prompt wird im Chat angezeigt,
+            // Enhanced-Prompt wird intern an die API geschickt
+            await handleSendWithSetup(enhancedPrompt, originalPrompt)
+
+          } catch (error: any) {
+            console.error('Error completing site setup:', error?.message || error)
+            console.error('Error details:', JSON.stringify(error, null, 2))
+            // Don't throw - just log and continue
+          }
+        }}
+        onSkip={(originalPrompt: string) => {
+          setSiteSetupModalOpen(false)
+          // Bei Skip: normale Generierung ohne Setup (skipSetup = true)
+          handleSend(originalPrompt, true)
         }}
       />
     </div>

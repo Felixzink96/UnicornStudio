@@ -168,7 +168,7 @@ export interface SuggestedTokens {
   fonts: {
     heading: string
     body: string
-    mono: string
+    mono?: string // Optional - nur für Tech/SaaS/Code-relevante Websites
   }
   spacing: {
     section: string

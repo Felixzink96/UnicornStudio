@@ -13,6 +13,11 @@ defined('ABSPATH') || exit;
 class Unicorn_Studio_API_Client {
 
     /**
+     * Single instance
+     */
+    private static $instance = null;
+
+    /**
      * API Key
      */
     private $api_key;
@@ -26,6 +31,18 @@ class Unicorn_Studio_API_Client {
      * Base API URL
      */
     private $base_url;
+
+    /**
+     * Get Instance (Singleton)
+     *
+     * @return Unicorn_Studio_API_Client
+     */
+    public static function get_instance() {
+        if (null === self::$instance) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
 
     /**
      * Constructor
@@ -473,5 +490,69 @@ class Unicorn_Studio_API_Client {
             error_log('[Unicorn Studio DEBUG] get_page result keys: ' . implode(', ', array_keys($result)));
         }
         return $result;
+    }
+
+    /**
+     * Get all menus
+     *
+     * @return array|WP_Error
+     */
+    public function get_menus() {
+        return $this->request('/menus');
+    }
+
+    /**
+     * Get single menu with items
+     *
+     * @param string $menu_id Menu ID
+     * @return array|WP_Error
+     */
+    public function get_menu($menu_id) {
+        return $this->request('/menus/' . $menu_id);
+    }
+
+    /**
+     * Get sitemap XML
+     *
+     * @return string|WP_Error
+     */
+    public function get_sitemap() {
+        $url = $this->base_url . '/sites/' . $this->site_id . '/sitemap.xml';
+
+        $response = wp_remote_get($url, [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $this->api_key,
+            ],
+            'timeout' => 30,
+        ]);
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        if ($status_code !== 200) {
+            return new WP_Error('sitemap_error', 'Failed to fetch sitemap: ' . $status_code);
+        }
+
+        return wp_remote_retrieve_body($response);
+    }
+
+    /**
+     * Get robots.txt content
+     *
+     * @return string|WP_Error
+     */
+    public function get_robots_txt() {
+        // Generate robots.txt based on site settings
+        $sitemap_url = home_url('/sitemap.xml');
+
+        $robots = "User-agent: *\n";
+        $robots .= "Allow: /\n";
+        $robots .= "\n";
+        $robots .= "# Sitemap\n";
+        $robots .= "Sitemap: " . $sitemap_url . "\n";
+
+        return $robots;
     }
 }

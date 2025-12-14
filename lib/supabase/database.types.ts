@@ -1005,17 +1005,26 @@ export type Database = {
           created_at: string | null
           custom_domain: string | null
           description: string | null
+          favicon_url: string | null
+          global_footer_id: string | null
+          global_header_id: string | null
           id: string
           integrations: Json | null
+          last_pushed_to_wordpress_at: string | null
+          logo_dark_url: string | null
+          logo_url: string | null
           name: string
+          og_image_url: string | null
           organization_id: string
           published_at: string | null
+          robots_txt: string | null
           seo: Json | null
           seo_settings: Json | null
           settings: Json | null
           slug: string
           status: string | null
           subdomain: string | null
+          tagline: string | null
           thumbnail_url: string | null
           updated_at: string | null
         }
@@ -1023,17 +1032,26 @@ export type Database = {
           created_at?: string | null
           custom_domain?: string | null
           description?: string | null
+          favicon_url?: string | null
+          global_footer_id?: string | null
+          global_header_id?: string | null
           id?: string
           integrations?: Json | null
+          last_pushed_to_wordpress_at?: string | null
+          logo_dark_url?: string | null
+          logo_url?: string | null
           name: string
+          og_image_url?: string | null
           organization_id: string
           published_at?: string | null
+          robots_txt?: string | null
           seo?: Json | null
           seo_settings?: Json | null
           settings?: Json | null
           slug: string
           status?: string | null
           subdomain?: string | null
+          tagline?: string | null
           thumbnail_url?: string | null
           updated_at?: string | null
         }
@@ -1041,21 +1059,44 @@ export type Database = {
           created_at?: string | null
           custom_domain?: string | null
           description?: string | null
+          favicon_url?: string | null
+          global_footer_id?: string | null
+          global_header_id?: string | null
           id?: string
           integrations?: Json | null
+          last_pushed_to_wordpress_at?: string | null
+          logo_dark_url?: string | null
+          logo_url?: string | null
           name?: string
+          og_image_url?: string | null
           organization_id?: string
           published_at?: string | null
+          robots_txt?: string | null
           seo?: Json | null
           seo_settings?: Json | null
           settings?: Json | null
           slug?: string
           status?: string | null
           subdomain?: string | null
+          tagline?: string | null
           thumbnail_url?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sites_global_footer_id_fkey"
+            columns: ["global_footer_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sites_global_header_id_fkey"
+            columns: ["global_header_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sites_organization_id_fkey"
             columns: ["organization_id"]

@@ -14,6 +14,7 @@ import {
   Settings,
   ArrowLeft,
   Database,
+  Menu,
 } from 'lucide-react'
 import type { ContentType } from '@/types/cms'
 
@@ -29,6 +30,7 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
   const mainNavigation = [
     { name: 'Übersicht', href: `/dashboard/sites/${siteId}`, icon: Database },
     { name: 'Pages', href: `/dashboard/sites/${siteId}/pages`, icon: FileText },
+    { name: 'Menüs', href: `/dashboard/sites/${siteId}/menus`, icon: Menu },
   ]
 
   const cmsNavigation = [

@@ -4,8 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import type { Site } from '@/types/database'
-import { SiteCard } from '@/components/dashboard/SiteCard'
+import { SiteCard, type SiteWithPreview } from '@/components/dashboard/SiteCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -19,13 +18,13 @@ import {
 import { Plus, Search, Loader2 } from 'lucide-react'
 
 interface SitesListProps {
-  sites: Site[]
+  sites: SiteWithPreview[]
   organizationId: string
 }
 
 export function SitesList({ sites: initialSites, organizationId }: SitesListProps) {
   const router = useRouter()
-  const [sites, setSites] = useState(initialSites)
+  const [sites, setSites] = useState<SiteWithPreview[]>(initialSites)
   const [searchQuery, setSearchQuery] = useState('')
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; siteId: string | null }>({
     open: false,
@@ -71,7 +70,13 @@ export function SitesList({ sites: initialSites, organizationId }: SitesListProp
       .single()
 
     if (!error && data) {
-      setSites([data, ...sites])
+      // Cast integrations from Json to expected type
+      const newSite: SiteWithPreview = {
+        ...data,
+        integrations: data.integrations as SiteWithPreview['integrations'],
+        homePageHtml: null,
+      }
+      setSites([newSite, ...sites])
     }
   }
 

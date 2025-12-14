@@ -42,6 +42,13 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                 </span>
             </h2>
 
+            <?php
+            // Get menu data
+            $synced_menus = get_option('unicorn_studio_menus', []);
+            $menus_last_sync = get_option('unicorn_studio_menus_last_sync', '');
+            $sitemap_last_sync = get_option('unicorn_studio_sitemap_last_sync', '');
+            $robots_last_sync = get_option('unicorn_studio_robots_last_sync', '');
+            ?>
             <div class="unicorn-stats">
                 <div class="unicorn-stat">
                     <span class="unicorn-stat-value"><?php echo count($content_types); ?></span>
@@ -67,6 +74,10 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                         ?>
                     </span>
                     <span class="unicorn-stat-label"><?php esc_html_e('Header/Footer', 'unicorn-studio'); ?></span>
+                </div>
+                <div class="unicorn-stat">
+                    <span class="unicorn-stat-value"><?php echo count($synced_menus); ?></span>
+                    <span class="unicorn-stat-label"><?php esc_html_e('Menus', 'unicorn-studio'); ?></span>
                 </div>
             </div>
 
@@ -110,6 +121,15 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                     </button>
                     <button type="button" class="button unicorn-sync-btn" data-type="global_components" <?php echo !$status['connected'] ? 'disabled' : ''; ?>>
                         <?php esc_html_e('Header/Footer', 'unicorn-studio'); ?>
+                    </button>
+                    <button type="button" class="button unicorn-sync-btn" data-type="menus" <?php echo !$status['connected'] ? 'disabled' : ''; ?>>
+                        <?php esc_html_e('Menus', 'unicorn-studio'); ?>
+                    </button>
+                    <button type="button" class="button unicorn-sync-btn" data-type="sitemap" <?php echo !$status['connected'] ? 'disabled' : ''; ?>>
+                        <?php esc_html_e('Sitemap', 'unicorn-studio'); ?>
+                    </button>
+                    <button type="button" class="button unicorn-sync-btn" data-type="robots" <?php echo !$status['connected'] ? 'disabled' : ''; ?>>
+                        <?php esc_html_e('robots.txt', 'unicorn-studio'); ?>
                     </button>
                 </div>
             </div>
@@ -174,17 +194,31 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                 <?php esc_html_e('Globale Komponenten', 'unicorn-studio'); ?>
             </h2>
 
+            <?php
+            // Check if header/footer HTML contains unresolved menu placeholders
+            $global_header = Unicorn_Studio_Global_Components::get_global_header();
+            $global_footer = Unicorn_Studio_Global_Components::get_global_footer();
+            $header_has_placeholder = $global_header && strpos($global_header['html'] ?? '', '{{menu:') !== false;
+            $footer_has_placeholder = $global_footer && strpos($global_footer['html'] ?? '', '{{menu:') !== false;
+            ?>
+
             <div class="unicorn-components-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
                 <!-- Header Status -->
-                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_header'] ? '#d4edda' : '#fff3cd'; ?>; border-radius: 8px;">
+                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_header'] ? ($header_has_placeholder ? '#fff3cd' : '#d4edda') : '#fff3cd'; ?>; border-radius: 8px;">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                        <span class="dashicons dashicons-<?php echo $status['has_header'] ? 'yes-alt' : 'warning'; ?>" style="color: <?php echo $status['has_header'] ? '#28a745' : '#856404'; ?>;"></span>
+                        <span class="dashicons dashicons-<?php echo $status['has_header'] ? ($header_has_placeholder ? 'warning' : 'yes-alt') : 'warning'; ?>" style="color: <?php echo $status['has_header'] && !$header_has_placeholder ? '#28a745' : '#856404'; ?>;"></span>
                         <strong><?php esc_html_e('Header', 'unicorn-studio'); ?></strong>
                     </div>
                     <?php if ($status['has_header']) : ?>
-                        <p style="margin: 0; font-size: 13px; color: #155724;">
+                        <p style="margin: 0; font-size: 13px; color: <?php echo $header_has_placeholder ? '#856404' : '#155724'; ?>;">
                             <?php echo esc_html($status['header_name'] ?: 'Global Header'); ?>
                         </p>
+                        <?php if ($header_has_placeholder) : ?>
+                            <p style="margin: 5px 0 0 0; font-size: 12px; color: #856404;">
+                                <span class="dashicons dashicons-warning" style="font-size: 14px;"></span>
+                                <?php esc_html_e('Menü-Placeholder nicht ersetzt! Bitte erneut pushen.', 'unicorn-studio'); ?>
+                            </p>
+                        <?php endif; ?>
                     <?php else : ?>
                         <p style="margin: 0; font-size: 13px; color: #856404;">
                             <?php esc_html_e('Nicht synchronisiert', 'unicorn-studio'); ?>
@@ -193,15 +227,21 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                 </div>
 
                 <!-- Footer Status -->
-                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_footer'] ? '#d4edda' : '#fff3cd'; ?>; border-radius: 8px;">
+                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_footer'] ? ($footer_has_placeholder ? '#fff3cd' : '#d4edda') : '#fff3cd'; ?>; border-radius: 8px;">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                        <span class="dashicons dashicons-<?php echo $status['has_footer'] ? 'yes-alt' : 'warning'; ?>" style="color: <?php echo $status['has_footer'] ? '#28a745' : '#856404'; ?>;"></span>
+                        <span class="dashicons dashicons-<?php echo $status['has_footer'] ? ($footer_has_placeholder ? 'warning' : 'yes-alt') : 'warning'; ?>" style="color: <?php echo $status['has_footer'] && !$footer_has_placeholder ? '#28a745' : '#856404'; ?>;"></span>
                         <strong><?php esc_html_e('Footer', 'unicorn-studio'); ?></strong>
                     </div>
                     <?php if ($status['has_footer']) : ?>
-                        <p style="margin: 0; font-size: 13px; color: #155724;">
+                        <p style="margin: 0; font-size: 13px; color: <?php echo $footer_has_placeholder ? '#856404' : '#155724'; ?>;">
                             <?php echo esc_html($status['footer_name'] ?: 'Global Footer'); ?>
                         </p>
+                        <?php if ($footer_has_placeholder) : ?>
+                            <p style="margin: 5px 0 0 0; font-size: 12px; color: #856404;">
+                                <span class="dashicons dashicons-warning" style="font-size: 14px;"></span>
+                                <?php esc_html_e('Menü-Placeholder nicht ersetzt! Bitte erneut pushen.', 'unicorn-studio'); ?>
+                            </p>
+                        <?php endif; ?>
                     <?php else : ?>
                         <p style="margin: 0; font-size: 13px; color: #856404;">
                             <?php esc_html_e('Nicht synchronisiert', 'unicorn-studio'); ?>
@@ -215,6 +255,24 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                     <p>
                         <span class="dashicons dashicons-info"></span>
                         <?php esc_html_e('Klicke auf "Header/Footer" um globale Komponenten aus Unicorn Studio zu synchronisieren.', 'unicorn-studio'); ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($header_has_placeholder || $footer_has_placeholder) : ?>
+                <div class="notice notice-error inline" style="margin-top: 15px;">
+                    <p>
+                        <span class="dashicons dashicons-warning"></span>
+                        <strong><?php esc_html_e('Problem erkannt:', 'unicorn-studio'); ?></strong>
+                        <?php esc_html_e('Die Navigation wurde nicht korrekt in den Header/Footer eingefügt. Das kann passieren wenn:', 'unicorn-studio'); ?>
+                    </p>
+                    <ul style="margin: 10px 0 0 20px; list-style: disc;">
+                        <li><?php esc_html_e('Keine Menus in Unicorn Studio angelegt sind', 'unicorn-studio'); ?></li>
+                        <li><?php esc_html_e('Der Menu-Slug nicht übereinstimmt (z.B. "header-menu")', 'unicorn-studio'); ?></li>
+                        <li><?php esc_html_e('Die Menus Tabelle noch nicht existiert (neue Migration)', 'unicorn-studio'); ?></li>
+                    </ul>
+                    <p style="margin-top: 10px;">
+                        <?php esc_html_e('Lösung: In Unicorn Studio ein Menu mit dem Slug "header-menu" anlegen und erneut pushen.', 'unicorn-studio'); ?>
                     </p>
                 </div>
             <?php endif; ?>
@@ -298,6 +356,96 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                     </tbody>
                 </table>
             <?php endif; ?>
+        </div>
+
+        <!-- Menus -->
+        <div class="unicorn-card">
+            <h2>
+                <span class="dashicons dashicons-menu"></span>
+                <?php esc_html_e('Synchronisierte Menus', 'unicorn-studio'); ?>
+            </h2>
+
+            <?php if (empty($synced_menus)) : ?>
+                <p class="description"><?php esc_html_e('Noch keine Menus synchronisiert. Klicke auf "Menus" um Menus von Unicorn Studio zu laden.', 'unicorn-studio'); ?></p>
+            <?php else : ?>
+                <table class="widefat" style="margin-top: 15px;">
+                    <thead>
+                        <tr>
+                            <th><?php esc_html_e('Name', 'unicorn-studio'); ?></th>
+                            <th><?php esc_html_e('Slug', 'unicorn-studio'); ?></th>
+                            <th><?php esc_html_e('Position', 'unicorn-studio'); ?></th>
+                            <th><?php esc_html_e('Items', 'unicorn-studio'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($synced_menus as $menu) : ?>
+                            <tr>
+                                <td><strong><?php echo esc_html($menu['name'] ?? ''); ?></strong></td>
+                                <td><code><?php echo esc_html($menu['slug'] ?? ''); ?></code></td>
+                                <td><?php echo esc_html($menu['position'] ?? $menu['menu_position'] ?? 'custom'); ?></td>
+                                <td><?php echo intval($menu['itemCount'] ?? $menu['item_count'] ?? 0); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+
+                <?php if ($menus_last_sync) : ?>
+                    <p class="description" style="margin-top: 10px;">
+                        <strong><?php esc_html_e('Letzte Aktualisierung:', 'unicorn-studio'); ?></strong>
+                        <?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($menus_last_sync))); ?>
+                    </p>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
+
+        <!-- Sitemap & robots.txt -->
+        <div class="unicorn-card">
+            <h2>
+                <span class="dashicons dashicons-admin-site"></span>
+                <?php esc_html_e('SEO Dateien', 'unicorn-studio'); ?>
+            </h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                <!-- Sitemap Status -->
+                <div style="padding: 15px; background: <?php echo $sitemap_last_sync ? '#d4edda' : '#fff3cd'; ?>; border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <span class="dashicons dashicons-<?php echo $sitemap_last_sync ? 'yes-alt' : 'warning'; ?>" style="color: <?php echo $sitemap_last_sync ? '#28a745' : '#856404'; ?>;"></span>
+                        <strong><?php esc_html_e('sitemap.xml', 'unicorn-studio'); ?></strong>
+                    </div>
+                    <?php if ($sitemap_last_sync) : ?>
+                        <p style="margin: 0; font-size: 13px; color: #155724;">
+                            <?php printf(esc_html__('Aktualisiert: %s', 'unicorn-studio'), date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($sitemap_last_sync))); ?>
+                        </p>
+                        <p style="margin: 5px 0 0 0; font-size: 12px;">
+                            <a href="<?php echo esc_url(home_url('/sitemap.xml')); ?>" target="_blank"><?php esc_html_e('Sitemap anzeigen', 'unicorn-studio'); ?> →</a>
+                        </p>
+                    <?php else : ?>
+                        <p style="margin: 0; font-size: 13px; color: #856404;">
+                            <?php esc_html_e('Nicht synchronisiert', 'unicorn-studio'); ?>
+                        </p>
+                    <?php endif; ?>
+                </div>
+
+                <!-- robots.txt Status -->
+                <div style="padding: 15px; background: <?php echo $robots_last_sync ? '#d4edda' : '#fff3cd'; ?>; border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <span class="dashicons dashicons-<?php echo $robots_last_sync ? 'yes-alt' : 'warning'; ?>" style="color: <?php echo $robots_last_sync ? '#28a745' : '#856404'; ?>;"></span>
+                        <strong><?php esc_html_e('robots.txt', 'unicorn-studio'); ?></strong>
+                    </div>
+                    <?php if ($robots_last_sync) : ?>
+                        <p style="margin: 0; font-size: 13px; color: #155724;">
+                            <?php printf(esc_html__('Aktualisiert: %s', 'unicorn-studio'), date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($robots_last_sync))); ?>
+                        </p>
+                        <p style="margin: 5px 0 0 0; font-size: 12px;">
+                            <a href="<?php echo esc_url(home_url('/robots.txt')); ?>" target="_blank"><?php esc_html_e('robots.txt anzeigen', 'unicorn-studio'); ?> →</a>
+                        </p>
+                    <?php else : ?>
+                        <p style="margin: 0; font-size: 13px; color: #856404;">
+                            <?php esc_html_e('Nicht synchronisiert', 'unicorn-studio'); ?>
+                        </p>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
     </div>
 </div>

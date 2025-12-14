@@ -636,6 +636,22 @@ export interface DesignVariables {
     [key: string]: string
   }
 
+  // Gradients
+  gradients?: {
+    [key: string]: {
+      from: string
+      to: string
+      via?: string // Optional middle color
+      direction: 'to-r' | 'to-br' | 'to-b' | 'to-bl' | 'to-l' | 'to-tl' | 'to-t' | 'to-tr'
+      enabled: boolean
+    }
+  }
+
+  // Custom Colors (zusätzlich zu den Standard-Farben)
+  customColors?: {
+    [key: string]: string
+  }
+
   // Timestamps
   created_at: string
   updated_at: string
@@ -648,6 +664,8 @@ export interface DesignVariablesUpdate {
   spacing?: Partial<DesignVariables['spacing']>
   borders?: Partial<DesignVariables['borders']>
   shadows?: Partial<DesignVariables['shadows']>
+  gradients?: DesignVariables['gradients']
+  customColors?: DesignVariables['customColors']
 }
 
 // ============================================

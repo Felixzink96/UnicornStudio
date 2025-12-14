@@ -14,6 +14,8 @@ import {
   validationErrorResponse,
 } from '@/lib/api/responses'
 import type { Json } from '@/types/database'
+import { injectMenusIntoHtml } from '@/lib/menus/render-menu'
+import type { MenuWithItems, MenuItem } from '@/types/menu'
 
 interface RouteParams {
   params: Promise<{ siteId: string }>
@@ -42,6 +44,7 @@ interface PushResult {
     taxonomies?: { count: number; success: boolean; error?: string }
     css?: { success: boolean; error?: string }
     global_components?: { count: number; success: boolean; error?: string }
+    site_identity?: { success: boolean; error?: string }
   }
   errors: string[]
 }
@@ -234,8 +237,108 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       result.results.css = { success: false, error: msg }
     }
 
-    // 9. Push Global Components (Header/Footer)
+    // 9. Push Global Components (Header/Footer) with dynamic menus
     try {
+      // Fetch menus with items for menu placeholder injection
+      // Note: menus table not in generated types yet
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: menusRaw, error: menusError } = await (supabase as any)
+        .from('menus')
+        .select(`
+          id,
+          name,
+          slug,
+          position,
+          settings,
+          menu_items (
+            id,
+            menu_id,
+            parent_id,
+            link_type,
+            page_id,
+            external_url,
+            anchor,
+            content_type_slug,
+            label,
+            icon,
+            description,
+            target,
+            position,
+            pages:page_id (slug, name)
+          )
+        `)
+        .eq('site_id', siteId)
+
+      // Log menu query results for debugging
+      if (menusError) {
+        console.error('Menu query error:', menusError)
+      }
+      console.log(`[WordPress Push] Found ${menusRaw?.length || 0} menus for site ${siteId}`)
+
+      // Type for raw menu item from database
+      type RawMenuItem = {
+        id: string
+        menu_id: string
+        parent_id: string | null
+        link_type: string
+        page_id: string | null
+        external_url: string | null
+        anchor: string | null
+        content_type_slug: string | null
+        label: string
+        icon: string | null
+        description: string | null
+        target: string
+        position: number
+        pages: { slug: string; name: string } | null
+      }
+
+      // Type for raw menu from database
+      type RawMenu = {
+        id: string
+        name: string
+        slug: string
+        position: string
+        settings: Record<string, unknown> | null
+        menu_items: RawMenuItem[]
+      }
+
+      // Convert to MenuWithItems format
+      const menus: MenuWithItems[] = ((menusRaw || []) as RawMenu[]).map((menu) => {
+        const rawItems = (menu.menu_items || []) as RawMenuItem[]
+        const items: MenuItem[] = rawItems.map((item) => ({
+          id: item.id,
+          menuId: item.menu_id,
+          parentId: item.parent_id,
+          linkType: item.link_type as MenuItem['linkType'],
+          pageId: item.page_id || undefined,
+          externalUrl: item.external_url || undefined,
+          anchor: item.anchor || undefined,
+          contentTypeSlug: item.content_type_slug || undefined,
+          label: item.label,
+          icon: item.icon || undefined,
+          description: item.description || undefined,
+          target: (item.target || '_self') as '_self' | '_blank',
+          position: item.position,
+          createdAt: '',
+          updatedAt: '',
+          pageSlug: item.pages?.slug,
+          pageName: item.pages?.name,
+        }))
+        return {
+          id: menu.id,
+          siteId,
+          name: menu.name,
+          slug: menu.slug,
+          description: undefined,
+          position: menu.position as MenuWithItems['position'],
+          settings: (menu.settings || {}) as MenuWithItems['settings'],
+          createdAt: '',
+          updatedAt: '',
+          items,
+        }
+      })
+
       let header = null
       let footer = null
       let componentCount = 0
@@ -306,6 +409,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           })
         }
 
+        // Inject menus into header/footer HTML before sending to WordPress
+        // Check if header/footer have menu placeholders
+        const headerHasPlaceholder = header?.html?.includes('{{menu:') || false
+        const footerHasPlaceholder = footer?.html?.includes('{{menu:') || false
+
+        const headerHtmlWithMenus = header?.html ? injectMenusIntoHtml(header.html, menus, {
+          containerClass: 'flex items-center gap-6',
+          linkClass: 'text-sm text-zinc-600 hover:text-zinc-900 transition-colors',
+        }) : null
+
+        const footerHtmlWithMenus = footer?.html ? injectMenusIntoHtml(footer.html, menus, {
+          containerClass: 'flex flex-wrap justify-center gap-6',
+          linkClass: 'text-sm text-zinc-500 hover:text-zinc-700 transition-colors',
+          includeDropdowns: false,
+        }) : null
+
+        // Check if placeholders were replaced
+        const headerPlaceholderReplaced = headerHasPlaceholder && !headerHtmlWithMenus?.includes('{{menu:')
+        const footerPlaceholderReplaced = footerHasPlaceholder && !footerHtmlWithMenus?.includes('{{menu:')
+
         // Send global_components.sync event with all components grouped
         await sendWebhook(webhookUrl, headers, {
           event: 'global_components.sync',
@@ -317,7 +440,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               ? {
                   id: header.id,
                   name: header.name,
-                  html: header.html,
+                  html: headerHtmlWithMenus || header.html,
                   css: header.css,
                   js: header.js,
                   position: 'header',
@@ -327,7 +450,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               ? {
                   id: footer.id,
                   name: footer.name,
-                  html: footer.html,
+                  html: footerHtmlWithMenus || footer.html,
                   css: footer.css,
                   js: footer.js,
                   position: 'footer',
@@ -339,11 +462,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         result.results.global_components = {
           count: componentCount,
           success: true,
+          menus_found: menus.length,
+          header_had_placeholder: headerHasPlaceholder,
+          header_placeholder_replaced: headerPlaceholderReplaced,
+          footer_had_placeholder: footerHasPlaceholder,
+          footer_placeholder_replaced: footerPlaceholderReplaced,
         }
       } else {
         result.results.global_components = {
           count: 0,
           success: true,
+          menus_found: menus.length,
         }
       }
     } catch (err) {
@@ -352,7 +481,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       result.results.global_components = { count: 0, success: false, error: msg }
     }
 
-    // 10. Update last_pushed_to_wordpress_at timestamp
+    // 10. Push Site Identity (Logo, Favicon, Tagline, OG Image)
+    try {
+      // Site already loaded above, just send identity data
+      if (site.logo_url || site.favicon_url || site.tagline || site.og_image_url) {
+        await sendWebhook(webhookUrl, headers, {
+          event: 'site_identity.updated',
+          site_id: siteId,
+          data: {
+            logo_url: site.logo_url,
+            logo_dark_url: site.logo_dark_url,
+            favicon_url: site.favicon_url,
+            tagline: site.tagline,
+            og_image_url: site.og_image_url,
+            site_name: site.name,
+          },
+        })
+        result.results.site_identity = { success: true }
+      } else {
+        result.results.site_identity = { success: true }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Site Identity sync failed'
+      result.errors.push(msg)
+      result.results.site_identity = { success: false, error: msg }
+    }
+
+    // 11. Update last_pushed_to_wordpress_at timestamp
     result.success = result.errors.length === 0
 
     if (result.success) {

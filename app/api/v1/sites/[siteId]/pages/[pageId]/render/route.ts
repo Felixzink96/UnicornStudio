@@ -12,6 +12,8 @@ import {
   notFoundResponse,
 } from '@/lib/api/responses'
 import type { PageWithGlobals, RenderedPage } from '@/types/global-components'
+import { injectMenusIntoHtml } from '@/lib/menus/render-menu'
+import type { MenuWithItems, MenuItem } from '@/types/menu'
 
 interface RouteParams {
   params: Promise<{ siteId: string; pageId: string }>
@@ -40,6 +42,100 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const supabase = createAPIClient()
 
+    // Fetch menus with items for menu placeholder injection
+    // Note: menus table not in generated types yet
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: menusRaw } = await (supabase as any)
+      .from('menus')
+      .select(`
+        id,
+        name,
+        slug,
+        position,
+        settings,
+        menu_items (
+          id,
+          menu_id,
+          parent_id,
+          link_type,
+          page_id,
+          external_url,
+          anchor,
+          content_type_slug,
+          label,
+          icon,
+          description,
+          target,
+          position,
+          pages:page_id (slug, name)
+        )
+      `)
+      .eq('site_id', siteId)
+
+    // Type for raw menu item from database
+    type RawMenuItem = {
+      id: string
+      menu_id: string
+      parent_id: string | null
+      link_type: string
+      page_id: string | null
+      external_url: string | null
+      anchor: string | null
+      content_type_slug: string | null
+      label: string
+      icon: string | null
+      description: string | null
+      target: string
+      position: number
+      pages: { slug: string; name: string } | null
+    }
+
+    // Type for raw menu from database
+    type RawMenu = {
+      id: string
+      name: string
+      slug: string
+      position: string
+      settings: Record<string, unknown> | null
+      menu_items: RawMenuItem[]
+    }
+
+    // Convert to MenuWithItems format
+    const menus: MenuWithItems[] = ((menusRaw || []) as RawMenu[]).map((menu) => {
+      const rawItems = (menu.menu_items || []) as RawMenuItem[]
+      const items: MenuItem[] = rawItems.map((item) => ({
+        id: item.id,
+        menuId: item.menu_id,
+        parentId: item.parent_id,
+        linkType: item.link_type as MenuItem['linkType'],
+        pageId: item.page_id || undefined,
+        externalUrl: item.external_url || undefined,
+        anchor: item.anchor || undefined,
+        contentTypeSlug: item.content_type_slug || undefined,
+        label: item.label,
+        icon: item.icon || undefined,
+        description: item.description || undefined,
+        target: (item.target || '_self') as '_self' | '_blank',
+        position: item.position,
+        createdAt: '',
+        updatedAt: '',
+        pageSlug: item.pages?.slug,
+        pageName: item.pages?.name,
+      }))
+      return {
+        id: menu.id,
+        siteId,
+        name: menu.name,
+        slug: menu.slug,
+        description: undefined,
+        position: menu.position as MenuWithItems['position'],
+        settings: (menu.settings || {}) as MenuWithItems['settings'],
+        createdAt: '',
+        updatedAt: '',
+        items,
+      }
+    })
+
     // Use RPC function to get page with globals
     const { data, error } = await supabase.rpc('get_page_with_globals', {
       p_page_id: pageId,
@@ -48,7 +144,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (error) {
       console.error('Get page with globals error:', error)
       // Fallback: try direct query
-      return await fallbackRender(supabase, siteId, pageId, format)
+      return await fallbackRender(supabase, siteId, pageId, format, menus)
     }
 
     if (!data || data.length === 0) {
@@ -57,8 +153,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const pageData = data[0] as PageWithGlobals
 
-    // Build rendered page
-    const rendered = buildRenderedPage(pageData)
+    // Build rendered page with menu injection
+    const rendered = buildRenderedPage(pageData, menus)
 
     if (format === 'html') {
       return new Response(rendered.html, {
@@ -78,8 +174,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 /**
  * Build the rendered page from page data with globals
+ * Injects dynamic menus into header/footer placeholders
  */
-function buildRenderedPage(pageData: PageWithGlobals): RenderedPage {
+function buildRenderedPage(pageData: PageWithGlobals, menus: MenuWithItems[] = []): RenderedPage {
   let css = ''
   let js = ''
   let html = ''
@@ -100,10 +197,14 @@ function buildRenderedPage(pageData: PageWithGlobals): RenderedPage {
     js += pageData.footer_js + '\n'
   }
 
-  // Build HTML
-  // Header
+  // Build HTML with menu injection
+  // Header - inject menus into placeholders
   if (!pageData.hide_header && pageData.header_html) {
-    html += pageData.header_html + '\n'
+    const headerWithMenus = injectMenusIntoHtml(pageData.header_html, menus, {
+      containerClass: 'flex items-center gap-6',
+      linkClass: 'text-sm text-zinc-600 hover:text-zinc-900 transition-colors',
+    })
+    html += headerWithMenus + '\n'
   }
 
   // Page Content
@@ -111,9 +212,14 @@ function buildRenderedPage(pageData: PageWithGlobals): RenderedPage {
     html += pageData.page_html + '\n'
   }
 
-  // Footer
+  // Footer - inject menus into placeholders
   if (!pageData.hide_footer && pageData.footer_html) {
-    html += pageData.footer_html + '\n'
+    const footerWithMenus = injectMenusIntoHtml(pageData.footer_html, menus, {
+      containerClass: 'flex flex-wrap justify-center gap-6',
+      linkClass: 'text-sm text-zinc-500 hover:text-zinc-700 transition-colors',
+      includeDropdowns: false,
+    })
+    html += footerWithMenus + '\n'
   }
 
   // Wrap with CSS and JS
@@ -173,7 +279,8 @@ async function fallbackRender(
   supabase: ReturnType<typeof createAPIClient>,
   siteId: string,
   pageId: string,
-  format: string
+  format: string,
+  menus: MenuWithItems[] = []
 ) {
   // Get page
   const { data: page, error: pageError } = await supabase
@@ -233,10 +340,22 @@ async function fallbackRender(
     }
   }
 
+  // Inject menus into header/footer placeholders
+  const headerWithMenus = headerHtml ? injectMenusIntoHtml(headerHtml, menus, {
+    containerClass: 'flex items-center gap-6',
+    linkClass: 'text-sm text-zinc-600 hover:text-zinc-900 transition-colors',
+  }) : ''
+
+  const footerWithMenus = footerHtml ? injectMenusIntoHtml(footerHtml, menus, {
+    containerClass: 'flex flex-wrap justify-center gap-6',
+    linkClass: 'text-sm text-zinc-500 hover:text-zinc-700 transition-colors',
+    includeDropdowns: false,
+  }) : ''
+
   // Build page
   const css = [headerCss, footerCss].filter(Boolean).join('\n')
   const js = [headerJs, footerJs].filter(Boolean).join('\n')
-  const bodyHtml = [headerHtml, page.html_content || '', footerHtml]
+  const bodyHtml = [headerWithMenus, page.html_content || '', footerWithMenus]
     .filter(Boolean)
     .join('\n')
 

@@ -114,6 +114,9 @@ export default function PreviewPage() {
   const [iframeDocSize, setIframeDocSize] = useState({ width: 0, height: 0 })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // External link modal
+  const [externalLinkModal, setExternalLinkModal] = useState<{ href: string } | null>(null)
+
   const supabase = createClient()
 
   // Generate a unique CSS selector for an element
@@ -166,6 +169,27 @@ export default function PreviewPage() {
     if (savedName) {
       setNewCommentAuthor(savedName)
     }
+  }, [])
+
+  // Listen for link clicks from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'link-click') {
+        const { href, isExternal } = event.data
+
+        if (isExternal) {
+          // Show confirmation modal for external links
+          setExternalLinkModal({ href })
+        } else {
+          // Internal links - could navigate within iframe or ignore
+          // For preview, we'll just ignore internal navigation
+          console.log('Internal link clicked:', href)
+        }
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
   }, [])
 
   // Load share link data
@@ -436,8 +460,73 @@ export default function PreviewPage() {
     const headerJs = globalHeader?.js || ''
     const footerJs = globalFooter?.js || ''
 
+    // CSS to hide editor artifacts and selection outlines
+    const previewCss = `
+      /* Hide editor-specific styles */
+      [data-element-id],
+      [data-section-id],
+      [contenteditable] {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+      *:focus {
+        outline: none !important;
+      }
+      /* Hide any dashed borders used for editing */
+      .editing-outline,
+      .selection-outline,
+      .hover-outline,
+      [data-selected],
+      [data-hovered] {
+        outline: none !important;
+        border-color: transparent !important;
+      }
+      /* Disable pointer events on editing overlays */
+      .element-overlay,
+      .section-overlay {
+        display: none !important;
+      }
+    `
+
+    // Script to handle link clicks - external links need confirmation
+    const linkHandlerScript = `
+      <script>
+        document.addEventListener('click', function(e) {
+          const link = e.target.closest('a');
+          if (!link) return;
+
+          const href = link.getAttribute('href');
+          if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Check if external link
+          const isExternal = href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//');
+          const currentHost = window.location.host;
+          let isExternalHost = false;
+
+          if (isExternal) {
+            try {
+              const url = new URL(href, window.location.origin);
+              isExternalHost = url.host !== currentHost;
+            } catch(e) {
+              isExternalHost = true;
+            }
+          }
+
+          // Send message to parent
+          window.parent.postMessage({
+            type: 'link-click',
+            href: href,
+            isExternal: isExternalHost
+          }, '*');
+        }, true);
+      </script>
+    `
+
     // Combine CSS
-    const combinedCss = [headerCss, footerCss].filter(Boolean).join('\n')
+    const combinedCss = [previewCss, headerCss, footerCss].filter(Boolean).join('\n')
     const combinedJs = [headerJs, footerJs].filter(Boolean).join('\n')
 
     // If page already has full HTML structure, inject header/footer
@@ -446,7 +535,7 @@ export default function PreviewPage() {
         .replace(/<body[^>]*>/, `$&\n${headerHtml}`)
         .replace(/<\/body>/, `${footerHtml}\n</body>`)
         .replace(/<\/head>/, `<style>${combinedCss}</style>\n</head>`)
-        .replace(/<\/body>/, `<script>${combinedJs}</script>\n</body>`)
+        .replace(/<\/body>/, `${linkHandlerScript}\n<script>${combinedJs}</script>\n</body>`)
     }
 
     // Otherwise wrap in full HTML
@@ -461,6 +550,7 @@ export default function PreviewPage() {
   ${headerHtml}
   ${pageContent}
   ${footerHtml}
+  ${linkHandlerScript}
   <script>${combinedJs}</script>
 </body>
 </html>`
@@ -998,6 +1088,41 @@ export default function PreviewPage() {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* External link confirmation modal */}
+      {externalLinkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <h2 className="text-lg font-semibold text-zinc-900 mb-2">
+              Externe Seite öffnen?
+            </h2>
+            <p className="text-sm text-zinc-600 mb-4">
+              Du wirst zu einer externen Seite weitergeleitet:
+            </p>
+            <p className="text-sm bg-zinc-100 rounded px-3 py-2 mb-4 break-all font-mono">
+              {externalLinkModal.href}
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setExternalLinkModal(null)}
+              >
+                Abbrechen
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  window.open(externalLinkModal.href, '_blank', 'noopener,noreferrer')
+                  setExternalLinkModal(null)
+                }}
+              >
+                In neuem Tab öffnen
+              </Button>
+            </div>
           </div>
         </div>
       )}

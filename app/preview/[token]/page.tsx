@@ -47,6 +47,10 @@ interface Comment {
   content: string
   position_x: number
   position_y: number
+  // Element-basierte Positionierung (neu)
+  element_selector?: string | null
+  offset_x?: number | null
+  offset_y?: number | null
   status: 'open' | 'resolved'
   created_at: string
 }
@@ -94,7 +98,13 @@ export default function PreviewPage() {
   const [mockup, setMockup] = useState<DeviceMockup>('none')
   const [showComments, setShowComments] = useState(true)
   const [isAddingComment, setIsAddingComment] = useState(false)
-  const [newCommentPos, setNewCommentPos] = useState<{ x: number; y: number } | null>(null)
+  const [newCommentPos, setNewCommentPos] = useState<{
+    x: number
+    y: number
+    elementSelector?: string
+    offsetX?: number
+    offsetY?: number
+  } | null>(null)
   const [newCommentAuthor, setNewCommentAuthor] = useState('')
   const [newCommentContent, setNewCommentContent] = useState('')
   const [editingComment, setEditingComment] = useState<Comment | null>(null)
@@ -105,6 +115,50 @@ export default function PreviewPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const supabase = createClient()
+
+  // Generate a unique CSS selector for an element
+  const generateSelector = (element: Element): string => {
+    // If element has an ID, use it
+    if (element.id) {
+      return `#${CSS.escape(element.id)}`
+    }
+
+    // Build path from element to root
+    const path: string[] = []
+    let current: Element | null = element
+
+    while (current && current !== current.ownerDocument?.body) {
+      let selector = current.tagName.toLowerCase()
+
+      // Add classes if available (limit to first 2 meaningful classes)
+      const classes = Array.from(current.classList)
+        .filter(c => !c.startsWith('_') && c.length < 30) // Filter out generated classes
+        .slice(0, 2)
+      if (classes.length > 0) {
+        selector += '.' + classes.map(c => CSS.escape(c)).join('.')
+      }
+
+      // Add nth-child if needed for uniqueness
+      const parent = current.parentElement
+      if (parent) {
+        const siblings = Array.from(parent.children).filter(
+          c => c.tagName === current!.tagName
+        )
+        if (siblings.length > 1) {
+          const index = siblings.indexOf(current) + 1
+          selector += `:nth-child(${index})`
+        }
+      }
+
+      path.unshift(selector)
+      current = current.parentElement
+
+      // Stop after 4 levels to keep selector manageable
+      if (path.length >= 4) break
+    }
+
+    return path.join(' > ')
+  }
 
   // Load saved author name from localStorage
   useEffect(() => {
@@ -269,7 +323,7 @@ export default function PreviewPage() {
     }
   }
 
-  // Handle comment click - Position in Pixel relativ zum Dokument
+  // Handle comment click - Find element under cursor and calculate relative position
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isAddingComment || !shareLink?.allow_comments) return
 
@@ -277,15 +331,48 @@ export default function PreviewPage() {
     const rect = overlay.getBoundingClientRect()
     const iframe = iframeRef.current
 
-    // Get scroll position from iframe
-    const scrollTop = iframe?.contentWindow?.scrollY || 0
-    const scrollLeft = iframe?.contentWindow?.scrollX || 0
+    if (!iframe?.contentDocument || !iframe?.contentWindow) return
 
-    // Position = Click-Position + Scroll = absolute Dokument-Position (in Pixel)
-    const docX = (e.clientX - rect.left) + scrollLeft
-    const docY = (e.clientY - rect.top) + scrollTop
+    // Click position relative to iframe viewport
+    const clickX = e.clientX - rect.left
+    const clickY = e.clientY - rect.top
 
-    setNewCommentPos({ x: docX, y: docY })
+    // Find element at click position in iframe
+    const element = iframe.contentDocument.elementFromPoint(clickX, clickY)
+
+    if (element && element !== iframe.contentDocument.body && element !== iframe.contentDocument.documentElement) {
+      // Generate unique selector for this element
+      const selector = generateSelector(element)
+
+      // Get element's bounding rect
+      const elementRect = element.getBoundingClientRect()
+
+      // Calculate offset relative to element (not to document)
+      const offsetX = clickX - elementRect.left
+      const offsetY = clickY - elementRect.top
+
+      // Also store absolute position as fallback
+      const scrollTop = iframe.contentWindow.scrollY || 0
+      const scrollLeft = iframe.contentWindow.scrollX || 0
+      const docX = clickX + scrollLeft
+      const docY = clickY + scrollTop
+
+      setNewCommentPos({
+        x: docX,
+        y: docY,
+        elementSelector: selector,
+        offsetX,
+        offsetY,
+      })
+    } else {
+      // Fallback: No element found, use absolute position
+      const scrollTop = iframe.contentWindow.scrollY || 0
+      const scrollLeft = iframe.contentWindow.scrollX || 0
+      const docX = clickX + scrollLeft
+      const docY = clickY + scrollTop
+
+      setNewCommentPos({ x: docX, y: docY })
+    }
   }
 
   // Setup iframe scroll listener
@@ -395,14 +482,19 @@ export default function PreviewPage() {
           page_id: currentPage?.id || null,
           author_name: newCommentAuthor,
           content: newCommentContent,
-          position_x: newCommentPos.x,  // Pixel!
-          position_y: newCommentPos.y,  // Pixel!
+          position_x: newCommentPos.x,
+          position_y: newCommentPos.y,
+          element_selector: newCommentPos.elementSelector || null,
+          offset_x: newCommentPos.offsetX ?? null,
+          offset_y: newCommentPos.offsetY ?? null,
           status: 'open',
         })
         .select()
         .single()
 
-      if (!error && data) {
+      if (error) {
+        console.error('Error saving comment:', error)
+      } else if (data) {
         setComments([...comments, data])
         setNewCommentPos(null)
         setNewCommentContent('')
@@ -439,16 +531,40 @@ export default function PreviewPage() {
     </svg>
   )
 
-  // Migrate old percent-based positions to pixels
-  const getPixelPosition = (comment: Comment) => {
-    // Old comments have percent values (0-100), new ones have pixel values (typically > 100)
-    // Heuristic: if both x and y are <= 100, assume percent
+  // Calculate pin position - element-based if available, fallback to absolute
+  const getPixelPosition = (comment: Comment): { x: number; y: number } => {
+    const iframe = iframeRef.current
+
+    // Try element-based positioning first
+    if (comment.element_selector && iframe?.contentDocument && comment.offset_x != null && comment.offset_y != null) {
+      try {
+        const element = iframe.contentDocument.querySelector(comment.element_selector)
+        if (element) {
+          const rect = element.getBoundingClientRect()
+          const scrollTop = iframe.contentWindow?.scrollY || 0
+          const scrollLeft = iframe.contentWindow?.scrollX || 0
+
+          // Element position + offset + scroll = absolute document position
+          return {
+            x: rect.left + comment.offset_x + scrollLeft,
+            y: rect.top + comment.offset_y + scrollTop,
+          }
+        }
+      } catch (e) {
+        // Selector failed, fallback to absolute position
+        console.warn('Element selector failed:', comment.element_selector)
+      }
+    }
+
+    // Fallback: Old percent-based positions
     if (comment.position_x <= 100 && comment.position_y <= 100 && iframeDocSize.width > 0) {
       return {
         x: (comment.position_x / 100) * iframeDocSize.width,
         y: (comment.position_y / 100) * iframeDocSize.height,
       }
     }
+
+    // Fallback: Absolute pixel position
     return { x: comment.position_x, y: comment.position_y }
   }
 
@@ -919,7 +1035,7 @@ export default function PreviewPage() {
               {passwordError && (
                 <p className="text-red-400 text-sm mb-4">{passwordError}</p>
               )}
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-100">
                 <Eye className="w-4 h-4 mr-2" />
                 Ansehen
               </Button>

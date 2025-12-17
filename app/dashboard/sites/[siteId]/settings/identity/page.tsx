@@ -148,7 +148,7 @@ export default function SiteIdentityPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-8">
       {/* Hidden file inputs */}
       <input
         type="file"
@@ -182,21 +182,21 @@ export default function SiteIdentityPage() {
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}/settings`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        Zuruck zu Einstellungen
+        Zurück zu Einstellungen
       </Link>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Globe className="h-8 w-8 text-purple-500" />
             Site Identity
           </h1>
-          <p className="text-slate-400 mt-2">
-            Logo, Favicon und Branding fur {siteName}
+          <p className="text-muted-foreground mt-2">
+            Logo, Favicon und Branding für {siteName}
           </p>
         </div>
 
@@ -217,9 +217,9 @@ export default function SiteIdentityPage() {
 
       <div className="space-y-6">
         {/* Logo */}
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-white">Site Logo</CardTitle>
+            <CardTitle className="text-foreground">Site Logo</CardTitle>
             <CardDescription>
               Das Logo wird im Header angezeigt und von der KI automatisch eingebunden
             </CardDescription>
@@ -228,15 +228,15 @@ export default function SiteIdentityPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Primary Logo */}
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">
-                  Primares Logo
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Primäres Logo
                 </label>
-                <p className="text-xs text-slate-400 mb-3">
-                  Fur helle Hintergrunde (empfohlen: SVG oder PNG mit Transparenz)
+                <p className="text-xs text-muted-foreground mb-3">
+                  Für helle Hintergründe (empfohlen: SVG oder PNG mit Transparenz)
                 </p>
                 {identity.logo_url ? (
                   <div className="relative group">
-                    <div className="p-4 bg-white rounded-lg border border-slate-700">
+                    <div className="p-4 bg-white rounded-lg border border-border">
                       <img
                         src={identity.logo_url}
                         alt="Logo"
@@ -254,7 +254,7 @@ export default function SiteIdentityPage() {
                   <button
                     onClick={() => logoInputRef.current?.click()}
                     disabled={uploading === 'logo_url'}
-                    className="w-full h-32 border-2 border-dashed border-slate-700 rounded-lg flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-purple-500 hover:text-purple-400 transition-colors"
+                    className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-purple-500 hover:text-purple-400 transition-colors"
                   >
                     {uploading === 'logo_url' ? (
                       <Loader2 className="h-8 w-8 animate-spin" />
@@ -270,15 +270,15 @@ export default function SiteIdentityPage() {
 
               {/* Dark Mode Logo */}
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">
-                  Logo fur Dark Mode (optional)
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Logo für Dark Mode (optional)
                 </label>
-                <p className="text-xs text-slate-400 mb-3">
-                  Fur dunkle Hintergrunde - helle Version des Logos
+                <p className="text-xs text-muted-foreground mb-3">
+                  Für dunkle Hintergründe - helle Version des Logos
                 </p>
                 {identity.logo_dark_url ? (
                   <div className="relative group">
-                    <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+                    <div className="p-4 bg-muted rounded-lg border border-border">
                       <img
                         src={identity.logo_dark_url}
                         alt="Logo Dark"
@@ -296,7 +296,7 @@ export default function SiteIdentityPage() {
                   <button
                     onClick={() => logoDarkInputRef.current?.click()}
                     disabled={uploading === 'logo_dark_url'}
-                    className="w-full h-32 border-2 border-dashed border-slate-700 rounded-lg flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-purple-500 hover:text-purple-400 transition-colors bg-slate-800/50"
+                    className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-purple-500 hover:text-purple-400 transition-colors bg-muted/50"
                   >
                     {uploading === 'logo_dark_url' ? (
                       <Loader2 className="h-8 w-8 animate-spin" />
@@ -314,9 +314,9 @@ export default function SiteIdentityPage() {
         </Card>
 
         {/* Favicon */}
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-white">Favicon</CardTitle>
+            <CardTitle className="text-foreground">Favicon</CardTitle>
             <CardDescription>
               Das kleine Icon im Browser-Tab (empfohlen: 512x512px PNG oder SVG)
             </CardDescription>
@@ -325,7 +325,7 @@ export default function SiteIdentityPage() {
             <div className="flex items-start gap-6">
               {identity.favicon_url ? (
                 <div className="relative group">
-                  <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+                  <div className="p-4 bg-muted rounded-lg border border-border">
                     <img
                       src={identity.favicon_url}
                       alt="Favicon"
@@ -343,7 +343,7 @@ export default function SiteIdentityPage() {
                 <button
                   onClick={() => faviconInputRef.current?.click()}
                   disabled={uploading === 'favicon_url'}
-                  className="h-32 w-32 border-2 border-dashed border-slate-700 rounded-lg flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-purple-500 hover:text-purple-400 transition-colors"
+                  className="h-32 w-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-purple-500 hover:text-purple-400 transition-colors"
                 >
                   {uploading === 'favicon_url' ? (
                     <Loader2 className="h-8 w-8 animate-spin" />
@@ -356,11 +356,11 @@ export default function SiteIdentityPage() {
                 </button>
               )}
               <div className="flex-1">
-                <p className="text-sm text-slate-400">
-                  Das Favicon wird automatisch in verschiedenen Grossen fur Browser-Tabs,
+                <p className="text-sm text-muted-foreground">
+                  Das Favicon wird automatisch in verschiedenen Größen für Browser-Tabs,
                   Lesezeichen und App-Icons generiert.
                 </p>
-                <ul className="text-xs text-slate-500 mt-2 space-y-1">
+                <ul className="text-xs text-muted-foreground mt-2 space-y-1">
                   <li>• Browser Tab: 16x16, 32x32</li>
                   <li>• Apple Touch Icon: 180x180</li>
                   <li>• Android Chrome: 192x192, 512x512</li>
@@ -371,11 +371,11 @@ export default function SiteIdentityPage() {
         </Card>
 
         {/* Tagline */}
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-white">Tagline / Slogan</CardTitle>
+            <CardTitle className="text-foreground">Tagline / Slogan</CardTitle>
             <CardDescription>
-              Ein kurzer Slogan fur deine Website (wird fur SEO verwendet)
+              Ein kurzer Slogan für deine Website (wird für SEO verwendet)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -385,30 +385,30 @@ export default function SiteIdentityPage() {
                 setIdentity(prev => ({ ...prev, tagline: e.target.value }))
                 setHasChanges(true)
               }}
-              placeholder="z.B. 'Die beste Losung fur...' oder 'Ihr Partner fur...'"
-              className="bg-slate-800 border-slate-700"
+              placeholder="z.B. 'Die beste Lösung für...' oder 'Ihr Partner für...'"
+              className="bg-muted border-border"
             />
-            <p className="text-xs text-slate-500 mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               Wird als Standard-Description verwendet, wenn keine spezifische gesetzt ist.
             </p>
           </CardContent>
         </Card>
 
         {/* OG Image */}
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="text-foreground flex items-center gap-2">
               <Share2 className="h-5 w-5" />
               Default Social Image
             </CardTitle>
             <CardDescription>
-              Das Standardbild fur Social Media Sharing (empfohlen: 1200x630px)
+              Das Standardbild für Social Media Sharing (empfohlen: 1200x630px)
             </CardDescription>
           </CardHeader>
           <CardContent>
             {identity.og_image_url ? (
               <div className="relative group">
-                <div className="rounded-lg border border-slate-700 overflow-hidden">
+                <div className="rounded-lg border border-border overflow-hidden">
                   <img
                     src={identity.og_image_url}
                     alt="OG Image"
@@ -426,7 +426,7 @@ export default function SiteIdentityPage() {
               <button
                 onClick={() => ogImageInputRef.current?.click()}
                 disabled={uploading === 'og_image_url'}
-                className="w-full max-w-lg h-48 border-2 border-dashed border-slate-700 rounded-lg flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-purple-500 hover:text-purple-400 transition-colors"
+                className="w-full max-w-lg h-48 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-purple-500 hover:text-purple-400 transition-colors"
               >
                 {uploading === 'og_image_url' ? (
                   <Loader2 className="h-8 w-8 animate-spin" />
@@ -448,7 +448,7 @@ export default function SiteIdentityPage() {
             <h3 className="font-semibold text-purple-400 mb-2">
               Wie die KI das Logo verwendet
             </h3>
-            <ul className="text-sm text-slate-400 space-y-2">
+            <ul className="text-sm text-muted-foreground space-y-2">
               <li>
                 1. Das Logo wird automatisch im Header jeder generierten Seite eingebunden
               </li>
@@ -456,7 +456,7 @@ export default function SiteIdentityPage() {
                 2. Die KI verwendet das passende Logo je nach Hintergrundfarbe
               </li>
               <li>
-                3. Bei WordPress-Sync werden Logo und Favicon automatisch ubertragen
+                3. Bei WordPress-Sync werden Logo und Favicon automatisch übertragen
               </li>
               <li>
                 4. Die Tagline wird als SEO-Fallback verwendet

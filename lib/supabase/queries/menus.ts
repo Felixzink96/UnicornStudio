@@ -26,11 +26,16 @@ import type {
 export async function getMenus(siteId: string): Promise<MenuListItem[]> {
   const supabase = createClient()
 
+  console.log('[getMenus] Querying menus for site:', siteId)
+
   // Menu RPC functions exist but types not generated
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any).rpc('get_site_menus', {
     p_site_id: siteId,
   })
+
+  console.log('[getMenus] RPC response data:', JSON.stringify(data, null, 2))
+  console.log('[getMenus] RPC error:', error)
 
   if (error) throw error
 

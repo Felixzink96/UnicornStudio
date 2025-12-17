@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useEditorStore } from '@/stores/editor-store'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import {
   Select,
@@ -45,12 +44,20 @@ import {
   Layers,
   LayoutTemplate,
   Settings2,
+  Share2,
+  Wrench,
+  Eye,
+  Code,
 } from 'lucide-react'
 import type { ViewMode, Breakpoint } from '@/types/editor'
 import { PublishDropdown } from './PublishDropdown'
+import { DesignSettingsDropdown } from './DesignSettingsDropdown'
+import { WordPressSetupModal } from './WordPressSetupModal'
 import { useWordPress } from '@/hooks/useWordPress'
 import { ComponentLibraryModal } from '../global-components/ComponentLibraryModal'
 import { PageSettingsPanel } from '../global-components/PageSettingsPanel'
+import { ShareLinkDialog } from '../share/ShareLinkDialog'
+import { toast } from '@/components/ui/use-toast'
 
 interface ToolbarProps {
   siteId: string
@@ -82,249 +89,229 @@ export function Toolbar({ siteId }: ToolbarProps) {
   // Global Components State
   const [showComponentLibrary, setShowComponentLibrary] = useState(false)
   const [showPageSettings, setShowPageSettings] = useState(false)
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  const [showWordPressSetup, setShowWordPressSetup] = useState(false)
 
   const handleSave = async () => {
     try {
       await save()
+      toast.success('Gespeichert', 'Änderungen wurden gespeichert.')
     } catch (error) {
       console.error('Save failed:', error)
+      toast.error('Fehler beim Speichern', 'Die Änderungen konnten nicht gespeichert werden.')
     }
   }
 
   return (
     <TooltipProvider>
-      <div className="h-12 bg-white border-b border-zinc-200 flex items-center justify-between px-3">
-        {/* Left Section */}
-        <div className="flex items-center gap-2">
-          {/* Back Button */}
+      <div className="h-11 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex items-center">
+        {/* Left Section - Logo & Page Name */}
+        <div className="w-[420px] min-w-[420px] flex items-center gap-2 px-3 border-r border-zinc-200 dark:border-zinc-800">
+          {/* Back Button - minimal */}
           <Link href={`/dashboard/sites/${siteId}`}>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-zinc-600 hover:text-zinc-900">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
               <ArrowLeft className="h-4 w-4" />
-              Back
             </Button>
           </Link>
 
-          <Separator orientation="vertical" className="h-5" />
-
-          {/* Chats Dropdown */}
+          {/* Page Selector - Figma style with dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1.5 text-zinc-600">
-                <MessageSquare className="h-4 w-4" />
-                Chats
-                <ChevronDown className="h-3 w-3" />
-              </Button>
+              <button className="flex items-center gap-2 px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors cursor-pointer">
+                <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[200px]">
+                  {currentPage?.name || 'Home'}
+                </span>
+                <ChevronDown className="h-3 w-3 text-zinc-400" />
+              </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem>Current Chat</DropdownMenuItem>
-              <DropdownMenuItem>New Chat</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Pages Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1.5 text-zinc-600">
-                <FileText className="h-4 w-4" />
-                Pages - {currentPage?.name || 'home'}
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent align="start" className="min-w-[180px]">
               {pages.map((page) => (
                 <DropdownMenuItem
                   key={page.id}
                   onClick={() => loadPage(page.id)}
+                  className="cursor-pointer"
                 >
-                  {page.name} {page.isHome && '(Home)'}
+                  <FileText className="h-3.5 w-3.5 mr-2 text-zinc-400" />
+                  {page.name} {page.isHome && <span className="text-xs text-zinc-400 ml-1">(Home)</span>}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
-        {/* Center Section - View Mode Tabs */}
-        <div className="flex items-center gap-2">
-          <Tabs
-            value={viewMode}
-            onValueChange={(v) => setViewMode(v as ViewMode)}
-          >
-            <TabsList className="h-8 bg-zinc-100">
-              <TabsTrigger value="preview" className="text-xs px-3 h-6">
+        {/* Center Section - View Mode */}
+        <div className="flex-1 flex items-center justify-between px-3">
+          {/* View Mode Tabs - Figma style clean tabs */}
+          <div className="flex items-center gap-1">
+            {/* Preview/Code Toggle - Figma style */}
+            <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('preview')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  viewMode === 'preview'
+                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}
+              >
+                <Eye className="h-3.5 w-3.5" />
                 Preview
-              </TabsTrigger>
-              <TabsTrigger value="design" className="text-xs px-3 h-6">
+              </button>
+              <button
+                onClick={() => setViewMode('design')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  viewMode === 'design'
+                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5" />
                 Design
-              </TabsTrigger>
-              <TabsTrigger value="code" className="text-xs px-3 h-6">
+              </button>
+              <button
+                onClick={() => setViewMode('code')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  viewMode === 'code'
+                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}
+              >
+                <Code className="h-3.5 w-3.5" />
                 Code
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+              </button>
+            </div>
 
-          {/* Play Button */}
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Play className="h-4 w-4" />
-          </Button>
-        </div>
+            {/* Breakpoint Selector - minimal icons */}
+            <div className="flex items-center ml-2 gap-0.5">
+              {[
+                { value: 'desktop', icon: Monitor },
+                { value: 'tablet', icon: Tablet },
+                { value: 'mobile', icon: Smartphone },
+              ].map(({ value, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setBreakpoint(value as Breakpoint)}
+                  className={`p-1.5 rounded transition-colors ${
+                    breakpoint === value
+                      ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-200 dark:bg-zinc-700'
+                      : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              ))}
+            </div>
+          </div>
 
-        {/* Right Section */}
-        <div className="flex items-center gap-1">
-          {/* Fonts */}
-          <Button variant="ghost" size="sm" className="gap-1.5 text-zinc-600 text-xs">
-            <Type className="h-4 w-4" />
-            Fonts
-          </Button>
+          {/* Right Section - Figma style minimal */}
+          <div className="flex items-center gap-1">
+            {/* Design Settings Dropdown - global settings */}
+            <DesignSettingsDropdown siteId={siteId} />
 
-          {/* Colors */}
-          <Button variant="ghost" size="sm" className="gap-1.5 text-zinc-600 text-xs">
-            <Palette className="h-4 w-4" />
-            Colors
-          </Button>
+            {/* Tool icons - minimal */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setShowComponentLibrary(true)}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                >
+                  <LayoutTemplate className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Komponenten</TooltipContent>
+            </Tooltip>
 
-          {/* Assets */}
-          <Button variant="ghost" size="sm" className="gap-1.5 text-zinc-600 text-xs">
-            <Image className="h-4 w-4" />
-            Assets
-          </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setShowPageSettings(true)}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                >
+                  <Settings2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Einstellungen</TooltipContent>
+            </Tooltip>
 
-          <Separator orientation="vertical" className="h-5 mx-1" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={toggleLayersPanel}
+                  className={`p-1.5 rounded transition-colors ${
+                    showLayersPanel
+                      ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-200 dark:bg-zinc-700'
+                      : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  <Layers className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Ebenen</TooltipContent>
+            </Tooltip>
 
-          {/* Component Library */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowComponentLibrary(true)}
-                className="gap-1.5 text-zinc-600 text-xs"
+            <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+
+            {/* Undo/Redo - minimal */}
+            <button
+              onClick={undo}
+              disabled={!canUndo()}
+              className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 disabled:opacity-30 rounded transition-colors"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={redo}
+              disabled={!canRedo()}
+              className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 disabled:opacity-30 rounded transition-colors"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+
+            <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+
+            {/* Share */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setShowShareDialog(true)}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Teilen</TooltipContent>
+            </Tooltip>
+
+            {/* Save Button - always visible */}
+            {hasUnsavedChanges && (
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="ml-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-colors"
               >
-                <LayoutTemplate className="h-4 w-4" />
-                Components
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Component Library</TooltipContent>
-          </Tooltip>
+                {isSaving ? 'Speichert...' : 'Speichern'}
+              </button>
+            )}
 
-          {/* Page Settings */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowPageSettings(true)}
-                className="gap-1.5 text-zinc-600 text-xs"
+            {/* Publish - WordPress verbunden oder Setup */}
+            {wordpress.config?.enabled && wordpress.config?.api_url ? (
+              <PublishDropdown
+                siteId={siteId}
+                pageId={pageId}
+                wordPressConfig={wordpress.config}
+                wordPressStatus={wordpress.status}
+                lastPushedAt={wordpress.lastPushedAt}
+                isPublishing={wordpress.isPublishing}
+                onPublishWordPress={wordpress.publishToWordPress}
+              />
+            ) : (
+              <button
+                onClick={() => setShowWordPressSetup(true)}
+                className="ml-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
               >
-                <Settings2 className="h-4 w-4" />
-                Settings
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Page Settings (Header/Footer)</TooltipContent>
-          </Tooltip>
-
-          <Separator orientation="vertical" className="h-5 mx-1" />
-
-          {/* Save Button */}
-          <Button
-            variant={hasUnsavedChanges ? 'default' : 'outline'}
-            size="sm"
-            onClick={handleSave}
-            disabled={isSaving}
-            className={hasUnsavedChanges ? 'bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5' : 'gap-1.5'}
-          >
-            <Save className="h-3.5 w-3.5" />
-            Save
-          </Button>
-
-          {/* Undo/Redo */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={undo}
-                disabled={!canUndo()}
-                className="h-8 w-8"
-              >
-                <Undo2 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Undo</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={redo}
-                disabled={!canRedo()}
-                className="h-8 w-8"
-              >
-                <Redo2 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Redo</TooltipContent>
-          </Tooltip>
-
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <X className="h-4 w-4" />
-          </Button>
-
-          <Separator orientation="vertical" className="h-5 mx-1" />
-
-          {/* Breakpoint Selector */}
-          <Tabs
-            value={breakpoint}
-            onValueChange={(v) => setBreakpoint(v as Breakpoint)}
-          >
-            <TabsList className="h-8 bg-zinc-100">
-              <TabsTrigger value="desktop" className="h-6 px-2">
-                <Monitor className="h-4 w-4" />
-              </TabsTrigger>
-              <TabsTrigger value="tablet" className="h-6 px-2">
-                <Tablet className="h-4 w-4" />
-              </TabsTrigger>
-              <TabsTrigger value="mobile" className="h-6 px-2">
-                <Smartphone className="h-4 w-4" />
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <Separator orientation="vertical" className="h-5 mx-1" />
-
-          {/* Layers Toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={showLayersPanel ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={toggleLayersPanel}
-                className={`gap-1.5 ${showLayersPanel ? 'bg-zinc-200 text-zinc-900' : 'text-zinc-600'}`}
-              >
-                <Layers className="h-4 w-4" />
-                Layers
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Toggle Layers Panel</TooltipContent>
-          </Tooltip>
-
-          {/* Export */}
-          <Button variant="ghost" size="sm" className="gap-1.5 text-zinc-600">
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-
-          {/* Publish */}
-          <PublishDropdown
-            siteId={siteId}
-            pageId={pageId}
-            wordPressConfig={wordpress.config}
-            wordPressStatus={wordpress.status}
-            lastPushedAt={wordpress.lastPushedAt}
-            isPublishing={wordpress.isPublishing}
-            onPublishWordPress={wordpress.publishToWordPress}
-          />
+                Publish
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -358,6 +345,27 @@ export function Toolbar({ siteId }: ToolbarProps) {
           }}
         />
       )}
+
+      {/* Share Link Dialog */}
+      <ShareLinkDialog
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+        siteId={siteId}
+        pageId={pageId || undefined}
+        siteName={currentPage?.name || 'Site'}
+        pageName={currentPage?.name}
+      />
+
+      {/* WordPress Setup Modal */}
+      <WordPressSetupModal
+        open={showWordPressSetup}
+        onOpenChange={setShowWordPressSetup}
+        siteId={siteId}
+        onComplete={() => {
+          // Reload WordPress config
+          wordpress.loadConfig?.()
+        }}
+      />
     </TooltipProvider>
   )
 }

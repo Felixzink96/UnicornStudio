@@ -185,6 +185,11 @@ class Unicorn_Studio_Pages {
         // Prepare content - extracts HTML and JS separately
         $prepared = $this->prepare_content($page);
 
+        // Rewrite Supabase image URLs to WordPress URLs (if images were synced)
+        if (function_exists('unicorn_studio') && unicorn_studio()->media_sync) {
+            $prepared['html'] = unicorn_studio()->media_sync->rewrite_supabase_urls($prepared['html']);
+        }
+
         // Determine post status:
         // - For new pages: use Unicorn Studio's is_published flag
         // - For existing pages: keep current WordPress status (don't downgrade published to draft)
@@ -217,10 +222,8 @@ class Unicorn_Studio_Pages {
             ],
         ];
 
-        // Set page template for full-width if needed
-        if (!empty($page['html'])) {
-            $post_data['meta_input']['_wp_page_template'] = 'templates/unicorn-studio-page.php';
-        }
+        // Note: Page template is handled by the theme's page.php
+        // which detects Unicorn Studio pages via _unicorn_studio_id meta
 
         // Handle SEO meta
         if (!empty($page['seo'])) {

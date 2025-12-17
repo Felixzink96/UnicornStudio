@@ -64,7 +64,7 @@ export default async function ComponentsPage({ params, searchParams }: Component
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zu {site.name}
@@ -73,18 +73,18 @@ export default async function ComponentsPage({ params, searchParams }: Component
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Puzzle className="h-8 w-8 text-purple-500" />
-            Component Library
+            Komponenten-Bibliothek
           </h1>
-          <p className="text-slate-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             Wiederverwendbare UI-Bausteine für deine Website
           </p>
         </div>
         <Link href={`/dashboard/sites/${siteId}/components/new`}>
-          <Button className="bg-purple-600 hover:bg-purple-700">
+          <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Neue Component
+            Neue Komponente
           </Button>
         </Link>
       </div>

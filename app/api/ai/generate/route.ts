@@ -3,8 +3,15 @@ import { buildSystemPrompt, type DesignTokensForAI, type GlobalComponentsForAI, 
 import { createClient } from '@/lib/supabase/server'
 import { darkenHex } from '@/lib/design/style-extractor'
 import { getOrCreateCache } from '@/lib/ai/cache-manager'
+import { htmlOperationTools } from '@/lib/ai/html-tools'
 
-const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! })
+// Configure Google AI with longer timeout to prevent ETIMEDOUT on long generations
+const genAI = new GoogleGenAI({
+  apiKey: process.env.GOOGLE_AI_API_KEY!,
+  httpOptions: {
+    timeout: 5 * 60 * 1000, // 5 minutes timeout for long AI generations
+  },
+})
 
 // Extract URLs from prompt for URL Context tool
 function extractUrls(prompt: string): string[] {
@@ -464,6 +471,20 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
     // Build Gemini Tools array based on request settings
     const tools: Array<Record<string, unknown>> = []
 
+    // Check if other tools are enabled (Function Calling can't be combined with these)
+    const hasOtherTools = googleSearchEnabled || codeExecutionEnabled || extractUrls(prompt).length > 0
+
+    // ONLY add HTML operation tools if no other tools are enabled
+    // Gemini doesn't support mixing function calling with other tools
+    if (!hasOtherTools) {
+      tools.push({
+        functionDeclarations: htmlOperationTools
+      })
+      console.log('[AI] HTML Operation Tools enabled (Function Calling)')
+    } else {
+      console.log('[AI] Function Calling disabled - using text-based output (other tools active)')
+    }
+
     // URL Context: Auto-detect URLs in prompt
     const detectedUrls = extractUrls(prompt)
     if (detectedUrls.length > 0) {
@@ -497,10 +518,21 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
     }
 
     // Add thinking config if enabled
+    // WICHTIG: Gemini 3 verwendet 'thinkingLevel', ältere Modelle 'thinkingBudget'
     if (thinkingEnabled) {
-      config.thinkingConfig = {
-        includeThoughts: true,
-        thinkingBudget: 24576,  // HIGH - Mehr Zeit zum Nachdenken für bessere Kreativität
+      if (selectedModel.includes('gemini-3')) {
+        // Gemini 3: thinking_level statt thinking_budget
+        // Laut Google Docs: "You cannot use both thinking_level and thinking_budget"
+        config.thinkingConfig = {
+          includeThoughts: true,
+          thinkingLevel: 'high',
+        }
+      } else {
+        // Gemini 2.5 und älter: thinking_budget
+        config.thinkingConfig = {
+          includeThoughts: true,
+          thinkingBudget: 32768,  // Erhöht von 24K auf 32K für komplexe Layouts
+        }
       }
     }
 
@@ -540,6 +572,44 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
       async start(controller) {
+        // Track controller state to avoid "Controller already closed" errors
+        let isClosed = false
+        let heartbeatInterval: ReturnType<typeof setInterval> | null = null
+
+        const safeEnqueue = (data: Uint8Array) => {
+          if (!isClosed) {
+            try {
+              controller.enqueue(data)
+            } catch {
+              isClosed = true
+            }
+          }
+        }
+
+        const safeClose = () => {
+          if (!isClosed) {
+            isClosed = true
+            // Clear heartbeat interval
+            if (heartbeatInterval) {
+              clearInterval(heartbeatInterval)
+              heartbeatInterval = null
+            }
+            try {
+              controller.close()
+            } catch {
+              // Already closed, ignore
+            }
+          }
+        }
+
+        // Start heartbeat to keep connection alive during long AI processing
+        // SSE comment lines (starting with :) are ignored by clients but keep connection open
+        heartbeatInterval = setInterval(() => {
+          if (!isClosed) {
+            safeEnqueue(encoder.encode(`: heartbeat ${Date.now()}\n\n`))
+          }
+        }, 8000) // Every 8 seconds (well under typical 30-60s proxy timeouts)
+
         try {
           // Track usage metadata from chunks
           let usageMetadata: {
@@ -568,7 +638,7 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
                   uri: c.web?.uri || '',
                 })) || [],
               })
-              controller.enqueue(encoder.encode(`data: ${searchData}\n\n`))
+              safeEnqueue(encoder.encode(`data: ${searchData}\n\n`))
             }
 
             // Check for thought parts when thinking is enabled
@@ -577,10 +647,20 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const anyPart = part as any
 
+                // Handle Function Calls (HTML Operations)
+                if (anyPart.functionCall) {
+                  const functionCallData = JSON.stringify({
+                    type: 'function_call',
+                    name: anyPart.functionCall.name,
+                    args: anyPart.functionCall.args,
+                  })
+                  safeEnqueue(encoder.encode(`data: ${functionCallData}\n\n`))
+                  console.log('[AI] Function Call:', anyPart.functionCall.name)
+                }
                 // Handle thinking content
-                if (anyPart.thought && part.text) {
+                else if (anyPart.thought && part.text) {
                   const thinkingData = JSON.stringify({ type: 'thinking', content: part.text })
-                  controller.enqueue(encoder.encode(`data: ${thinkingData}\n\n`))
+                  safeEnqueue(encoder.encode(`data: ${thinkingData}\n\n`))
                 }
                 // Handle executable code from Code Execution tool
                 else if (anyPart.executableCode?.code) {
@@ -589,7 +669,7 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
                     language: anyPart.executableCode.language || 'python',
                     code: anyPart.executableCode.code,
                   })
-                  controller.enqueue(encoder.encode(`data: ${codeData}\n\n`))
+                  safeEnqueue(encoder.encode(`data: ${codeData}\n\n`))
                 }
                 // Handle code execution results
                 else if (anyPart.codeExecutionResult?.output) {
@@ -597,18 +677,18 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
                     type: 'code_result',
                     output: anyPart.codeExecutionResult.output,
                   })
-                  controller.enqueue(encoder.encode(`data: ${resultData}\n\n`))
+                  safeEnqueue(encoder.encode(`data: ${resultData}\n\n`))
                 }
                 // Handle regular text content
                 else if (part.text) {
                   const data = JSON.stringify({ type: 'text', content: part.text })
-                  controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+                  safeEnqueue(encoder.encode(`data: ${data}\n\n`))
                 }
               }
             } else if (chunk.text) {
               // Fallback for simple text response
               const data = JSON.stringify({ type: 'text', content: chunk.text })
-              controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+              safeEnqueue(encoder.encode(`data: ${data}\n\n`))
             }
           }
 
@@ -622,13 +702,24 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
               total_tokens: usageMetadata?.totalTokenCount || 0,
             }
           })
-          controller.enqueue(encoder.encode(`data: ${doneData}\n\n`))
-          controller.close()
+          safeEnqueue(encoder.encode(`data: ${doneData}\n\n`))
+          safeClose()
         } catch (error) {
           console.error('Streaming error:', error)
-          const errorData = JSON.stringify({ type: 'error', message: String(error) })
-          controller.enqueue(encoder.encode(`data: ${errorData}\n\n`))
-          controller.close()
+          // Clear heartbeat on error
+          if (heartbeatInterval) {
+            clearInterval(heartbeatInterval)
+            heartbeatInterval = null
+          }
+          // Send error to client if stream is still open
+          const errorData = JSON.stringify({
+            type: 'error',
+            message: error instanceof Error && error.message.includes('ETIMEDOUT')
+              ? 'Verbindung zur KI unterbrochen. Bitte erneut versuchen.'
+              : String(error)
+          })
+          safeEnqueue(encoder.encode(`data: ${errorData}\n\n`))
+          safeClose()
         }
       }
     })

@@ -85,27 +85,27 @@ export function SitesList({ sites: initialSites, organizationId }: SitesListProp
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white">Sites</h1>
-          <p className="text-slate-400 mt-1">
-            Manage your websites and landing pages
+          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">Websites</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+            Verwalte deine Websites und Landing Pages
           </p>
         </div>
         <Link href="/dashboard/sites/new">
-          <Button className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
+          <Button>
             <Plus className="h-4 w-4 mr-2" />
-            New Site
+            Neue Website
           </Button>
         </Link>
       </div>
 
       {/* Search */}
       <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
         <Input
-          placeholder="Search sites..."
+          placeholder="Websites durchsuchen..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 bg-slate-900 border-slate-800 text-white placeholder:text-slate-500"
+          className="pl-9"
         />
       </div>
 
@@ -114,22 +114,22 @@ export function SitesList({ sites: initialSites, organizationId }: SitesListProp
         <div className="text-center py-16">
           {searchQuery ? (
             <>
-              <p className="text-slate-400 mb-4">
-                No sites found matching &quot;{searchQuery}&quot;
+              <p className="text-zinc-500 dark:text-zinc-400 mb-4">
+                Keine Websites gefunden für &quot;{searchQuery}&quot;
               </p>
               <Button variant="outline" onClick={() => setSearchQuery('')}>
-                Clear search
+                Suche zurücksetzen
               </Button>
             </>
           ) : (
             <>
-              <p className="text-slate-400 mb-4">
-                You haven&apos;t created any sites yet
+              <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+                Du hast noch keine Websites erstellt
               </p>
               <Link href="/dashboard/sites/new">
-                <Button className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
+                <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Create your first site
+                  Erstelle deine erste Website
                 </Button>
               </Link>
             </>
@@ -153,21 +153,20 @@ export function SitesList({ sites: initialSites, organizationId }: SitesListProp
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog({ open, siteId: null })}
       >
-        <DialogContent className="bg-slate-900 border-slate-800">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-white">Delete Site</DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Are you sure you want to delete this site? This action cannot be
-              undone. All pages and content will be permanently deleted.
+            <DialogTitle>Website löschen</DialogTitle>
+            <DialogDescription>
+              Bist du sicher, dass du diese Website löschen möchtest? Diese Aktion kann nicht
+              rückgängig gemacht werden. Alle Seiten und Inhalte werden dauerhaft gelöscht.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setDeleteDialog({ open: false, siteId: null })}
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
             >
-              Cancel
+              Abbrechen
             </Button>
             <Button
               variant="destructive"
@@ -177,10 +176,10 @@ export function SitesList({ sites: initialSites, organizationId }: SitesListProp
               {isDeleting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
+                  Löschen...
                 </>
               ) : (
-                'Delete Site'
+                'Website löschen'
               )}
             </Button>
           </DialogFooter>

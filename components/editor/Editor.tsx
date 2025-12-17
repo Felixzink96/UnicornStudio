@@ -6,7 +6,7 @@ import { Toolbar } from './toolbar/Toolbar'
 import { ChatPanel } from './chat/ChatPanel'
 import { LivePreview } from './preview/LivePreview'
 import { CodeEditor } from './code-view/CodeEditor'
-import { ElementPanel } from './element-panel/ElementPanel'
+import { ElementFloatingBar } from './element-panel/ElementFloatingBar'
 import { LayersPanel } from './layers/LayersPanel'
 
 interface EditorProps {
@@ -64,28 +64,28 @@ export function Editor({ siteId, pageId }: EditorProps) {
   }, [save, undo, redo, clearSelection])
 
   return (
-    <div className="h-screen flex flex-col bg-[#0a0a0a]">
+    <div className="h-screen flex flex-col bg-zinc-100 dark:bg-zinc-950">
       {/* Toolbar */}
       <Toolbar siteId={siteId} />
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Chat (fixed width) */}
-        <div className="w-[420px] min-w-[420px] max-w-[420px] flex-shrink-0 bg-white border-r border-zinc-200 overflow-hidden">
+        <div className="w-[420px] min-w-[420px] max-w-[420px] flex-shrink-0 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 overflow-hidden">
           <ChatPanel />
         </div>
 
-        {/* Center - Preview oder Code (dunkel) */}
-        <div className="flex-1 relative bg-[#0a0a0a]">
+        {/* Center - Preview oder Code */}
+        <div className="flex-1 relative bg-zinc-100 dark:bg-zinc-950">
           {viewMode === 'code' ? (
             <CodeEditor />
           ) : (
             <LivePreview />
           )}
 
-          {/* Floating Element Panel (Popup) */}
+          {/* Floating Element Bar (Figma-style) */}
           {viewMode === 'design' && selectedElement && (
-            <ElementPanel />
+            <ElementFloatingBar />
           )}
         </div>
 

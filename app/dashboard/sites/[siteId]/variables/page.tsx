@@ -48,7 +48,7 @@ export default async function VariablesPage({ params }: VariablesPageProps) {
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zu {site.name}
@@ -56,11 +56,11 @@ export default async function VariablesPage({ params }: VariablesPageProps) {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
           <Palette className="h-8 w-8 text-purple-500" />
           Design Variables
         </h1>
-        <p className="text-slate-400 mt-2">
+        <p className="text-muted-foreground mt-2">
           Globale Design Tokens für Farben, Typography, Spacing und mehr
         </p>
       </div>

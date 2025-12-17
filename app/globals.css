@@ -171,6 +171,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -229,21 +230,27 @@ button[disabled],
 .bg-primary {
   background-color: var(--site-primary) !important;
 }
+
 .bg-primary-hover {
   background-color: var(--site-primary-hover) !important;
 }
+
 .hover\:bg-primary-hover:hover {
   background-color: var(--site-primary-hover) !important;
 }
+
 .bg-secondary {
   background-color: var(--site-secondary) !important;
 }
+
 .bg-accent {
   background-color: var(--site-accent) !important;
 }
+
 .bg-background {
   background-color: var(--site-background) !important;
 }
+
 .bg-muted {
   background-color: var(--site-muted) !important;
 }
@@ -252,15 +259,19 @@ button[disabled],
 .text-primary {
   color: var(--site-primary) !important;
 }
+
 .text-secondary {
   color: var(--site-secondary) !important;
 }
+
 .text-accent {
   color: var(--site-accent) !important;
 }
+
 .text-foreground {
   color: var(--site-foreground) !important;
 }
+
 .text-muted-foreground {
   color: color-mix(in srgb, var(--site-foreground) 60%, transparent) !important;
 }
@@ -269,9 +280,11 @@ button[disabled],
 .border-primary {
   border-color: var(--site-primary) !important;
 }
+
 .border-secondary {
   border-color: var(--site-secondary) !important;
 }
+
 .border-border {
   border-color: var(--site-border) !important;
 }
@@ -280,9 +293,11 @@ button[disabled],
 .font-heading {
   font-family: var(--site-font-heading) !important;
 }
+
 .font-body {
   font-family: var(--site-font-body) !important;
 }
+
 .font-mono {
   font-family: var(--site-font-mono) !important;
 }
@@ -291,6 +306,104 @@ button[disabled],
 .ring-primary {
   --tw-ring-color: var(--site-primary) !important;
 }
+
 .focus\:ring-primary:focus {
   --tw-ring-color: var(--site-primary) !important;
+}
+
+/* ================================================================
+   WIREFRAME BUILD ANIMATION
+   Animation for AI generation progress indicator
+   ================================================================ */
+
+/* Scan line animation - horizontal */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(2400%);
+    opacity: 0;
+  }
+}
+
+.animate-scan {
+  animation: scan 1.5s ease-in-out infinite;
+}
+
+/* Scan line animation - vertical */
+@keyframes scan-vertical {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(9600%);
+    opacity: 0;
+  }
+}
+
+.animate-scan-vertical {
+  animation: scan-vertical 2s ease-in-out infinite;
+}
+
+/* Particle explosion effect */
+@keyframes particle {
+  0% {
+    opacity: 1;
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5) translate(
+      calc((var(--random-x, 0) - 0.5) * 60px),
+      calc((var(--random-y, 0) - 0.5) * 60px)
+    );
+  }
+}
+
+.animate-particle {
+  animation: particle 0.8s ease-out forwards;
+}
+
+/* Progress bar animation */
+@keyframes progress {
+  0% {
+    width: 0%;
+  }
+  10% {
+    width: 15%;
+  }
+  30% {
+    width: 35%;
+  }
+  50% {
+    width: 55%;
+  }
+  70% {
+    width: 75%;
+  }
+  90% {
+    width: 90%;
+  }
+  100% {
+    width: 95%;
+  }
+}
+
+.animate-progress {
+  animation: progress 4s ease-out infinite;
 }

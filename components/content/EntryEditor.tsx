@@ -35,6 +35,8 @@ import {
 import { FieldRenderer } from './fields'
 import { createEntry, updateEntry, setEntryTerms } from '@/lib/supabase/queries/entries'
 import { getTerms } from '@/lib/supabase/queries/taxonomies'
+import { ImagePicker } from '@/components/editor/assets/ImagePicker'
+import { toast } from '@/components/ui/use-toast'
 import type {
   ContentType,
   Entry,
@@ -86,6 +88,7 @@ export function EntryEditor({
 
   // Collapsible states
   const [seoOpen, setSeoOpen] = useState(false)
+  const [showImagePicker, setShowImagePicker] = useState(false)
 
   // Load taxonomy terms
   useEffect(() => {
@@ -452,28 +455,57 @@ export function EntryEditor({
 
         {/* Featured Image */}
         {contentType.has_featured_image && (
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
             <CardHeader>
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <ImageIcon className="h-4 w-4 text-slate-400" />
+              <CardTitle className="text-zinc-900 dark:text-white text-base flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                 Beitragsbild
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <button
-                type="button"
-                onClick={() => {
-                  const url = prompt('Bild URL eingeben:')
-                  if (url) {
-                    // In production, this would use a media picker
-                    setFeaturedImageId(url)
-                  }
-                }}
-                className="w-full h-32 border-2 border-dashed border-slate-700 rounded-lg flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors"
-              >
-                <ImageIcon className="h-8 w-8" />
-                <span className="text-sm">Bild auswählen</span>
-              </button>
+              {featuredImageId ? (
+                <div className="relative group">
+                  <img
+                    src={featuredImageId}
+                    alt="Beitragsbild"
+                    className="w-full h-32 object-cover rounded-lg border border-zinc-200 dark:border-zinc-700"
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowImagePicker(true)}
+                    >
+                      Ändern
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setFeaturedImageId('')}
+                    >
+                      Entfernen
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowImagePicker(true)}
+                  className="w-full h-32 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors"
+                >
+                  <ImageIcon className="h-8 w-8" />
+                  <span className="text-sm">Bild auswählen</span>
+                </button>
+              )}
+              <ImagePicker
+                siteId={siteId}
+                open={showImagePicker}
+                onOpenChange={setShowImagePicker}
+                onSelect={(url) => setFeaturedImageId(url)}
+                currentUrl={featuredImageId}
+              />
             </CardContent>
           </Card>
         )}

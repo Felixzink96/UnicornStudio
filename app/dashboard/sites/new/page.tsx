@@ -87,82 +87,78 @@ export default function NewSitePage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-8">
       <Link
         href="/dashboard/sites"
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8"
+        className="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 mb-8"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Sites
+        Zurück zu Websites
       </Link>
 
-      <h1 className="text-3xl font-bold text-white mb-2">Create a new site</h1>
-      <p className="text-slate-400 mb-8">
-        Set up a new website or landing page project
+      <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Neue Website erstellen</h1>
+      <p className="text-zinc-600 dark:text-zinc-400 mb-8">
+        Richte ein neues Website- oder Landing-Page-Projekt ein
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg text-sm">
+          <div className="bg-red-500/10 border border-red-500/50 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
             {error}
           </div>
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="name" className="text-white">
-            Site Name *
+          <Label htmlFor="name">
+            Website-Name *
           </Label>
           <Input
             id="name"
-            placeholder="My Awesome Website"
+            placeholder="Meine großartige Website"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500"
           />
           {name && (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
               URL: {generateSlug(name)}.unicorn.studio
             </p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="description" className="text-white">
-            Description
+          <Label htmlFor="description">
+            Beschreibung
           </Label>
           <Textarea
             id="description"
-            placeholder="A brief description of your site..."
+            placeholder="Eine kurze Beschreibung deiner Website..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500"
           />
         </div>
 
         <div className="flex gap-4">
           <Button
             type="submit"
-            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
             disabled={isLoading || !name}
           >
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
+                Erstellen...
               </>
             ) : (
-              'Create Site'
+              'Website erstellen'
             )}
           </Button>
           <Link href="/dashboard/sites">
             <Button
               type="button"
               variant="outline"
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
             >
-              Cancel
+              Abbrechen
             </Button>
           </Link>
         </div>

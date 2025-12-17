@@ -84,7 +84,7 @@ export default async function ContentTypesPage({ params }: ContentTypesPageProps
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zu {site.name}
@@ -93,18 +93,18 @@ export default async function ContentTypesPage({ params }: ContentTypesPageProps
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Layers className="h-8 w-8 text-purple-500" />
-            Content Types
+            Inhaltstypen
           </h1>
-          <p className="text-slate-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             Erstelle und verwalte deine eigenen Inhaltstypen
           </p>
         </div>
         <Link href={`/dashboard/sites/${siteId}/builder/content-types/new`}>
-          <Button className="bg-purple-600 hover:bg-purple-700">
+          <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Neuer Content Type
+            Neuer Inhaltstyp
           </Button>
         </Link>
       </div>
@@ -118,19 +118,19 @@ export default async function ContentTypesPage({ params }: ContentTypesPageProps
           fieldCounts={fieldCounts}
         />
       ) : (
-        <div className="text-center py-16 bg-slate-900 rounded-lg border border-slate-800">
+        <div className="text-center py-16 bg-card rounded-lg border border-border">
           <Layers className="h-16 w-16 text-slate-700 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">
-            Keine Content Types vorhanden
+          <h2 className="text-xl font-semibold text-foreground mb-2">
+            Keine Inhaltstypen vorhanden
           </h2>
-          <p className="text-slate-400 mb-6 max-w-md mx-auto">
-            Content Types definieren die Struktur deiner Inhalte. Erstelle z.B.
-            Blog Posts, Produkte, Rezepte oder Events.
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            Inhaltstypen definieren die Struktur deiner Inhalte. Erstelle z.B.
+            Blog-Beiträge, Produkte, Rezepte oder Events.
           </p>
           <Link href={`/dashboard/sites/${siteId}/builder/content-types/new`}>
-            <Button className="bg-purple-600 hover:bg-purple-700">
+            <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Ersten Content Type erstellen
+              Ersten Inhaltstyp erstellen
             </Button>
           </Link>
         </div>

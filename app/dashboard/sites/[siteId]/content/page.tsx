@@ -122,7 +122,7 @@ export default async function ContentPage({ params }: ContentPageProps) {
             Erstelle zuerst Content Types im Builder, um Inhalte verwalten zu können.
           </p>
           <Link href={`/dashboard/sites/${siteId}/builder/content-types`}>
-            <Button className="bg-purple-600 hover:bg-purple-700">
+            <Button>
               <Plus className="h-4 w-4 mr-2" />
               Content Types erstellen
             </Button>

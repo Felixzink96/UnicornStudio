@@ -53,6 +53,12 @@ export default async function SitePage({ params }: SitePageProps) {
     archived: 'bg-gray-500/10 text-gray-500',
   }
 
+  const statusLabels: Record<string, string> = {
+    draft: 'Entwurf',
+    published: 'Veröffentlicht',
+    archived: 'Archiviert',
+  }
+
   const siteStatus = site.status || 'draft'
 
   return (
@@ -60,24 +66,24 @@ export default async function SitePage({ params }: SitePageProps) {
       {/* Back Link */}
       <Link
         href="/dashboard/sites"
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Sites
+        Zurück zu Websites
       </Link>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold text-white">{site.name}</h1>
-            <Badge className={statusColors[siteStatus]}>{siteStatus}</Badge>
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{site.name}</h1>
+            <Badge className={statusColors[siteStatus]}>{statusLabels[siteStatus] || siteStatus}</Badge>
           </div>
           {site.description && (
-            <p className="text-slate-400">{site.description}</p>
+            <p className="text-zinc-600 dark:text-zinc-400">{site.description}</p>
           )}
           {site.subdomain && (
-            <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 flex items-center gap-1">
               <Globe className="h-3 w-3" />
               {site.subdomain}.unicorn.studio
             </p>
@@ -85,21 +91,21 @@ export default async function SitePage({ params }: SitePageProps) {
         </div>
         <div className="flex gap-3">
           <Link href={`/preview/${siteId}`} target="_blank">
-            <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
+            <Button variant="outline">
               <Eye className="h-4 w-4 mr-2" />
-              Preview
+              Vorschau
             </Button>
           </Link>
           <Link href="/dashboard/settings/integrations">
-            <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
+            <Button variant="outline">
               <Puzzle className="h-4 w-4 mr-2" />
               Integrationen
             </Button>
           </Link>
           <Link href={`/dashboard/sites/${siteId}/settings`}>
-            <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
+            <Button variant="outline">
               <Settings className="h-4 w-4 mr-2" />
-              Settings
+              Einstellungen
             </Button>
           </Link>
         </div>
@@ -107,36 +113,36 @@ export default async function SitePage({ params }: SitePageProps) {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card className="bg-slate-900 border-slate-800">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-400">
-              Pages
+            <CardTitle className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              Seiten
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-white">{pages.length}</p>
+            <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{pages.length}</p>
           </CardContent>
         </Card>
-        <Card className="bg-slate-900 border-slate-800">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-400">
+            <CardTitle className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
               Status
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Badge className={statusColors[siteStatus] + ' text-lg px-3 py-1'}>
-              {siteStatus}
+              {statusLabels[siteStatus] || siteStatus}
             </Badge>
           </CardContent>
         </Card>
-        <Card className="bg-slate-900 border-slate-800">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-400">
-              Last Updated
+            <CardTitle className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              Zuletzt aktualisiert
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-medium text-white">
+            <p className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
               {new Date(site.updated_at || Date.now()).toLocaleDateString('de-DE')}
             </p>
           </CardContent>
@@ -146,9 +152,9 @@ export default async function SitePage({ params }: SitePageProps) {
       {/* Pages Section */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Pages
+            Seiten
           </h2>
           <PagesList siteId={siteId} initialPages={pages} />
         </div>
@@ -160,34 +166,34 @@ export default async function SitePage({ params }: SitePageProps) {
               <Link
                 key={page.id}
                 href={`/editor/${siteId}/${page.id}`}
-                className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-700 transition-colors group"
+                className="flex items-center justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-primary/50 transition-colors group"
               >
                 <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-slate-500" />
+                  <FileText className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
                   <div>
-                    <p className="font-medium text-white group-hover:text-purple-400 transition-colors">
+                    <p className="font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-purple-500 transition-colors">
                       {page.name}
                     </p>
-                    <p className="text-sm text-slate-500">
-                      /{page.slug || '(home)'}
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      /{page.slug || '(Startseite)'}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {page.is_home && (
-                    <Badge variant="outline" className="border-slate-700 text-slate-400">
-                      Home
+                    <Badge variant="outline">
+                      Startseite
                     </Badge>
                   )}
-                  <ExternalLink className="h-4 w-4 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ExternalLink className="h-4 w-4 text-zinc-600 dark:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-800">
-            <FileText className="h-12 w-12 text-slate-700 mx-auto mb-4" />
-            <p className="text-slate-400 mb-4">No pages yet</p>
+          <div className="text-center py-12 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+            <FileText className="h-12 w-12 text-zinc-600 dark:text-zinc-400 mx-auto mb-4" />
+            <p className="text-zinc-600 dark:text-zinc-400 mb-4">Noch keine Seiten vorhanden</p>
           </div>
         )}
       </div>

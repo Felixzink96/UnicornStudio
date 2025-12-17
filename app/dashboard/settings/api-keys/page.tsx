@@ -37,7 +37,7 @@ export default async function APIKeysPage() {
       {/* Back Link */}
       <Link
         href="/dashboard/sites"
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zum Dashboard
@@ -45,11 +45,11 @@ export default async function APIKeysPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+        <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-3">
           <Key className="h-8 w-8 text-purple-500" />
           API Keys
         </h1>
-        <p className="text-slate-400 mt-2">
+        <p className="text-zinc-600 dark:text-zinc-400 mt-2">
           Verwalte API Keys für externe Integrationen wie WordPress
         </p>
       </div>

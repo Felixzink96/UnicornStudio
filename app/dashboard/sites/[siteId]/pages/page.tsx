@@ -40,7 +40,7 @@ export default async function PagesPage({ params }: PagesPageProps) {
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zur Übersicht
@@ -49,11 +49,11 @@ export default async function PagesPage({ params }: PagesPageProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-3">
             <FileText className="h-8 w-8 text-purple-500" />
-            Pages
+            Seiten
           </h1>
-          <p className="text-slate-400 mt-2">
+          <p className="text-zinc-600 dark:text-zinc-400 mt-2">
             Alle Seiten von {site.name}
           </p>
         </div>
@@ -67,35 +67,35 @@ export default async function PagesPage({ params }: PagesPageProps) {
             <Link
               key={page.id}
               href={`/editor/${siteId}/${page.id}`}
-              className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-700 transition-colors group"
+              className="flex items-center justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-primary/50 transition-colors group"
             >
               <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-slate-500" />
+                <FileText className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
                 <div>
-                  <p className="font-medium text-white group-hover:text-purple-400 transition-colors">
+                  <p className="font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-purple-500 transition-colors">
                     {page.name}
                   </p>
-                  <p className="text-sm text-slate-500">
-                    /{page.slug || '(home)'}
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    /{page.slug || '(Startseite)'}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {page.is_home && (
-                  <Badge variant="outline" className="border-slate-700 text-slate-400">
-                    Home
+                  <Badge variant="outline">
+                    Startseite
                   </Badge>
                 )}
-                <ExternalLink className="h-4 w-4 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ExternalLink className="h-4 w-4 text-zinc-600 dark:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </Link>
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-slate-900 rounded-lg border border-slate-800">
-          <FileText className="h-12 w-12 text-slate-700 mx-auto mb-4" />
-          <p className="text-slate-400 mb-4">Noch keine Seiten vorhanden</p>
-          <p className="text-sm text-slate-500">Klicke auf "Neue Seite" um loszulegen</p>
+        <div className="text-center py-12 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <FileText className="h-12 w-12 text-zinc-600 dark:text-zinc-400 mx-auto mb-4" />
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">Noch keine Seiten vorhanden</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Klicke auf "Neue Seite" um loszulegen</p>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
@@ -81,6 +82,7 @@ export function EntriesList({
   const [entryToDelete, setEntryToDelete] = useState<Entry | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [loadingAction, setLoadingAction] = useState<string | null>(null)
 
   const handleDelete = async () => {
     if (!entryToDelete) return
@@ -90,24 +92,32 @@ export function EntriesList({
       await deleteEntry(entryToDelete.id)
       setEntries((prev) => prev.filter((e) => e.id !== entryToDelete.id))
       setDeleteDialogOpen(false)
+      toast.success('Erfolgreich gelöscht', `"${entryToDelete.title}" wurde gelöscht.`)
       setEntryToDelete(null)
     } catch (error) {
       console.error('Error deleting entry:', error)
+      toast.error('Fehler beim Löschen', 'Der Eintrag konnte nicht gelöscht werden.')
     } finally {
       setIsDeleting(false)
     }
   }
 
   const handleDuplicate = async (entry: Entry) => {
+    setLoadingAction(`duplicate-${entry.id}`)
     try {
       await duplicateEntry(entry.id)
+      toast.success('Dupliziert', `"${entry.title}" wurde dupliziert.`)
       router.refresh()
     } catch (error) {
       console.error('Error duplicating entry:', error)
+      toast.error('Fehler beim Duplizieren', 'Der Eintrag konnte nicht dupliziert werden.')
+    } finally {
+      setLoadingAction(null)
     }
   }
 
   const handlePublish = async (entry: Entry) => {
+    setLoadingAction(`publish-${entry.id}`)
     try {
       await publishEntry(entry.id)
       setEntries((prev) =>
@@ -117,12 +127,17 @@ export function EntriesList({
             : e
         )
       )
+      toast.success('Veröffentlicht', `"${entry.title}" wurde veröffentlicht.`)
     } catch (error) {
       console.error('Error publishing entry:', error)
+      toast.error('Fehler beim Veröffentlichen', 'Der Eintrag konnte nicht veröffentlicht werden.')
+    } finally {
+      setLoadingAction(null)
     }
   }
 
   const handleUnpublish = async (entry: Entry) => {
+    setLoadingAction(`unpublish-${entry.id}`)
     try {
       await unpublishEntry(entry.id)
       setEntries((prev) =>
@@ -130,19 +145,28 @@ export function EntriesList({
           e.id === entry.id ? { ...e, status: 'draft' as const, published_at: null } : e
         )
       )
+      toast.success('Zurückgezogen', `"${entry.title}" wurde zurückgezogen.`)
     } catch (error) {
       console.error('Error unpublishing entry:', error)
+      toast.error('Fehler', 'Der Eintrag konnte nicht zurückgezogen werden.')
+    } finally {
+      setLoadingAction(null)
     }
   }
 
   const handleArchive = async (entry: Entry) => {
+    setLoadingAction(`archive-${entry.id}`)
     try {
       await archiveEntry(entry.id)
       setEntries((prev) =>
         prev.map((e) => (e.id === entry.id ? { ...e, status: 'archived' as const } : e))
       )
+      toast.success('Archiviert', `"${entry.title}" wurde archiviert.`)
     } catch (error) {
       console.error('Error archiving entry:', error)
+      toast.error('Fehler beim Archivieren', 'Der Eintrag konnte nicht archiviert werden.')
+    } finally {
+      setLoadingAction(null)
     }
   }
 

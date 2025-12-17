@@ -141,21 +141,27 @@ interface SiteCardProps {
 
 export function SiteCard({ site, onDelete, onDuplicate }: SiteCardProps) {
   const statusColors: Record<string, string> = {
-    draft: 'bg-yellow-500/10 text-yellow-500',
-    published: 'bg-green-500/10 text-green-500',
-    archived: 'bg-gray-500/10 text-gray-500',
+    draft: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400',
+    published: 'bg-green-500/10 text-green-600 dark:text-green-400',
+    archived: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400',
+  }
+
+  const statusLabels: Record<string, string> = {
+    draft: 'Entwurf',
+    published: 'Veröffentlicht',
+    archived: 'Archiviert',
   }
 
   const siteStatus = site.status || 'draft'
   const hasWordPress = !!(site.integrations as any)?.wordpress?.webhook_url
 
   return (
-    <Card className="group relative overflow-hidden bg-slate-900 border-slate-800 hover:border-slate-700 transition-colors cursor-pointer p-0 gap-0">
+    <Card className="group relative overflow-hidden hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors cursor-pointer p-0 gap-0">
       {/* Full card link - z-10 to be above content, but below dropdown (z-20) */}
       <Link href={`/dashboard/sites/${site.id}`} className="absolute inset-0 z-10" />
 
       {/* Thumbnail / Live Preview */}
-      <div className="aspect-video bg-slate-800 relative overflow-hidden">
+      <div className="aspect-video bg-zinc-100 dark:bg-zinc-800 relative overflow-hidden">
         {site.homePageHtml ? (
           <SitePreviewThumbnail html={site.homePageHtml} />
         ) : site.thumbnail_url ? (
@@ -166,20 +172,20 @@ export function SiteCard({ site, onDelete, onDuplicate }: SiteCardProps) {
           />
         ) : (
           <div className="flex items-center justify-center h-full">
-            <Globe className="w-12 h-12 text-slate-700" />
+            <Globe className="w-12 h-12 text-zinc-300 dark:text-zinc-600" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-white/80 dark:from-zinc-900/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
       </div>
 
       <CardContent className="p-4 relative">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-white truncate group-hover:text-purple-400 transition-colors">
+            <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 truncate group-hover:text-primary transition-colors">
               {site.name}
             </h3>
-            <p className="text-sm text-slate-400 mt-1">
-              Updated{' '}
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+              Aktualisiert{' '}
               {formatDistanceToNow(new Date(site.updated_at || Date.now()), {
                 addSuffix: true,
                 locale: de,
@@ -192,22 +198,19 @@ export function SiteCard({ site, onDelete, onDuplicate }: SiteCardProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-slate-400 hover:text-white relative z-20"
+                className="h-8 w-8 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 relative z-20"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-48 bg-slate-900 border-slate-800"
-            >
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
                 <Link
                   href={`/dashboard/sites/${site.id}`}
                   className="flex items-center gap-2 cursor-pointer"
                 >
                   <ExternalLink className="h-4 w-4" />
-                  Open
+                  Öffnen
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
@@ -216,33 +219,33 @@ export function SiteCard({ site, onDelete, onDuplicate }: SiteCardProps) {
                   className="flex items-center gap-2 cursor-pointer"
                 >
                   <Settings className="h-4 w-4" />
-                  Settings
+                  Einstellungen
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-slate-800" />
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onDuplicate?.(site.id)}
                 className="flex items-center gap-2 cursor-pointer"
               >
                 <Copy className="h-4 w-4" />
-                Duplicate
+                Duplizieren
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-slate-800" />
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onDelete?.(site.id)}
-                className="flex items-center gap-2 cursor-pointer text-red-400 focus:text-red-400"
+                className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
               >
                 <Trash2 className="h-4 w-4" />
-                Delete
+                Löschen
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
         <div className="mt-3 flex items-center gap-2">
-          <Badge className={statusColors[siteStatus]}>{siteStatus}</Badge>
+          <Badge className={statusColors[siteStatus]}>{statusLabels[siteStatus] || siteStatus}</Badge>
           {hasWordPress && (
-            <Badge className="bg-blue-500/10 text-blue-400 gap-1">
+            <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 gap-1">
               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18.5c-4.687 0-8.5-3.813-8.5-8.5 0-4.687 3.813-8.5 8.5-8.5 4.687 0 8.5 3.813 8.5 8.5 0 4.687-3.813 8.5-8.5 8.5zm-3.5-8.5L5.5 17l2.5-5 2 3 3-5 4 7H8.5z"/>
               </svg>
@@ -250,7 +253,7 @@ export function SiteCard({ site, onDelete, onDuplicate }: SiteCardProps) {
             </Badge>
           )}
           {site.subdomain && (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">
               {site.subdomain}.unicorn.studio
             </span>
           )}

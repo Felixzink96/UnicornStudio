@@ -393,11 +393,17 @@ class Unicorn_Studio_Global_Components {
             $position = $component['component_position'] ?? $component['position'] ?? 'content';
             $is_global = $component['is_global'] ?? false;
 
+            // Get HTML and rewrite image URLs
+            $html = $component['component_html'] ?? $component['html'] ?? '';
+            if (function_exists('unicorn_studio') && unicorn_studio()->media_sync) {
+                $html = unicorn_studio()->media_sync->rewrite_supabase_urls($html);
+            }
+
             // Normalize the component data
             $normalized = [
                 'id'       => $id,
                 'name'     => $component['component_name'] ?? $component['name'] ?? '',
-                'html'     => $component['component_html'] ?? $component['html'] ?? '',
+                'html'     => $html,
                 'css'      => $component['component_css'] ?? $component['css'] ?? '',
                 'js'       => $component['component_js'] ?? $component['js'] ?? '',
                 'position' => $position,

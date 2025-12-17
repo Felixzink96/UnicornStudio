@@ -85,12 +85,13 @@ class Unicorn_Studio_Menus {
         }
 
         // Fetch menus from API
-        $response = $this->api_client->get("/sites/{$site_id}/menus");
+        $response = $this->api_client->get_menus();
         if (is_wp_error($response)) {
             return $response;
         }
 
-        $menus = $response;
+        // Extract menus from response
+        $menus = isset($response['data']) ? $response['data'] : $response;
         $results = array();
 
         foreach ($menus as $menu_data) {

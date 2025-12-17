@@ -25,7 +25,7 @@ export default function SignupPage() {
     setError(null)
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+      setError('Passwort muss mindestens 6 Zeichen lang sein')
       setIsLoading(false)
       return
     }
@@ -62,9 +62,9 @@ export default function SignupPage() {
     return (
       <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/20 text-center">
         <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-        <h1 className="text-2xl font-bold text-white mb-2">Account created!</h1>
+        <h1 className="text-2xl font-bold text-white mb-2">Konto erstellt!</h1>
         <p className="text-gray-300">
-          Redirecting you to the dashboard...
+          Du wirst zum Dashboard weitergeleitet...
         </p>
       </div>
     )
@@ -74,10 +74,10 @@ export default function SignupPage() {
     <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/20">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">
-          Create your account
+          Konto erstellen
         </h1>
         <p className="text-gray-300">
-          Start building amazing websites with Unicorn Studio
+          Erstelle großartige Websites mit Unicorn Studio
         </p>
       </div>
 
@@ -90,12 +90,12 @@ export default function SignupPage() {
 
         <div className="space-y-2">
           <Label htmlFor="fullName" className="text-white">
-            Full Name
+            Vollständiger Name
           </Label>
           <Input
             id="fullName"
             type="text"
-            placeholder="John Doe"
+            placeholder="Max Mustermann"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
@@ -105,7 +105,7 @@ export default function SignupPage() {
 
         <div className="space-y-2">
           <Label htmlFor="email" className="text-white">
-            Email
+            E-Mail
           </Label>
           <Input
             id="email"
@@ -120,12 +120,12 @@ export default function SignupPage() {
 
         <div className="space-y-2">
           <Label htmlFor="password" className="text-white">
-            Password
+            Passwort
           </Label>
           <Input
             id="password"
             type="password"
-            placeholder="Min. 6 characters"
+            placeholder="Min. 6 Zeichen"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -136,27 +136,20 @@ export default function SignupPage() {
 
         <Button
           type="submit"
-          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
-          disabled={isLoading}
+          className="w-full"
+          loading={isLoading}
         >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating account...
-            </>
-          ) : (
-            'Create account'
-          )}
+          {isLoading ? 'Konto wird erstellt...' : 'Konto erstellen'}
         </Button>
       </form>
 
       <div className="mt-6 text-center text-gray-300">
-        Already have an account?{' '}
+        Bereits ein Konto?{' '}
         <Link
           href="/login"
           className="text-purple-400 hover:text-purple-300 font-medium"
         >
-          Sign in
+          Anmelden
         </Link>
       </div>
     </div>

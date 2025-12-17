@@ -71,18 +71,17 @@ export function PagesList({ siteId }: PagesListProps) {
       <DialogTrigger asChild>
         <Button
           size="sm"
-          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Add Page
+          Seite hinzufügen
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-slate-900 border-slate-800">
         <form onSubmit={handleCreate}>
           <DialogHeader>
-            <DialogTitle className="text-white">Create New Page</DialogTitle>
+            <DialogTitle className="text-white">Neue Seite erstellen</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Add a new page to your site
+              Füge eine neue Seite zu deiner Website hinzu
             </DialogDescription>
           </DialogHeader>
 
@@ -95,11 +94,11 @@ export function PagesList({ siteId }: PagesListProps) {
 
             <div className="space-y-2">
               <Label htmlFor="pageName" className="text-white">
-                Page Name
+                Seitenname
               </Label>
               <Input
                 id="pageName"
-                placeholder="About Us"
+                placeholder="Über uns"
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value)
@@ -114,20 +113,20 @@ export function PagesList({ siteId }: PagesListProps) {
 
             <div className="space-y-2">
               <Label htmlFor="pageSlug" className="text-white">
-                URL Slug
+                URL-Slug
               </Label>
               <div className="flex items-center gap-2">
                 <span className="text-slate-500">/</span>
                 <Input
                   id="pageSlug"
-                  placeholder={name ? generateSlug(name) : 'about-us'}
+                  placeholder={name ? generateSlug(name) : 'ueber-uns'}
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   className="bg-slate-800 border-slate-700 text-white"
                 />
               </div>
               <p className="text-xs text-slate-500">
-                Leave empty to auto-generate from name
+                Leer lassen, um automatisch vom Namen zu generieren
               </p>
             </div>
           </div>
@@ -139,20 +138,19 @@ export function PagesList({ siteId }: PagesListProps) {
               onClick={() => setOpen(false)}
               className="border-slate-700 text-slate-300 hover:bg-slate-800"
             >
-              Cancel
+              Abbrechen
             </Button>
             <Button
               type="submit"
               disabled={isLoading || !name}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
+                  Erstellen...
                 </>
               ) : (
-                'Create Page'
+                'Seite erstellen'
               )}
             </Button>
           </DialogFooter>

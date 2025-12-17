@@ -109,7 +109,7 @@ export default async function ContentTypeEntriesPage({
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}/content`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zu Inhalte
@@ -119,7 +119,7 @@ export default async function ContentTypeEntriesPage({
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1
-            className="text-3xl font-bold text-white flex items-center gap-3"
+            className="text-3xl font-bold text-foreground flex items-center gap-3"
           >
             <div
               className="p-2 rounded-lg"
@@ -133,11 +133,11 @@ export default async function ContentTypeEntriesPage({
             {contentType.label_plural}
           </h1>
           {contentType.description && (
-            <p className="text-slate-400 mt-2">{contentType.description}</p>
+            <p className="text-muted-foreground mt-2">{contentType.description}</p>
           )}
         </div>
         <Link href={`/dashboard/sites/${siteId}/content/${contentTypeSlug}/new`}>
-          <Button className="bg-purple-600 hover:bg-purple-700">
+          <Button>
             <Plus className="h-4 w-4 mr-2" />
             {contentType.label_singular} erstellen
           </Button>
@@ -150,8 +150,8 @@ export default async function ContentTypeEntriesPage({
           href={`/dashboard/sites/${siteId}/content/${contentTypeSlug}`}
           className={`px-4 py-2 rounded-lg text-sm transition-colors ${
             !status || status === 'all'
-              ? 'bg-purple-600 text-white'
-              : 'bg-slate-800 text-slate-400 hover:text-white'
+              ? 'bg-primary text-white'
+              : 'bg-muted text-muted-foreground hover:text-foreground'
           }`}
         >
           Alle ({totalCount})
@@ -160,8 +160,8 @@ export default async function ContentTypeEntriesPage({
           href={`/dashboard/sites/${siteId}/content/${contentTypeSlug}?status=published`}
           className={`px-4 py-2 rounded-lg text-sm transition-colors ${
             status === 'published'
-              ? 'bg-green-600 text-white'
-              : 'bg-slate-800 text-slate-400 hover:text-white'
+              ? 'bg-primary text-white'
+              : 'bg-muted text-muted-foreground hover:text-foreground'
           }`}
         >
           Veröffentlicht ({statusCounts.published})
@@ -170,8 +170,8 @@ export default async function ContentTypeEntriesPage({
           href={`/dashboard/sites/${siteId}/content/${contentTypeSlug}?status=draft`}
           className={`px-4 py-2 rounded-lg text-sm transition-colors ${
             status === 'draft'
-              ? 'bg-yellow-600 text-white'
-              : 'bg-slate-800 text-slate-400 hover:text-white'
+              ? 'bg-primary text-white'
+              : 'bg-muted text-muted-foreground hover:text-foreground'
           }`}
         >
           Entwürfe ({statusCounts.draft})
@@ -181,8 +181,8 @@ export default async function ContentTypeEntriesPage({
             href={`/dashboard/sites/${siteId}/content/${contentTypeSlug}?status=scheduled`}
             className={`px-4 py-2 rounded-lg text-sm transition-colors ${
               status === 'scheduled'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
+                ? 'bg-primary text-white'
+                : 'bg-muted text-muted-foreground hover:text-foreground'
             }`}
           >
             Geplant ({statusCounts.scheduled})

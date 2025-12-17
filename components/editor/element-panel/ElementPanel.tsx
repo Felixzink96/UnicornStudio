@@ -13,7 +13,11 @@ import {
   GripHorizontal,
   Send,
   Loader2,
+  Image as ImageIcon,
+  Upload,
+  ExternalLink,
 } from 'lucide-react'
+import { ImagePicker } from '../assets/ImagePicker'
 
 // Parse spacing from Tailwind classes
 function parseSpacing(classes: string, prefix: string): { t: string, r: string, b: string, l: string } {
@@ -65,11 +69,13 @@ export function ElementPanel() {
   const [isDragging, setIsDragging] = useState(false)
   const [elementPrompt, setElementPrompt] = useState('')
   const [isModifying, setIsModifying] = useState(false)
+  const [showImagePicker, setShowImagePicker] = useState(false)
   const dragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null)
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     family: true,
     text: true,
+    image: true,
     margin: true,
     padding: true,
     size: true,
@@ -79,6 +85,67 @@ export function ElementPanel() {
   const clearSelection = useEditorStore((s) => s.clearSelection)
   const html = useEditorStore((s) => s.html)
   const updateHtml = useEditorStore((s) => s.updateHtml)
+  const siteId = useEditorStore((s) => s.siteId)
+
+  // Check if selected element is an image
+  const isImageElement = selectedElement?.tagName?.toUpperCase() === 'IMG'
+
+  // Parse image src/alt from current HTML (re-parses when html changes)
+  const getImageAttributes = () => {
+    if (!isImageElement || !selectedElement?.selector) return { src: null, alt: '' }
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const img = doc.querySelector(selectedElement.selector) as HTMLImageElement
+    return {
+      src: img?.src || null,
+      alt: img?.alt || ''
+    }
+  }
+  const imageAttrs = getImageAttributes()
+  const currentImageSrc = imageAttrs.src
+  const currentImageAlt = imageAttrs.alt
+
+  // Update image src
+  const updateImageSrc = (newSrc: string, newAlt?: string) => {
+    if (!selectedElement?.selector) return
+
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const element = doc.querySelector(selectedElement.selector) as HTMLImageElement
+    if (!element || element.tagName !== 'IMG') return
+
+    element.src = newSrc
+    if (newAlt !== undefined) {
+      element.alt = newAlt
+    }
+
+    // Reconstruct HTML
+    let newHtml = '<!DOCTYPE html>\n<html'
+    Array.from(doc.documentElement.attributes).forEach(attr => {
+      newHtml += ` ${attr.name}="${attr.value}"`
+    })
+    newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+
+    updateHtml(newHtml, true)
+  }
+
+  // Update image alt text
+  const updateImageAlt = (newAlt: string) => {
+    if (!selectedElement?.selector) return
+
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const element = doc.querySelector(selectedElement.selector) as HTMLImageElement
+    if (!element || element.tagName !== 'IMG') return
+
+    element.alt = newAlt
+
+    // Reconstruct HTML
+    let newHtml = '<!DOCTYPE html>\n<html'
+    Array.from(doc.documentElement.attributes).forEach(attr => {
+      newHtml += ` ${attr.name}="${attr.value}"`
+    })
+    newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+
+    updateHtml(newHtml, true)
+  }
 
   // Current classes
   const currentClasses = selectedElement?.className?.replace('unicorn-selected', '').replace('unicorn-hover-outline', '').trim() || ''
@@ -250,7 +317,7 @@ export function ElementPanel() {
                 onClick={() => toggleSection('family')}
                 className="flex items-center justify-between w-full py-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900"
               >
-                Family Elements
+                Element-Hierarchie
                 <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 transition-transform ${expandedSections.family ? '' : '-rotate-90'}`} />
               </button>
               {expandedSections.family && (
@@ -268,13 +335,13 @@ export function ElementPanel() {
             </div>
 
             {/* Text Content */}
-            {selectedElement.textContent && (
+            {selectedElement.textContent && !isImageElement && (
               <div className="border-t border-zinc-100 pt-0.5">
                 <button
                   onClick={() => toggleSection('text')}
                   className="flex items-center justify-between w-full py-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900"
                 >
-                  Text Content
+                  Text-Inhalt
                   <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 transition-transform ${expandedSections.text ? '' : '-rotate-90'}`} />
                 </button>
                 {expandedSections.text && (
@@ -284,6 +351,107 @@ export function ElementPanel() {
                       defaultValue={selectedElement.textContent.substring(0, 50)}
                       className="w-full h-8 px-2.5 text-xs text-zinc-900 bg-zinc-50 border border-zinc-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Image - only for IMG elements */}
+            {isImageElement && (
+              <div className="border-t border-zinc-100 pt-0.5">
+                <button
+                  onClick={() => toggleSection('image')}
+                  className="flex items-center justify-between w-full py-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5" />
+                    Bild
+                  </span>
+                  <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 transition-transform ${expandedSections.image ? '' : '-rotate-90'}`} />
+                </button>
+                {expandedSections.image && (
+                  <div className="pb-3 space-y-2">
+                    {/* Current image preview */}
+                    {currentImageSrc && (
+                      <div className="relative rounded-md overflow-hidden border border-zinc-200 bg-zinc-50">
+                        <img
+                          src={currentImageSrc}
+                          alt={currentImageAlt || ''}
+                          className="w-full h-24 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+                          <button
+                            onClick={() => setShowImagePicker(true)}
+                            className="px-3 py-1.5 bg-white rounded-md text-xs font-medium shadow-lg flex items-center gap-1.5"
+                          >
+                            <Upload className="h-3 w-3" />
+                            Ersetzen
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Replace button */}
+                    <button
+                      onClick={() => setShowImagePicker(true)}
+                      className="w-full h-8 px-3 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-md transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      Bild auswählen / hochladen
+                    </button>
+
+                    {/* Alt text */}
+                    <div>
+                      <label className="text-[10px] text-zinc-400 block mb-1">Alt-Text (SEO)</label>
+                      <input
+                        type="text"
+                        defaultValue={currentImageAlt}
+                        onBlur={(e) => updateImageAlt(e.target.value)}
+                        placeholder="Bildbeschreibung..."
+                        className="w-full h-7 px-2 text-xs text-zinc-900 bg-zinc-50 border border-zinc-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    {/* URL Input */}
+                    <div>
+                      <label className="text-[10px] text-zinc-400 block mb-1">Bild-URL</label>
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          defaultValue={currentImageSrc || ''}
+                          key={currentImageSrc}
+                          onBlur={(e) => {
+                            const newUrl = e.target.value.trim()
+                            if (newUrl && newUrl !== currentImageSrc) {
+                              updateImageSrc(newUrl)
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const newUrl = (e.target as HTMLInputElement).value.trim()
+                              if (newUrl && newUrl !== currentImageSrc) {
+                                updateImageSrc(newUrl)
+                              }
+                              (e.target as HTMLInputElement).blur()
+                            }
+                          }}
+                          placeholder="https://..."
+                          className="flex-1 h-7 px-2 text-[10px] text-zinc-700 bg-zinc-50 border border-zinc-200 rounded font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        {currentImageSrc && (
+                          <a
+                            href={currentImageSrc}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="h-7 w-7 flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 rounded transition-colors"
+                            title="In neuem Tab öffnen"
+                          >
+                            <ExternalLink className="h-3 w-3 text-zinc-500" />
+                          </a>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-zinc-400 mt-1">Enter drücken oder Feld verlassen zum Speichern</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -415,6 +583,20 @@ export function ElementPanel() {
           </div>
         )}
       </div>
+
+      {/* Image Picker Modal */}
+      {siteId && (
+        <ImagePicker
+          siteId={siteId}
+          open={showImagePicker}
+          onOpenChange={setShowImagePicker}
+          onSelect={(url, altText) => {
+            updateImageSrc(url, altText || currentImageAlt || '')
+          }}
+          currentUrl={currentImageSrc || undefined}
+          currentAlt={currentImageAlt || undefined}
+        />
+      )}
     </div>
   )
 }

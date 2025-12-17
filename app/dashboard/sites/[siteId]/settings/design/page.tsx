@@ -241,7 +241,7 @@ export default function DesignSettingsPage() {
   }
 
   const handleReset = async () => {
-    if (!confirm('Mochtest du alle Design-Einstellungen zurucksetzen?')) return
+    if (!confirm('Möchtest du alle Design-Einstellungen zurücksetzen?')) return
 
     const supabase = createClient()
 
@@ -269,7 +269,7 @@ export default function DesignSettingsPage() {
   if (!designVars) {
     return (
       <div className="p-8">
-        <p className="text-slate-400">Design-Variablen konnten nicht geladen werden.</p>
+        <p className="text-muted-foreground">Design-Variablen konnten nicht geladen werden.</p>
       </div>
     )
   }
@@ -279,28 +279,28 @@ export default function DesignSettingsPage() {
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}/settings`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        Zuruck zu Einstellungen
+        Zurück zu Einstellungen
       </Link>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Palette className="h-8 w-8 text-purple-500" />
             Design System
           </h1>
-          <p className="text-slate-400 mt-2">
-            Zentrale Design-Tokens fur {siteName}
+          <p className="text-muted-foreground mt-2">
+            Zentrale Design-Tokens für {siteName}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={handleReset} disabled={saving}>
             <RotateCcw className="h-4 w-4 mr-2" />
-            Zurucksetzen
+            Zurücksetzen
           </Button>
           <Button onClick={handleSave} disabled={!hasChanges || saving}>
             {saving ? (
@@ -319,33 +319,33 @@ export default function DesignSettingsPage() {
       </div>
 
       <Tabs defaultValue="colors" className="space-y-6">
-        <TabsList className="bg-slate-900 border border-slate-800">
-          <TabsTrigger value="colors" className="data-[state=active]:bg-purple-600">
+        <TabsList className="bg-card border border-border">
+          <TabsTrigger value="colors">
             <Palette className="h-4 w-4 mr-2" />
             Farben
           </TabsTrigger>
-          <TabsTrigger value="gradients" className="data-[state=active]:bg-purple-600">
+          <TabsTrigger value="gradients">
             <Sparkles className="h-4 w-4 mr-2" />
             Gradients
           </TabsTrigger>
-          <TabsTrigger value="typography" className="data-[state=active]:bg-purple-600">
+          <TabsTrigger value="typography">
             <Type className="h-4 w-4 mr-2" />
             Typografie
           </TabsTrigger>
-          <TabsTrigger value="spacing" className="data-[state=active]:bg-purple-600">
+          <TabsTrigger value="spacing">
             <Ruler className="h-4 w-4 mr-2" />
-            Abstande
+            Abstände
           </TabsTrigger>
         </TabsList>
 
         {/* Colors Tab */}
         <TabsContent value="colors" className="space-y-6">
           {/* Brand Colors */}
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">Markenfarben</CardTitle>
+              <CardTitle className="text-foreground">Markenfarben</CardTitle>
               <CardDescription>
-                Hauptfarben fur Buttons, CTAs und Akzente
+                Hauptfarben für Buttons, CTAs und Akzente
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -379,11 +379,11 @@ export default function DesignSettingsPage() {
           </Card>
 
           {/* Neutral Colors */}
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">Neutrale Farben</CardTitle>
+              <CardTitle className="text-foreground">Neutrale Farben</CardTitle>
               <CardDescription>
-                Hintergrunde, Text und Rahmen
+                Hintergründe, Text und Rahmen
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -417,11 +417,11 @@ export default function DesignSettingsPage() {
           </Card>
 
           {/* Custom Colors */}
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">Custom Colors</CardTitle>
+              <CardTitle className="text-foreground">Custom Colors</CardTitle>
               <CardDescription>
-                Eigene Farben fur spezielle Elemente
+                Eigene Farben für spezielle Elemente
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -437,7 +437,7 @@ export default function DesignSettingsPage() {
                       />
                       <button
                         onClick={() => removeCustomColor(key)}
-                        className="absolute top-0 right-0 p-1 text-slate-400 hover:text-red-400"
+                        className="absolute top-0 right-0 p-1 text-muted-foreground hover:text-red-400"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -446,28 +446,28 @@ export default function DesignSettingsPage() {
                 </div>
               )}
 
-              <div className="flex gap-3 items-end pt-4 border-t border-slate-800">
+              <div className="flex gap-3 items-end pt-4 border-t border-border">
                 <div className="flex-1">
-                  <label className="text-sm text-slate-400 mb-1 block">Name</label>
+                  <label className="text-sm text-muted-foreground mb-1 block">Name</label>
                   <Input
                     placeholder="z.B. success, warning, gold"
                     value={newColorName}
                     onChange={(e) => setNewColorName(e.target.value)}
-                    className="bg-slate-800 border-slate-700"
+                    className="bg-muted border-border"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-400 mb-1 block">Farbe</label>
+                  <label className="text-sm text-muted-foreground mb-1 block">Farbe</label>
                   <input
                     type="color"
                     value={newColorValue}
                     onChange={(e) => setNewColorValue(e.target.value)}
-                    className="h-10 w-20 rounded border border-slate-700 bg-slate-800 cursor-pointer"
+                    className="h-10 w-20 rounded border border-border bg-muted cursor-pointer"
                   />
                 </div>
                 <Button onClick={addCustomColor} disabled={!newColorName.trim()}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Hinzufugen
+                  Hinzufügen
                 </Button>
               </div>
             </CardContent>
@@ -476,18 +476,18 @@ export default function DesignSettingsPage() {
 
         {/* Gradients Tab */}
         <TabsContent value="gradients" className="space-y-6">
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">Gradients</CardTitle>
+              <CardTitle className="text-foreground">Gradients</CardTitle>
               <CardDescription>
-                Farbverlaufe fur Hintergrunde und Akzente
+                Farbverläufe für Hintergründe und Akzente
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Primary Gradient */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-white">Primary Gradient</h4>
+                  <h4 className="font-medium text-foreground">Primary Gradient</h4>
                   {!gradients.primary ? (
                     <Button size="sm" variant="outline" onClick={() => addGradient('primary')}>
                       <Plus className="h-4 w-4 mr-2" />
@@ -502,36 +502,36 @@ export default function DesignSettingsPage() {
                 </div>
 
                 {gradients.primary && (
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-slate-800/50 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-muted/50 rounded-lg">
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Von</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Von</label>
                       <input
                         type="color"
                         value={gradients.primary.from}
                         onChange={(e) => updateGradient('primary', 'from', e.target.value)}
-                        className="h-10 w-full rounded border border-slate-700 bg-slate-800 cursor-pointer"
+                        className="h-10 w-full rounded border border-border bg-muted cursor-pointer"
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Via (optional)</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Via (optional)</label>
                       <input
                         type="color"
                         value={gradients.primary.via || '#ffffff'}
                         onChange={(e) => updateGradient('primary', 'via', e.target.value)}
-                        className="h-10 w-full rounded border border-slate-700 bg-slate-800 cursor-pointer"
+                        className="h-10 w-full rounded border border-border bg-muted cursor-pointer"
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Zu</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Zu</label>
                       <input
                         type="color"
                         value={gradients.primary.to}
                         onChange={(e) => updateGradient('primary', 'to', e.target.value)}
-                        className="h-10 w-full rounded border border-slate-700 bg-slate-800 cursor-pointer"
+                        className="h-10 w-full rounded border border-border bg-muted cursor-pointer"
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Richtung</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Richtung</label>
                       <div className="grid grid-cols-4 gap-1">
                         {GRADIENT_DIRECTIONS.map((d) => (
                           <button
@@ -539,8 +539,8 @@ export default function DesignSettingsPage() {
                             onClick={() => updateGradient('primary', 'direction', d.value)}
                             className={`p-2 rounded text-lg ${
                               gradients.primary.direction === d.value
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                ? 'bg-primary text-white'
+                                : 'bg-muted text-muted-foreground hover:bg-accent'
                             }`}
                             title={d.title}
                           >
@@ -550,9 +550,9 @@ export default function DesignSettingsPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Vorschau</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Vorschau</label>
                       <div
-                        className="h-10 w-full rounded border border-slate-700"
+                        className="h-10 w-full rounded border border-border"
                         style={{
                           background: `linear-gradient(${gradients.primary.direction.replace('to-', 'to ')}, ${gradients.primary.from}, ${gradients.primary.via || ''} ${gradients.primary.via ? ',' : ''} ${gradients.primary.to})`.replace(', ,', ','),
                         }}
@@ -567,7 +567,7 @@ export default function DesignSettingsPage() {
               {/* Secondary Gradient */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-white">Secondary Gradient</h4>
+                  <h4 className="font-medium text-foreground">Secondary Gradient</h4>
                   {!gradients.secondary ? (
                     <Button size="sm" variant="outline" onClick={() => addGradient('secondary')}>
                       <Plus className="h-4 w-4 mr-2" />
@@ -582,36 +582,36 @@ export default function DesignSettingsPage() {
                 </div>
 
                 {gradients.secondary && (
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-slate-800/50 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-muted/50 rounded-lg">
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Von</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Von</label>
                       <input
                         type="color"
                         value={gradients.secondary.from}
                         onChange={(e) => updateGradient('secondary', 'from', e.target.value)}
-                        className="h-10 w-full rounded border border-slate-700 bg-slate-800 cursor-pointer"
+                        className="h-10 w-full rounded border border-border bg-muted cursor-pointer"
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Via (optional)</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Via (optional)</label>
                       <input
                         type="color"
                         value={gradients.secondary.via || '#ffffff'}
                         onChange={(e) => updateGradient('secondary', 'via', e.target.value)}
-                        className="h-10 w-full rounded border border-slate-700 bg-slate-800 cursor-pointer"
+                        className="h-10 w-full rounded border border-border bg-muted cursor-pointer"
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Zu</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Zu</label>
                       <input
                         type="color"
                         value={gradients.secondary.to}
                         onChange={(e) => updateGradient('secondary', 'to', e.target.value)}
-                        className="h-10 w-full rounded border border-slate-700 bg-slate-800 cursor-pointer"
+                        className="h-10 w-full rounded border border-border bg-muted cursor-pointer"
                       />
                     </div>
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Richtung</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Richtung</label>
                       <div className="grid grid-cols-4 gap-1">
                         {GRADIENT_DIRECTIONS.map((d) => (
                           <button
@@ -619,8 +619,8 @@ export default function DesignSettingsPage() {
                             onClick={() => updateGradient('secondary', 'direction', d.value)}
                             className={`p-2 rounded text-lg ${
                               gradients.secondary.direction === d.value
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                ? 'bg-primary text-white'
+                                : 'bg-muted text-muted-foreground hover:bg-accent'
                             }`}
                             title={d.title}
                           >
@@ -630,9 +630,9 @@ export default function DesignSettingsPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm text-slate-400 mb-1 block">Vorschau</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">Vorschau</label>
                       <div
-                        className="h-10 w-full rounded border border-slate-700"
+                        className="h-10 w-full rounded border border-border"
                         style={{
                           background: `linear-gradient(${gradients.secondary.direction.replace('to-', 'to ')}, ${gradients.secondary.from}, ${gradients.secondary.via || ''} ${gradients.secondary.via ? ',' : ''} ${gradients.secondary.to})`.replace(', ,', ','),
                         }}
@@ -647,34 +647,34 @@ export default function DesignSettingsPage() {
 
         {/* Typography Tab */}
         <TabsContent value="typography" className="space-y-6">
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">Schriftarten</CardTitle>
+              <CardTitle className="text-foreground">Schriftarten</CardTitle>
               <CardDescription>
-                Schriften fur Uberschriften, Fliesstext und Code
+                Schriften für Überschriften, Fließtext und Code
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FontSelector
-                  label="Uberschriften"
+                  label="Überschriften"
                   description="H1 - H6"
                   value={designVars.typography.fontHeading}
                   onChange={(v) => updateTypography('fontHeading', v)}
                 />
                 <FontSelector
-                  label="Fliesstext"
+                  label="Fließtext"
                   description="Paragraphen, Listen"
                   value={designVars.typography.fontBody}
                   onChange={(v) => updateTypography('fontBody', v)}
                 />
                 <div>
-                  <label className="text-sm font-medium text-white mb-1 block">Monospace</label>
-                  <p className="text-xs text-slate-400 mb-2">Code-Blocke</p>
+                  <label className="text-sm font-medium text-foreground mb-1 block">Monospace</label>
+                  <p className="text-xs text-muted-foreground mb-2">Code-Blöcke</p>
                   <select
                     value={designVars.typography.fontMono || ''}
                     onChange={(e) => updateTypography('fontMono', e.target.value)}
-                    className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white"
+                    className="w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground"
                   >
                     <option value="">Nicht gesetzt</option>
                     {MONO_FONTS.map((font) => (
@@ -686,12 +686,12 @@ export default function DesignSettingsPage() {
 
               <Separator />
 
-              <div className="p-4 bg-slate-800/50 rounded-lg">
-                <div className="flex items-center gap-2 text-sm text-slate-400 mb-3">
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                   <Download className="h-4 w-4" />
                   DSGVO-konforme Fonts
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Google Fonts werden automatisch heruntergeladen und lokal gehostet
                   beim Export zu WordPress.
                 </p>
@@ -702,11 +702,11 @@ export default function DesignSettingsPage() {
 
         {/* Spacing Tab */}
         <TabsContent value="spacing" className="space-y-6">
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">Abstande</CardTitle>
+              <CardTitle className="text-foreground">Abstände</CardTitle>
               <CardDescription>
-                Standardabstande fur Sections und Container
+                Standardabstände für Sections und Container
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -729,11 +729,11 @@ export default function DesignSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">Border Radius</CardTitle>
+              <CardTitle className="text-foreground">Border Radius</CardTitle>
               <CardDescription>
-                Eckenradius fur Buttons, Karten und andere Elemente
+                Eckenradius für Buttons, Karten und andere Elemente
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -764,15 +764,15 @@ export default function DesignSettingsPage() {
           <h3 className="font-semibold text-purple-400 mb-2">
             Design Token System
           </h3>
-          <ul className="text-sm text-slate-400 space-y-2">
+          <ul className="text-sm text-muted-foreground space-y-2">
             <li>
-              1. Definiere hier deine Farben, Schriften, Gradients und Abstande
+              1. Definiere hier deine Farben, Schriften, Gradients und Abstände
             </li>
             <li>
               2. Die AI verwendet automatisch diese Tokens bei der Generierung
             </li>
             <li>
-              3. Anderungen hier wirken sich auf alle generierten Seiten aus
+              3. Änderungen hier wirken sich auf alle generierten Seiten aus
             </li>
             <li>
               4. Referenziere Tokens im Chat mit @ (z.B. @PrimaryColor, @HeadingFont)

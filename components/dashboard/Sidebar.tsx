@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import {
   LayoutDashboard,
   Globe,
@@ -20,12 +21,12 @@ import {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, exact: true },
-  { name: 'Sites', href: '/dashboard/sites', icon: Globe },
-  { name: 'Templates', href: '/dashboard/templates', icon: FolderOpen },
+  { name: 'Websites', href: '/dashboard/sites', icon: Globe },
+  { name: 'Vorlagen', href: '/dashboard/templates', icon: FolderOpen },
 ]
 
 const settingsNavigation = [
-  { name: 'API Keys', href: '/dashboard/settings/api-keys', icon: Key },
+  { name: 'API-Schlüssel', href: '/dashboard/settings/api-keys', icon: Key },
   { name: 'Integrationen', href: '/dashboard/settings/integrations', icon: Puzzle },
 ]
 
@@ -44,13 +45,16 @@ export function Sidebar() {
   }
 
   return (
-    <div className="flex h-full w-64 flex-col bg-slate-900">
+    <div className="flex h-full w-64 flex-col bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2 px-6 border-b border-slate-800">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
-          <Sparkles className="w-5 h-5 text-white" />
+      <div className="flex h-16 items-center justify-between px-6 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900 dark:bg-zinc-100">
+            <Sparkles className="w-5 h-5 text-white dark:text-zinc-900" />
+          </div>
+          <span className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Unicorn Studio</span>
         </div>
-        <span className="text-xl font-bold text-white">Unicorn Studio</span>
+        <ThemeToggle />
       </div>
 
       {/* Navigation */}
@@ -66,8 +70,8 @@ export function Sidebar() {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
               )}
             >
               <item.icon className="h-5 w-5" />
@@ -83,12 +87,12 @@ export function Sidebar() {
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors w-full',
               isSettingsActive
-                ? 'bg-slate-800 text-white'
-                : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
             )}
           >
             <Settings className="h-5 w-5" />
-            <span className="flex-1 text-left">Settings</span>
+            <span className="flex-1 text-left">Einstellungen</span>
             <ChevronDown
               className={cn(
                 'h-4 w-4 transition-transform',
@@ -99,14 +103,14 @@ export function Sidebar() {
 
           {/* Settings Sub-Items */}
           {settingsOpen && (
-            <div className="mt-1 ml-4 space-y-1 border-l border-slate-700 pl-3">
+            <div className="mt-1 ml-4 space-y-1 border-l border-zinc-200 dark:border-zinc-700 pl-3">
               <Link
                 href="/dashboard/settings"
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   pathname === '/dashboard/settings'
-                    ? 'bg-slate-800/50 text-white'
-                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
                 )}
               >
                 Übersicht
@@ -120,8 +124,8 @@ export function Sidebar() {
                     className={cn(
                       'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                       isActive
-                        ? 'bg-slate-800/50 text-white'
-                        : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                        ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
                     )}
                   >
                     <item.icon className="h-4 w-4" />
@@ -135,14 +139,14 @@ export function Sidebar() {
       </nav>
 
       {/* Sign Out */}
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-slate-400 hover:text-white hover:bg-slate-800/50"
+          className="w-full justify-start gap-3 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800"
           onClick={handleSignOut}
         >
           <LogOut className="h-5 w-5" />
-          Sign out
+          Abmelden
         </Button>
       </div>
     </div>

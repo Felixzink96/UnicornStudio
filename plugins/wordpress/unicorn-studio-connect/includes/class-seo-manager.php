@@ -77,7 +77,7 @@ class Unicorn_Studio_SEO_Manager {
      */
     public function get_sitemap_url() {
         $site_id = Unicorn_Studio::get_site_id();
-        $api_url = Unicorn_Studio::get_api_url();
+        $api_url = get_option('unicorn_studio_api_url', '');
 
         if (!$site_id || !$api_url) {
             return false;

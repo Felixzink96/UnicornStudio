@@ -32,7 +32,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     },
     {
       title: 'Design System',
-      description: 'Farben, Schriften und Abstande fur konsistente Generierung',
+      description: 'Farben, Schriften und Abstände für konsistente Generierung',
       href: `/dashboard/sites/${siteId}/settings/design`,
       icon: Palette,
     },
@@ -45,7 +45,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     {
       title: 'Integrationen',
       description: 'WordPress, Webhooks und externe Verbindungen',
-      href: `/dashboard/sites/${siteId}/settings/integrations`,
+      href: `/dashboard/settings/integrations`,
       icon: Puzzle,
     },
   ]
@@ -55,16 +55,16 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        Zuruck zu {site.name}
+        Zurück zu {site.name}
       </Link>
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white">Einstellungen</h1>
-        <p className="text-slate-400 mt-2">
+        <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">Einstellungen</h1>
+        <p className="text-zinc-600 dark:text-zinc-400 mt-2">
           Konfiguriere deine Site
         </p>
       </div>
@@ -73,20 +73,20 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
       <div className="grid gap-4">
         {settingsLinks.map((link) => (
           <Link key={link.href} href={link.href}>
-            <Card className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-colors cursor-pointer">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
               <CardContent className="flex items-center justify-between p-6">
                 <div className="flex items-center gap-4">
                   <div className="p-3 rounded-lg bg-purple-500/10">
                     <link.icon className="h-6 w-6 text-purple-500" />
                   </div>
                   <div>
-                    <CardTitle className="text-white text-lg">{link.title}</CardTitle>
-                    <CardDescription className="text-slate-400">
+                    <CardTitle className="text-zinc-900 dark:text-zinc-100 text-lg">{link.title}</CardTitle>
+                    <CardDescription className="text-zinc-600 dark:text-zinc-400">
                       {link.description}
                     </CardDescription>
                   </div>
                 </div>
-                <ChevronRight className="h-5 w-5 text-slate-500" />
+                <ChevronRight className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
               </CardContent>
             </Card>
           </Link>

@@ -45,10 +45,10 @@ function LoginForm() {
     <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/20">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">
-          Welcome back
+          Willkommen zurück
         </h1>
         <p className="text-gray-300">
-          Sign in to your Unicorn Studio account
+          Melde dich bei deinem Unicorn Studio Konto an
         </p>
       </div>
 
@@ -61,7 +61,7 @@ function LoginForm() {
 
         <div className="space-y-2">
           <Label htmlFor="email" className="text-white">
-            Email
+            E-Mail
           </Label>
           <Input
             id="email"
@@ -76,12 +76,12 @@ function LoginForm() {
 
         <div className="space-y-2">
           <Label htmlFor="password" className="text-white">
-            Password
+            Passwort
           </Label>
           <Input
             id="password"
             type="password"
-            placeholder="Your password"
+            placeholder="Dein Passwort"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -91,27 +91,20 @@ function LoginForm() {
 
         <Button
           type="submit"
-          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
-          disabled={isLoading}
+          className="w-full"
+          loading={isLoading}
         >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Signing in...
-            </>
-          ) : (
-            'Sign in'
-          )}
+          {isLoading ? 'Anmelden...' : 'Anmelden'}
         </Button>
       </form>
 
       <div className="mt-6 text-center text-gray-300">
-        Don&apos;t have an account?{' '}
+        Noch kein Konto?{' '}
         <Link
           href="/signup"
           className="text-purple-400 hover:text-purple-300 font-medium"
         >
-          Sign up
+          Registrieren
         </Link>
       </div>
     </div>

@@ -82,6 +82,8 @@ final class Unicorn_Studio {
     public $site_identity;
     public $seo;
     public $menus;
+    public $forms;
+    public $media_sync;
 
     /**
      * Get single instance
@@ -142,6 +144,8 @@ final class Unicorn_Studio {
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-menus.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-site-identity.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-seo-manager.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-form-handler.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-media-sync.php';
 
         // Initialize components
         $this->api = new Unicorn_Studio_API_Client();
@@ -166,6 +170,8 @@ final class Unicorn_Studio {
         $this->seo = new Unicorn_Studio_SEO_Manager($this->api);
         $this->seo->init();
         $this->menus = Unicorn_Studio_Menus::get_instance();
+        $this->forms = new Unicorn_Studio_Form_Handler();
+        $this->media_sync = new Unicorn_Studio_Media_Sync();
 
         // Admin bar / floating button (frontend only)
         if (!is_admin()) {
@@ -215,6 +221,8 @@ final class Unicorn_Studio {
 
         // Register webhook endpoint
         add_action('rest_api_init', [$this->webhooks, 'register_endpoint']);
+        add_action('rest_api_init', [$this->forms, 'register_endpoint']);
+        add_action('rest_api_init', [$this->media_sync, 'register_endpoints']);
 
         // AJAX handlers
         add_action('wp_ajax_unicorn_studio_sync', [$this->sync, 'ajax_sync']);

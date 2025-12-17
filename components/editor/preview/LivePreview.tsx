@@ -6,6 +6,9 @@ import type { SelectedElement, Breakpoint } from '@/types/editor'
 import { insertGlobalComponents } from '@/lib/ai/html-operations'
 import { injectMenusIntoHtml } from '@/lib/menus/render-menu'
 import { darkenHex } from '@/lib/design/style-extractor'
+import { ContextMenu } from '../context-menu/ContextMenu'
+import { SaveComponentDialog } from '../context-menu/SaveComponentDialog'
+import { ImagePicker } from '../assets/ImagePicker'
 
 // Helper: Convert hex to RGB string (space-separated for CSS)
 function hexToRgb(hex: string): string {
@@ -34,19 +37,76 @@ function useDebouncedValue<T>(value: T, delay: number): T {
 
 export function LivePreview() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  // Scroll-Position speichern für Wiederherstellung nach iframe-Update
+  const savedScrollPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
 
   const html = useEditorStore((s) => s.html)
   const viewMode = useEditorStore((s) => s.viewMode)
   const breakpoint = useEditorStore((s) => s.breakpoint)
   const selectElement = useEditorStore((s) => s.selectElement)
+  const selectedElement = useEditorStore((s) => s.selectedElement)
   const updateHtml = useEditorStore((s) => s.updateHtml)
   const globalHeader = useEditorStore((s) => s.globalHeader)
   const globalFooter = useEditorStore((s) => s.globalFooter)
   const menus = useEditorStore((s) => s.menus)
   const designVariables = useEditorStore((s) => s.designVariables)
+  const siteId = useEditorStore((s) => s.siteId)
+  const messages = useEditorStore((s) => s.messages)
 
-  // Debounce HTML updates during streaming (150ms delay)
-  const debouncedHtml = useDebouncedValue(html, 150)
+  // Prüfen ob gerade gestreamt wird (für Animation-Pause und Scroll-Restore)
+  const lastMessage = messages[messages.length - 1]
+  const isCurrentlyStreaming = lastMessage?.isStreaming || false
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    element: { tagName: string; selector: string; outerHTML: string } | null
+  } | null>(null)
+
+  // Save component dialog
+  const [showSaveComponent, setShowSaveComponent] = useState(false)
+  const [componentHtml, setComponentHtml] = useState('')
+
+  // Image picker for replace image action
+  const [showImagePicker, setShowImagePicker] = useState(false)
+  const [imageSelector, setImageSelector] = useState<string | null>(null)
+
+  // Clipboard for cut/copy/paste
+  const [clipboard, setClipboard] = useState<string | null>(null)
+
+  // Debounce HTML updates during streaming (400ms delay for smoother animations)
+  // Verhindert Flackern bei schnellen Updates während des AI-Streamings
+  const debouncedHtml = useDebouncedValue(html, 400)
+
+  // Scroll-Position speichern BEVOR das HTML sich ändert
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (iframe?.contentWindow) {
+      savedScrollPos.current = {
+        x: iframe.contentWindow.scrollX || 0,
+        y: iframe.contentWindow.scrollY || 0,
+      }
+    }
+  }, [debouncedHtml]) // Triggert bevor srcDoc aktualisiert wird
+
+  // Scroll-Position wiederherstellen NACHDEM iframe geladen hat
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const handleLoad = () => {
+      // Kurze Verzögerung damit DOM bereit ist
+      requestAnimationFrame(() => {
+        if (iframe.contentWindow && savedScrollPos.current.y > 0) {
+          iframe.contentWindow.scrollTo(savedScrollPos.current.x, savedScrollPos.current.y)
+        }
+      })
+    }
+
+    iframe.addEventListener('load', handleLoad)
+    return () => iframe.removeEventListener('load', handleLoad)
+  }, [])
 
   // Generate CSS variables from design tokens
   const designTokensCss = useMemo(() => {
@@ -137,11 +197,21 @@ export function LivePreview() {
     return htmlWithComponents
   }, [debouncedHtml, globalHeader, globalFooter, menus, designTokensCss])
 
-  const getHtmlWithScript = useCallback((html: string): string => {
+  const getHtmlWithScript = useCallback((html: string, pauseAnimations: boolean): string => {
     if (viewMode !== 'design') return html
+
+    // CSS um Animationen während Streaming zu pausieren (verhindert Flackern)
+    const animationPauseCSS = pauseAnimations ? `
+      /* Animationen pausieren während Streaming - verhindert Flackern */
+      *, *::before, *::after {
+        animation-play-state: paused !important;
+        transition: none !important;
+      }
+    ` : ''
 
     const selectionScript = `
     <style>
+      ${animationPauseCSS}
       * { cursor: default !important; }
       a, button, input, select, textarea { pointer-events: auto !important; }
       .unicorn-hover-outline {
@@ -202,6 +272,27 @@ export function LivePreview() {
       .unicorn-badge-btn svg {
         width: 14px;
         height: 14px;
+      }
+      .unicorn-badge-drag {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 28px;
+        background: rgba(255,255,255,0.1);
+        color: white;
+        cursor: grab;
+        border-right: 1px solid rgba(255,255,255,0.15);
+      }
+      .unicorn-badge-drag:hover {
+        background: rgba(255,255,255,0.2);
+      }
+      .unicorn-badge-drag:active {
+        cursor: grabbing;
+      }
+      .unicorn-badge-drag svg {
+        width: 12px;
+        height: 12px;
       }
       .unicorn-margin-box {
         position: absolute;
@@ -300,13 +391,14 @@ export function LivePreview() {
           var badge = document.createElement('div');
           badge.id = 'unicorn-badge';
           badge.className = 'unicorn-badge';
-          badge.innerHTML = '<span class="unicorn-badge-label">DIV</span><button class="unicorn-badge-btn" id="unicorn-btn-up" title="Parent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg></button><button class="unicorn-badge-btn" id="unicorn-btn-down" title="Child"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button><button class="unicorn-badge-btn unicorn-btn-delete" id="unicorn-btn-delete" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>';
+          badge.innerHTML = '<div class="unicorn-badge-drag" id="unicorn-btn-drag" title="Verschieben"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></div><span class="unicorn-badge-label">DIV</span><button class="unicorn-badge-btn" id="unicorn-btn-up" title="Parent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg></button><button class="unicorn-badge-btn" id="unicorn-btn-down" title="Child"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button><button class="unicorn-badge-btn unicorn-btn-delete" id="unicorn-btn-delete" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>';
           badge.style.display = 'none';
           document.body.appendChild(badge);
           var badgeLabel = badge.querySelector('.unicorn-badge-label');
           var btnUp = badge.querySelector('#unicorn-btn-up');
           var btnDown = badge.querySelector('#unicorn-btn-down');
           var btnDelete = badge.querySelector('#unicorn-btn-delete');
+          var btnDrag = badge.querySelector('#unicorn-btn-drag');
 
           var marginBoxes = { top: null, right: null, bottom: null, left: null };
           var paddingBoxes = { top: null, right: null, bottom: null, left: null };
@@ -496,6 +588,89 @@ export function LivePreview() {
             }
           });
 
+          // Element Drag & Drop via Badge
+          var isDraggingElement = false;
+          var dragPlaceholder = null;
+          var dragClone = null;
+
+          btnDrag.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!selectedElement) return;
+
+            isDraggingElement = true;
+
+            // Create placeholder
+            dragPlaceholder = document.createElement('div');
+            dragPlaceholder.style.cssText = 'height:' + selectedElement.offsetHeight + 'px;background:rgba(59,130,246,0.1);border:2px dashed #3b82f6;border-radius:4px;margin:4px 0;';
+            selectedElement.parentNode.insertBefore(dragPlaceholder, selectedElement);
+
+            // Create clone for visual feedback
+            dragClone = selectedElement.cloneNode(true);
+            dragClone.style.cssText = 'position:fixed;opacity:0.7;pointer-events:none;z-index:99999;width:' + selectedElement.offsetWidth + 'px;box-shadow:0 10px 40px rgba(0,0,0,0.3);';
+            document.body.appendChild(dragClone);
+
+            selectedElement.style.display = 'none';
+            document.body.style.cursor = 'grabbing';
+            hideBadge();
+          });
+
+          document.addEventListener('mousemove', function(e) {
+            if (!isDraggingElement || !dragClone || !selectedElement) return;
+
+            // Position clone at cursor
+            dragClone.style.left = (e.clientX - dragClone.offsetWidth / 2) + 'px';
+            dragClone.style.top = (e.clientY - 20) + 'px';
+
+            // Find drop target
+            dragClone.style.display = 'none';
+            var target = document.elementFromPoint(e.clientX, e.clientY);
+            dragClone.style.display = '';
+
+            if (target && target !== dragPlaceholder && target !== selectedElement) {
+              var parent = target.closest('section, div, article, main');
+              if (parent && parent !== selectedElement && !selectedElement.contains(parent)) {
+                var rect = target.getBoundingClientRect();
+                var midY = rect.top + rect.height / 2;
+
+                if (e.clientY < midY) {
+                  target.parentNode.insertBefore(dragPlaceholder, target);
+                } else {
+                  target.parentNode.insertBefore(dragPlaceholder, target.nextSibling);
+                }
+              }
+            }
+          });
+
+          document.addEventListener('mouseup', function(e) {
+            if (!isDraggingElement) return;
+
+            isDraggingElement = false;
+            document.body.style.cursor = '';
+
+            if (dragPlaceholder && selectedElement) {
+              // Move element to placeholder position
+              dragPlaceholder.parentNode.insertBefore(selectedElement, dragPlaceholder);
+              selectedElement.style.display = '';
+              dragPlaceholder.remove();
+
+              // Notify parent of change
+              window.parent.postMessage({
+                type: 'element-moved',
+                html: document.documentElement.outerHTML
+              }, '*');
+
+              // Re-select
+              selectEl(selectedElement);
+            }
+
+            if (dragClone) {
+              dragClone.remove();
+              dragClone = null;
+            }
+            dragPlaceholder = null;
+          });
+
           function showSpacing(el) {
             if (!el) return;
             var rect = el.getBoundingClientRect();
@@ -591,6 +766,41 @@ export function LivePreview() {
             e.stopPropagation();
             if (editingElement && e.target !== editingElement) stopEdit();
             selectEl(e.target);
+          }, true);
+
+          // Right-click context menu
+          document.addEventListener('contextmenu', function(e) {
+            if (isUnicorn(e.target)) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            var el = e.target;
+            if (!el || el === document.body || el === document.documentElement) return;
+
+            // Select the element first
+            selectEl(el);
+
+            // Get iframe position relative to parent window
+            var iframeRect = { left: 0, top: 0 };
+            try {
+              var iframe = window.frameElement;
+              if (iframe) {
+                var rect = iframe.getBoundingClientRect();
+                iframeRect = { left: rect.left, top: rect.top };
+              }
+            } catch(err) {}
+
+            // Send context menu event to parent
+            window.parent.postMessage({
+              type: 'context-menu',
+              x: e.clientX + iframeRect.left,
+              y: e.clientY + iframeRect.top,
+              element: {
+                tagName: el.tagName,
+                selector: getSelector(el),
+                outerHTML: el.outerHTML
+              }
+            }, '*');
           }, true);
 
           // Mousedown
@@ -707,6 +917,264 @@ export function LivePreview() {
             }
           });
 
+          // =============================================
+          // SECTION DRAG & DROP
+          // =============================================
+          console.log('[Unicorn] Initializing Section Drag & Drop...');
+          (function initSectionDrag() {
+            console.log('[Unicorn] Section Drag IIFE running');
+            var draggedSection = null;
+            var dragHandle = null;
+            var placeholder = null;
+            var sections = [];
+
+            var SECTION_SELECTORS = 'section[id], body > section, body > div:not([id^="unicorn-"]):not(.unicorn-badge):not(.unicorn-margin-box):not(.unicorn-padding-box), body > article, body > main > section, body > main > div, main > section, main > div, body > * > section, body > * > * > section';
+
+            function updateSections() {
+              sections = Array.from(document.querySelectorAll(SECTION_SELECTORS))
+                .filter(function(el) {
+                  if (el.id && el.id.startsWith('unicorn-')) return false;
+                  if (el.className && el.className.includes && el.className.includes('unicorn-')) return false;
+                  var rect = el.getBoundingClientRect();
+                  return rect.height > 50;
+                });
+              console.log('[Unicorn] Found sections:', sections.length, sections.map(function(s) { return s.id || s.tagName; }));
+            }
+
+            dragHandle = document.createElement('div');
+            dragHandle.id = 'unicorn-drag-handle';
+            dragHandle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>';
+            dragHandle.style.cssText = 'position:fixed;display:none;width:20px;height:28px;background:#3b82f6;border-radius:0 4px 4px 0;cursor:grab;z-index:99999;align-items:center;justify-content:center;color:white;box-shadow:0 2px 6px rgba(0,0,0,0.2);';
+            document.body.appendChild(dragHandle);
+            console.log('[Unicorn] Drag handle created:', dragHandle);
+
+            placeholder = document.createElement('div');
+            placeholder.id = 'unicorn-drop-placeholder';
+            placeholder.style.cssText = 'display:none;height:4px;background:#3b82f6;margin:8px 0;border-radius:2px;pointer-events:none;';
+            document.body.appendChild(placeholder);
+
+            updateSections();
+
+            function showDragHandle(section) {
+              if (draggedSection) return;
+              var rect = section.getBoundingClientRect();
+              // Position inside the section, not outside (to stay visible in iframe)
+              var leftPos = Math.max(4, rect.left + 4);
+              var topPos = rect.top + rect.height / 2 - 14;
+              console.log('[Unicorn] Showing drag handle for section:', section.id, 'at', leftPos, topPos);
+              dragHandle.style.display = 'flex';
+              dragHandle.style.left = leftPos + 'px';
+              dragHandle.style.top = topPos + 'px';
+              dragHandle.dataset.sectionIndex = sections.indexOf(section);
+            }
+
+            function hideDragHandle() {
+              if (!draggedSection) dragHandle.style.display = 'none';
+            }
+
+            document.addEventListener('mouseover', function(e) {
+              if (draggedSection) return;
+              var section = e.target.closest(SECTION_SELECTORS);
+              if (section && sections.includes(section)) {
+                console.log('[Unicorn] Mouseover on section:', section.id || section.tagName);
+                showDragHandle(section);
+              }
+            });
+
+            document.addEventListener('mouseout', function(e) {
+              if (draggedSection) return;
+              var relatedTarget = e.relatedTarget;
+              if (relatedTarget && relatedTarget.closest && relatedTarget.closest(SECTION_SELECTORS)) return;
+              if (relatedTarget === dragHandle || (dragHandle.contains && dragHandle.contains(relatedTarget))) return;
+              hideDragHandle();
+            });
+
+            dragHandle.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              var index = parseInt(dragHandle.dataset.sectionIndex, 10);
+              if (isNaN(index) || index < 0 || !sections[index]) return;
+
+              draggedSection = sections[index];
+              draggedSection.style.opacity = '0.5';
+              var rect = draggedSection.getBoundingClientRect();
+
+              placeholder.style.height = rect.height + 'px';
+              placeholder.style.display = 'block';
+              draggedSection.parentNode.insertBefore(placeholder, draggedSection);
+
+              dragHandle.style.cursor = 'grabbing';
+              document.body.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+              if (!draggedSection) return;
+              e.preventDefault();
+
+              for (var i = 0; i < sections.length; i++) {
+                var s = sections[i];
+                if (s === draggedSection || s === placeholder) continue;
+                var rect = s.getBoundingClientRect();
+                if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                  var middle = rect.top + rect.height / 2;
+                  if (e.clientY < middle) {
+                    s.parentNode.insertBefore(placeholder, s);
+                  } else {
+                    s.parentNode.insertBefore(placeholder, s.nextSibling);
+                  }
+                  break;
+                }
+              }
+
+              dragHandle.style.top = (e.clientY - 14) + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+              if (!draggedSection) return;
+
+              placeholder.parentNode.insertBefore(draggedSection, placeholder);
+              draggedSection.style.opacity = '';
+              placeholder.style.display = 'none';
+              dragHandle.style.cursor = 'grab';
+              document.body.style.cursor = '';
+
+              window.parent.postMessage({ type: 'section-reordered', html: document.documentElement.outerHTML }, '*');
+
+              draggedSection = null;
+              updateSections();
+              hideDragHandle();
+            });
+          })();
+
+          // =============================================
+          // SPACING VISUALIZATION (Webflow/Figma style)
+          // =============================================
+          (function initSpacingViz() {
+            var spacingOverlay = document.createElement('div');
+            spacingOverlay.id = 'unicorn-spacing-overlay';
+            spacingOverlay.style.cssText = 'position:fixed;pointer-events:none;z-index:99990;display:none;';
+            document.body.appendChild(spacingOverlay);
+
+            // Create margin areas (orange)
+            var marginAreas = {};
+            var paddingAreas = {};
+            ['top','right','bottom','left'].forEach(function(side) {
+              var mArea = document.createElement('div');
+              mArea.className = 'unicorn-margin-area';
+              mArea.style.cssText = 'position:fixed;background:rgba(255,150,50,0.15);pointer-events:none;display:none;';
+              var mLabel = document.createElement('span');
+              mLabel.style.cssText = 'position:absolute;background:#f97316;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;white-space:nowrap;';
+              mArea.appendChild(mLabel);
+              spacingOverlay.appendChild(mArea);
+              marginAreas[side] = { area: mArea, label: mLabel };
+
+              var pArea = document.createElement('div');
+              pArea.className = 'unicorn-padding-area';
+              pArea.style.cssText = 'position:fixed;background:rgba(34,197,94,0.15);pointer-events:none;display:none;';
+              var pLabel = document.createElement('span');
+              pLabel.style.cssText = 'position:absolute;background:#22c55e;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;white-space:nowrap;';
+              pArea.appendChild(pLabel);
+              spacingOverlay.appendChild(pArea);
+              paddingAreas[side] = { area: pArea, label: pLabel };
+            });
+
+            function showSpacingOverlay(el) {
+              if (!el) { spacingOverlay.style.display = 'none'; return; }
+
+              var rect = el.getBoundingClientRect();
+              var cs = window.getComputedStyle(el);
+              var m = {
+                top: parseInt(cs.marginTop)||0,
+                right: parseInt(cs.marginRight)||0,
+                bottom: parseInt(cs.marginBottom)||0,
+                left: parseInt(cs.marginLeft)||0
+              };
+              var p = {
+                top: parseInt(cs.paddingTop)||0,
+                right: parseInt(cs.paddingRight)||0,
+                bottom: parseInt(cs.paddingBottom)||0,
+                left: parseInt(cs.paddingLeft)||0
+              };
+
+              spacingOverlay.style.display = 'block';
+
+              // Margin TOP
+              if (m.top > 0) {
+                marginAreas.top.area.style.cssText = 'position:fixed;background:rgba(255,150,50,0.2);pointer-events:none;display:block;left:'+rect.left+'px;top:'+(rect.top-m.top)+'px;width:'+rect.width+'px;height:'+m.top+'px;';
+                marginAreas.top.label.textContent = m.top;
+                marginAreas.top.label.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#f97316;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;';
+              } else { marginAreas.top.area.style.display = 'none'; }
+
+              // Margin BOTTOM
+              if (m.bottom > 0) {
+                marginAreas.bottom.area.style.cssText = 'position:fixed;background:rgba(255,150,50,0.2);pointer-events:none;display:block;left:'+rect.left+'px;top:'+rect.bottom+'px;width:'+rect.width+'px;height:'+m.bottom+'px;';
+                marginAreas.bottom.label.textContent = m.bottom;
+                marginAreas.bottom.label.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#f97316;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;';
+              } else { marginAreas.bottom.area.style.display = 'none'; }
+
+              // Margin LEFT
+              if (m.left > 0) {
+                marginAreas.left.area.style.cssText = 'position:fixed;background:rgba(255,150,50,0.2);pointer-events:none;display:block;left:'+(rect.left-m.left)+'px;top:'+rect.top+'px;width:'+m.left+'px;height:'+rect.height+'px;';
+                marginAreas.left.label.textContent = m.left;
+                marginAreas.left.label.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#f97316;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;';
+              } else { marginAreas.left.area.style.display = 'none'; }
+
+              // Margin RIGHT
+              if (m.right > 0) {
+                marginAreas.right.area.style.cssText = 'position:fixed;background:rgba(255,150,50,0.2);pointer-events:none;display:block;left:'+rect.right+'px;top:'+rect.top+'px;width:'+m.right+'px;height:'+rect.height+'px;';
+                marginAreas.right.label.textContent = m.right;
+                marginAreas.right.label.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#f97316;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;';
+              } else { marginAreas.right.area.style.display = 'none'; }
+
+              // Padding TOP
+              if (p.top > 0) {
+                paddingAreas.top.area.style.cssText = 'position:fixed;background:rgba(34,197,94,0.2);pointer-events:none;display:block;left:'+rect.left+'px;top:'+rect.top+'px;width:'+rect.width+'px;height:'+p.top+'px;';
+                paddingAreas.top.label.textContent = p.top;
+                paddingAreas.top.label.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#22c55e;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;';
+              } else { paddingAreas.top.area.style.display = 'none'; }
+
+              // Padding BOTTOM
+              if (p.bottom > 0) {
+                paddingAreas.bottom.area.style.cssText = 'position:fixed;background:rgba(34,197,94,0.2);pointer-events:none;display:block;left:'+rect.left+'px;top:'+(rect.bottom-p.bottom)+'px;width:'+rect.width+'px;height:'+p.bottom+'px;';
+                paddingAreas.bottom.label.textContent = p.bottom;
+                paddingAreas.bottom.label.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#22c55e;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;';
+              } else { paddingAreas.bottom.area.style.display = 'none'; }
+
+              // Padding LEFT
+              if (p.left > 0) {
+                paddingAreas.left.area.style.cssText = 'position:fixed;background:rgba(34,197,94,0.2);pointer-events:none;display:block;left:'+rect.left+'px;top:'+(rect.top+p.top)+'px;width:'+p.left+'px;height:'+(rect.height-p.top-p.bottom)+'px;';
+                paddingAreas.left.label.textContent = p.left;
+                paddingAreas.left.label.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#22c55e;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;';
+              } else { paddingAreas.left.area.style.display = 'none'; }
+
+              // Padding RIGHT
+              if (p.right > 0) {
+                paddingAreas.right.area.style.cssText = 'position:fixed;background:rgba(34,197,94,0.2);pointer-events:none;display:block;left:'+(rect.right-p.right)+'px;top:'+(rect.top+p.top)+'px;width:'+p.right+'px;height:'+(rect.height-p.top-p.bottom)+'px;';
+                paddingAreas.right.label.textContent = p.right;
+                paddingAreas.right.label.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#22c55e;color:white;font-size:10px;padding:1px 4px;border-radius:2px;font-family:system-ui;';
+              } else { paddingAreas.right.area.style.display = 'none'; }
+            }
+
+            function hideSpacingOverlay() {
+              spacingOverlay.style.display = 'none';
+            }
+
+            // Hook into selection
+            var origSelectEl = selectEl;
+            selectEl = function(target) {
+              origSelectEl(target);
+              if (target) {
+                showSpacingOverlay(target);
+              } else {
+                hideSpacingOverlay();
+              }
+            };
+
+            // Update on scroll
+            window.addEventListener('scroll', function() {
+              if (selectedElement) showSpacingOverlay(selectedElement);
+            });
+          })();
+
         }
       })();
     </script>
@@ -779,15 +1247,233 @@ export function LivePreview() {
           }
         }
       }
+
+      // Handle section reordering (drag & drop)
+      if (event.data?.type === 'section-reordered') {
+        const newHtmlFromIframe = event.data.html
+        if (newHtmlFromIframe) {
+          // Parse and clean the HTML from iframe
+          const doc = new DOMParser().parseFromString(newHtmlFromIframe, 'text/html')
+
+          // Remove unicorn elements
+          doc.querySelectorAll('[id^="unicorn-"]').forEach(el => el.remove())
+          doc.querySelectorAll('[class*="unicorn-"]').forEach(el => {
+            el.classList.forEach(cls => {
+              if (cls.startsWith('unicorn-')) el.classList.remove(cls)
+            })
+          })
+
+          // Reconstruct clean HTML
+          let cleanHtml = '<!DOCTYPE html>\n<html'
+          Array.from(doc.documentElement.attributes).forEach(attr => {
+            cleanHtml += ` ${attr.name}="${attr.value}"`
+          })
+          cleanHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+
+          console.log('Section reordered, updating HTML')
+          updateHtml(cleanHtml, true)
+        }
+      }
+
+      // Handle spacing changes (drag handles)
+      if (event.data?.type === 'spacing-changed') {
+        const { selector, className } = event.data
+        if (selector && className) {
+          const doc = new DOMParser().parseFromString(html, 'text/html')
+          const element = doc.querySelector(selector)
+
+          if (element) {
+            element.className = className
+
+            // Reconstruct HTML
+            let newHtml = '<!DOCTYPE html>\n<html'
+            Array.from(doc.documentElement.attributes).forEach(attr => {
+              newHtml += ` ${attr.name}="${attr.value}"`
+            })
+            newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+
+            console.log('Spacing changed for', selector)
+            updateHtml(newHtml, true)
+          }
+        }
+      }
+
+      // Handle element moved (drag & drop)
+      if (event.data?.type === 'element-moved') {
+        const newHtmlFromIframe = event.data.html
+        if (newHtmlFromIframe) {
+          // Parse and clean the HTML from iframe
+          const doc = new DOMParser().parseFromString(newHtmlFromIframe, 'text/html')
+
+          // Remove unicorn elements
+          doc.querySelectorAll('[id^="unicorn-"]').forEach(el => el.remove())
+          doc.querySelectorAll('[class*="unicorn-"]').forEach(el => {
+            el.classList.forEach(cls => {
+              if (cls.startsWith('unicorn-')) el.classList.remove(cls)
+            })
+          })
+
+          // Reconstruct clean HTML
+          let cleanHtml = '<!DOCTYPE html>\n<html'
+          Array.from(doc.documentElement.attributes).forEach(attr => {
+            cleanHtml += ` ${attr.name}="${attr.value}"`
+          })
+          cleanHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+
+          console.log('Element moved, updating HTML')
+          updateHtml(cleanHtml, true)
+        }
+      }
+
+      // Handle context menu
+      if (event.data?.type === 'context-menu') {
+        setContextMenu({
+          x: event.data.x,
+          y: event.data.y,
+          element: event.data.element,
+        })
+      }
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [selectElement, html, updateHtml])
 
+  // Handle context menu actions
+  const handleContextMenuAction = (action: string) => {
+    if (!contextMenu?.element) return
+
+    const { selector, outerHTML, tagName } = contextMenu.element
+
+    switch (action) {
+      case 'save-component':
+        setComponentHtml(outerHTML)
+        setShowSaveComponent(true)
+        break
+
+      case 'duplicate':
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+        const el = doc.querySelector(selector)
+        if (el && el.parentNode) {
+          const clone = el.cloneNode(true) as HTMLElement
+          // Remove any IDs to avoid duplicates
+          clone.removeAttribute('id')
+          el.parentNode.insertBefore(clone, el.nextSibling)
+
+          let newHtml = '<!DOCTYPE html>\n<html'
+          Array.from(doc.documentElement.attributes).forEach(attr => {
+            newHtml += ` ${attr.name}="${attr.value}"`
+          })
+          newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+          updateHtml(newHtml, true)
+        }
+        break
+
+      case 'select-parent':
+        iframeRef.current?.contentWindow?.postMessage({ type: 'select-parent' }, '*')
+        break
+
+      case 'select-child':
+        iframeRef.current?.contentWindow?.postMessage({ type: 'select-child' }, '*')
+        break
+
+      case 'replace-image':
+        if (tagName === 'IMG') {
+          setImageSelector(selector)
+          setShowImagePicker(true)
+        }
+        break
+
+      case 'copy-html':
+        navigator.clipboard.writeText(outerHTML)
+        break
+
+      case 'cut':
+        setClipboard(outerHTML)
+        // Delete element
+        const cutDoc = new DOMParser().parseFromString(html, 'text/html')
+        const cutEl = cutDoc.querySelector(selector)
+        if (cutEl) {
+          cutEl.remove()
+          let newHtml = '<!DOCTYPE html>\n<html'
+          Array.from(cutDoc.documentElement.attributes).forEach(attr => {
+            newHtml += ` ${attr.name}="${attr.value}"`
+          })
+          newHtml += '>\n' + cutDoc.head.outerHTML + '\n' + cutDoc.body.outerHTML + '\n</html>'
+          updateHtml(newHtml, true)
+          selectElement(null)
+        }
+        break
+
+      case 'paste':
+        if (clipboard) {
+          const pasteDoc = new DOMParser().parseFromString(html, 'text/html')
+          const pasteEl = pasteDoc.querySelector(selector)
+          if (pasteEl && pasteEl.parentNode) {
+            const temp = pasteDoc.createElement('div')
+            temp.innerHTML = clipboard
+            const newEl = temp.firstElementChild
+            if (newEl) {
+              pasteEl.parentNode.insertBefore(newEl, pasteEl.nextSibling)
+              let newHtml = '<!DOCTYPE html>\n<html'
+              Array.from(pasteDoc.documentElement.attributes).forEach(attr => {
+                newHtml += ` ${attr.name}="${attr.value}"`
+              })
+              newHtml += '>\n' + pasteDoc.head.outerHTML + '\n' + pasteDoc.body.outerHTML + '\n</html>'
+              updateHtml(newHtml, true)
+            }
+          }
+        }
+        break
+
+      case 'delete':
+        const delDoc = new DOMParser().parseFromString(html, 'text/html')
+        const delEl = delDoc.querySelector(selector)
+        if (delEl) {
+          delEl.remove()
+          let newHtml = '<!DOCTYPE html>\n<html'
+          Array.from(delDoc.documentElement.attributes).forEach(attr => {
+            newHtml += ` ${attr.name}="${attr.value}"`
+          })
+          newHtml += '>\n' + delDoc.head.outerHTML + '\n' + delDoc.body.outerHTML + '\n</html>'
+          updateHtml(newHtml, true)
+          selectElement(null)
+        }
+        break
+    }
+
+    setContextMenu(null)
+  }
+
+  // Handle image replacement
+  const handleImageReplace = (url: string, altText?: string) => {
+    if (!imageSelector) return
+
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const img = doc.querySelector(imageSelector) as HTMLImageElement
+    if (img) {
+      img.src = url
+      if (altText) img.alt = altText
+
+      let newHtml = '<!DOCTYPE html>\n<html'
+      Array.from(doc.documentElement.attributes).forEach(attr => {
+        newHtml += ` ${attr.name}="${attr.value}"`
+      })
+      newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+      updateHtml(newHtml, true)
+    }
+
+    setShowImagePicker(false)
+    setImageSelector(null)
+  }
+
   const handleContainerClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget && viewMode === 'design') {
       selectElement(null)
       iframeRef.current?.contentWindow?.postMessage({ type: 'deselect' }, '*')
+    }
+    // Close context menu on click
+    if (contextMenu) {
+      setContextMenu(null)
     }
   }
 
@@ -797,7 +1483,7 @@ export function LivePreview() {
   return (
     <div
       onClick={handleContainerClick}
-      className="h-full w-full bg-zinc-950 flex items-start justify-center overflow-auto"
+      className="h-full w-full bg-zinc-950 flex items-center justify-center overflow-auto"
     >
       <div
         className={`h-full transition-all duration-300 ${isResponsive ? 'my-4 rounded-lg overflow-hidden shadow-2xl border border-zinc-700' : ''}`}
@@ -808,11 +1494,45 @@ export function LivePreview() {
       >
         <iframe
           ref={iframeRef}
-          srcDoc={getHtmlWithScript(previewHtml)}
+          srcDoc={getHtmlWithScript(previewHtml, isCurrentlyStreaming)}
           className="w-full h-full border-0 block bg-white"
           sandbox="allow-scripts allow-same-origin"
         />
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          element={contextMenu.element}
+          onAction={handleContextMenuAction}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* Save Component Dialog */}
+      {siteId && (
+        <SaveComponentDialog
+          open={showSaveComponent}
+          onOpenChange={setShowSaveComponent}
+          siteId={siteId}
+          html={componentHtml}
+          onSaved={() => {
+            console.log('Component saved!')
+          }}
+        />
+      )}
+
+      {/* Image Picker for Replace */}
+      {siteId && (
+        <ImagePicker
+          siteId={siteId}
+          open={showImagePicker}
+          onOpenChange={setShowImagePicker}
+          onSelect={handleImageReplace}
+        />
+      )}
     </div>
   )
 }

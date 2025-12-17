@@ -3,6 +3,144 @@ import { analyzeHtmlForComponents, detectHeader, detectFooter } from './componen
 import type { DesignVariables } from '@/types/cms'
 
 /**
+ * Standard Animation Keyframes die von der KI verwendet werden können
+ * Diese werden automatisch injiziert wenn sie im HTML verwendet aber nicht definiert sind
+ */
+const ANIMATION_KEYFRAMES: Record<string, string> = {
+  fadeIn: `@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}`,
+  fadeOut: `@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}`,
+  fadeUp: `@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}`,
+  fadeDown: `@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}`,
+  fadeLeft: `@keyframes fadeLeft {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}`,
+  fadeRight: `@keyframes fadeRight {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}`,
+  slideUp: `@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}`,
+  slideDown: `@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}`,
+  slideLeft: `@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}`,
+  slideRight: `@keyframes slideRight {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}`,
+  zoomIn: `@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}`,
+  zoomOut: `@keyframes zoomOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.9); }
+}`,
+  scaleUp: `@keyframes scaleUp {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}`,
+  scaleDown: `@keyframes scaleDown {
+  from { transform: scale(1); }
+  to { transform: scale(0); }
+}`,
+  rotateIn: `@keyframes rotateIn {
+  from { opacity: 0; transform: rotate(-180deg); }
+  to { opacity: 1; transform: rotate(0); }
+}`,
+  shake: `@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}`,
+  wiggle: `@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-5deg); }
+  75% { transform: rotate(5deg); }
+}`,
+  float: `@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}`,
+  pulse: `@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}`,
+  glow: `@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px currentColor; }
+  50% { box-shadow: 0 0 20px currentColor; }
+}`,
+}
+
+/**
+ * Erkennt verwendete Animationen im HTML und injiziert fehlende Keyframes
+ */
+export function injectAnimationKeyframes(html: string): string {
+  // Finde alle animate-[name...] Klassen
+  const animateRegex = /animate-\[([a-zA-Z]+)[_\s]/g
+  const usedAnimations = new Set<string>()
+
+  let match
+  while ((match = animateRegex.exec(html)) !== null) {
+    usedAnimations.add(match[1])
+  }
+
+  if (usedAnimations.size === 0) {
+    return html
+  }
+
+  // Sammle fehlende keyframes
+  const missingKeyframes: string[] = []
+
+  for (const animName of usedAnimations) {
+    // Prüfe ob keyframes bereits im HTML definiert sind
+    const keyframeRegex = new RegExp(`@keyframes\\s+${animName}\\s*\\{`, 'i')
+    if (!keyframeRegex.test(html) && ANIMATION_KEYFRAMES[animName]) {
+      missingKeyframes.push(ANIMATION_KEYFRAMES[animName])
+    }
+  }
+
+  if (missingKeyframes.length === 0) {
+    return html
+  }
+
+  // Erstelle Style-Block mit den fehlenden keyframes
+  const keyframesCSS = `<style id="auto-animations">
+/* Auto-injected animation keyframes */
+${missingKeyframes.join('\n\n')}
+</style>`
+
+  // Füge vor </head> ein, oder vor </body> wenn kein head
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${keyframesCSS}\n</head>`)
+  } else if (html.includes('</body>')) {
+    return html.replace('</body>', `${keyframesCSS}\n</body>`)
+  }
+
+  // Fallback: Am Ende anhängen
+  return html + keyframesCSS
+}
+
+/**
  * Convert hex color to RGB values (space-separated for Tailwind opacity)
  */
 function hexToRgb(hex: string): string | null {
@@ -266,6 +404,13 @@ export function cleanOperationMetadataFromHtml(html: string): string {
 // Apply operation to existing HTML
 export function applyOperation(existingHtml: string, op: ParsedOperation): string {
   let result: string
+
+  // NOTE: We intentionally do NOT sanitize here because:
+  // 1. The HTML comes from our AI (trusted source)
+  // 2. It's displayed in a sandboxed iframe
+  // 3. DOMPurify removes DOCTYPE, html/head/body structure, and script tags
+  //    which breaks Tailwind and page structure
+  // Sanitization should only be used for untrusted user input
 
   switch (op.operation) {
     case 'replace_all':

@@ -70,7 +70,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           email,
           avatar_url
         ),
-        featured_image:assets (
+        featured_image:assets!featured_image_id (
           id,
           name,
           file_url,

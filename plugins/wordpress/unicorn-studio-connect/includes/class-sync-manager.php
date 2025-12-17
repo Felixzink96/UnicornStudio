@@ -359,7 +359,15 @@ class Unicorn_Studio_Sync_Manager {
     public function sync_menus() {
         $response = $this->api->get_menus();
 
+        // Debug logging
+        error_log('[Unicorn Menu Sync] API Response type: ' . gettype($response));
+        if (is_array($response)) {
+            error_log('[Unicorn Menu Sync] API Response keys: ' . implode(', ', array_keys($response)));
+            error_log('[Unicorn Menu Sync] API Response: ' . wp_json_encode($response));
+        }
+
         if (is_wp_error($response)) {
+            error_log('[Unicorn Menu Sync] Error: ' . $response->get_error_message());
             return $response;
         }
 
@@ -367,8 +375,15 @@ class Unicorn_Studio_Sync_Manager {
         $menus = [];
         if (isset($response['data']) && is_array($response['data'])) {
             $menus = $response['data'];
+            error_log('[Unicorn Menu Sync] Extracted from data key, count: ' . count($menus));
         } elseif (is_array($response) && !isset($response['data'])) {
             $menus = $response;
+            error_log('[Unicorn Menu Sync] Using response directly, count: ' . count($menus));
+        }
+
+        // Log each menu
+        foreach ($menus as $index => $menu) {
+            error_log('[Unicorn Menu Sync] Menu ' . $index . ': ' . wp_json_encode($menu));
         }
 
         // Store menus in option

@@ -105,24 +105,24 @@ export default function RobotsTxtPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-8">
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}/settings/seo`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        Zuruck zu SEO Einstellungen
+        Zurück zu SEO Einstellungen
       </Link>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Bot className="h-8 w-8 text-purple-500" />
             robots.txt
           </h1>
-          <p className="text-slate-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             Steuere wie Suchmaschinen deine Website crawlen
           </p>
         </div>
@@ -163,11 +163,11 @@ export default function RobotsTxtPage() {
 
       <div className="space-y-6">
         {/* Editor */}
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-white">robots.txt Inhalt</CardTitle>
+            <CardTitle className="text-foreground">robots.txt Inhalt</CardTitle>
             <CardDescription>
-              Definiere Regeln fur Suchmaschinen-Crawler
+              Definiere Regeln für Suchmaschinen-Crawler
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -177,7 +177,7 @@ export default function RobotsTxtPage() {
                 setRobotsTxt(e.target.value)
                 setHasChanges(true)
               }}
-              className="bg-slate-800 border-slate-700 font-mono text-sm min-h-[300px]"
+              className="bg-muted border-border font-mono text-sm min-h-[300px]"
               placeholder="User-agent: *
 Allow: /"
             />
@@ -186,18 +186,18 @@ Allow: /"
 
         {/* Sitemap Info */}
         {sitemapUrl && (
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">Sitemap URL</CardTitle>
+              <CardTitle className="text-foreground">Sitemap URL</CardTitle>
               <CardDescription>
-                Diese URL wird automatisch zur robots.txt hinzugefugt
+                Diese URL wird automatisch zur robots.txt hinzugefügt
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <code className="block p-3 bg-slate-800 rounded-lg text-purple-400 text-sm">
+              <code className="block p-3 bg-muted rounded-lg text-purple-400 text-sm">
                 Sitemap: {sitemapUrl}
               </code>
-              <p className="text-xs text-slate-500 mt-2">
+              <p className="text-xs text-muted-foreground mt-2">
                 Die Sitemap wird von Unicorn Studio generiert und vom WordPress Plugin bereitgestellt.
               </p>
             </CardContent>
@@ -205,15 +205,15 @@ Allow: /"
         )}
 
         {/* Preview */}
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-white">Vorschau</CardTitle>
+            <CardTitle className="text-foreground">Vorschau</CardTitle>
             <CardDescription>
-              So sieht deine robots.txt fur Suchmaschinen aus
+              So sieht deine robots.txt für Suchmaschinen aus
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="p-4 bg-slate-800 rounded-lg text-slate-300 text-sm overflow-x-auto whitespace-pre-wrap">
+            <pre className="p-4 bg-muted rounded-lg text-foreground text-sm overflow-x-auto whitespace-pre-wrap">
               {robotsTxt}
               {sitemapUrl && (
                 <>
@@ -230,15 +230,15 @@ Allow: /"
             <h3 className="font-semibold text-purple-400 mb-2">
               Wichtige Hinweise
             </h3>
-            <ul className="text-sm text-slate-400 space-y-2">
+            <ul className="text-sm text-muted-foreground space-y-2">
               <li>
                 Die robots.txt wird vom WordPress Plugin automatisch bereitgestellt
               </li>
               <li>
-                Anderungen werden bei WordPress-Sync ubertragen
+                Änderungen werden bei WordPress-Sync übertragen
               </li>
               <li>
-                Die Sitemap-URL wird automatisch hinzugefugt
+                Die Sitemap-URL wird automatisch hinzugefügt
               </li>
               <li>
                 Teste deine robots.txt mit dem Google Search Console Tool

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Image as ImageIcon, Upload, X } from 'lucide-react'
 import { FieldWrapper, type FieldRendererProps } from './index'
+import { ImagePicker } from '@/components/editor/assets/ImagePicker'
 
 interface ImageValue {
   id?: string
@@ -14,18 +15,14 @@ interface ImageValue {
 export function ImageField({ field, value, onChange, error, disabled, siteId }: FieldRendererProps) {
   const settings = field.settings || {}
   const imageValue = value as ImageValue | null
+  const [showPicker, setShowPicker] = useState(false)
 
   const handleRemove = () => {
     onChange(null)
   }
 
-  // In production, this would open a media library modal
-  const handleSelectImage = () => {
-    // Placeholder - would open asset picker
-    const url = prompt('Bild URL eingeben (oder Media Library implementieren):')
-    if (url) {
-      onChange({ url, alt: '' })
-    }
+  const handleSelectImage = (url: string, alt?: string) => {
+    onChange({ url, alt: alt || '' })
   }
 
   return (
@@ -35,14 +32,14 @@ export function ImageField({ field, value, onChange, error, disabled, siteId }: 
           <img
             src={imageValue.url}
             alt={imageValue.alt || ''}
-            className="w-full h-48 object-cover rounded-lg border border-slate-700"
+            className="w-full h-48 object-cover rounded-lg border border-zinc-200 dark:border-zinc-700"
           />
           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
             <Button
               type="button"
               variant="secondary"
               size="sm"
-              onClick={handleSelectImage}
+              onClick={() => setShowPicker(true)}
               disabled={disabled}
             >
               Ändern
@@ -62,9 +59,9 @@ export function ImageField({ field, value, onChange, error, disabled, siteId }: 
       ) : (
         <button
           type="button"
-          onClick={handleSelectImage}
+          onClick={() => setShowPicker(true)}
           disabled={disabled}
-          className="w-full h-48 border-2 border-dashed border-slate-700 rounded-lg flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-48 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Upload className="h-8 w-8" />
           <span className="text-sm">Bild auswählen oder hochladen</span>
@@ -72,6 +69,17 @@ export function ImageField({ field, value, onChange, error, disabled, siteId }: 
             {settings.allowedTypes?.join(', ') || 'jpg, png, webp'}
           </span>
         </button>
+      )}
+
+      {siteId && (
+        <ImagePicker
+          siteId={siteId}
+          open={showPicker}
+          onOpenChange={setShowPicker}
+          onSelect={handleSelectImage}
+          currentUrl={imageValue?.url}
+          currentAlt={imageValue?.alt}
+        />
       )}
     </FieldWrapper>
   )

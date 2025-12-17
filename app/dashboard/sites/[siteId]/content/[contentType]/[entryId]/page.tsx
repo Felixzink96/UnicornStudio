@@ -86,7 +86,7 @@ export default async function EditEntryPage({ params }: EditEntryPageProps) {
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}/content/${contentTypeSlug}`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zu {contentType.label_plural}
@@ -94,7 +94,7 @@ export default async function EditEntryPage({ params }: EditEntryPageProps) {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
           <div
             className="p-2 rounded-lg"
             style={{ backgroundColor: `${contentType.color || '#8b5cf6'}20` }}
@@ -107,7 +107,7 @@ export default async function EditEntryPage({ params }: EditEntryPageProps) {
           {contentType.label_singular} bearbeiten
         </h1>
         {entry.title && (
-          <p className="text-slate-400 mt-2">{entry.title}</p>
+          <p className="text-muted-foreground mt-2">{entry.title}</p>
         )}
       </div>
 

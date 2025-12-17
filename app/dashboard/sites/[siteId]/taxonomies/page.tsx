@@ -50,7 +50,7 @@ export default async function TaxonomiesPage({ params }: TaxonomiesPageProps) {
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zu {site.name}
@@ -59,11 +59,11 @@ export default async function TaxonomiesPage({ params }: TaxonomiesPageProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Tags className="h-8 w-8 text-purple-500" />
             Taxonomien
           </h1>
-          <p className="text-slate-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             Verwalte Kategorien, Tags und andere Klassifizierungen
           </p>
         </div>
@@ -82,7 +82,7 @@ export default async function TaxonomiesPage({ params }: TaxonomiesPageProps) {
             <Link
               key={taxonomy.id}
               href={`/dashboard/sites/${siteId}/taxonomies/${taxonomy.id}`}
-              className="p-6 bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-700 transition-colors group"
+              className="p-6 bg-card border border-border rounded-lg hover:border-border transition-colors group"
             >
               <div className="flex items-start gap-4">
                 <div className="p-3 rounded-lg bg-purple-500/20">
@@ -93,13 +93,13 @@ export default async function TaxonomiesPage({ params }: TaxonomiesPageProps) {
                   )}
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-white group-hover:text-purple-400 transition-colors">
+                  <h3 className="font-semibold text-foreground group-hover:text-purple-400 transition-colors">
                     {taxonomy.label_plural}
                   </h3>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     {termCounts[taxonomy.id]} {termCounts[taxonomy.id] === 1 ? 'Begriff' : 'Begriffe'}
                   </p>
-                  <p className="text-xs text-slate-600 mt-2">
+                  <p className="text-xs text-muted-foreground mt-2">
                     {taxonomy.hierarchical ? 'Hierarchisch' : 'Flat'} • /{taxonomy.slug}
                   </p>
                 </div>
@@ -108,12 +108,12 @@ export default async function TaxonomiesPage({ params }: TaxonomiesPageProps) {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 bg-slate-900 rounded-lg border border-slate-800">
+        <div className="text-center py-16 bg-card rounded-lg border border-border">
           <Tags className="h-16 w-16 text-slate-700 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             Keine Taxonomien vorhanden
           </h2>
-          <p className="text-slate-400 mb-6 max-w-md mx-auto">
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             Erstelle Taxonomien wie Kategorien oder Tags, um deine Inhalte zu organisieren.
           </p>
         </div>

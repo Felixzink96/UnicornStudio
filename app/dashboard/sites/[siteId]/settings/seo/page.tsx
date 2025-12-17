@@ -32,7 +32,7 @@ export default async function SEOSettingsPage({ params }: SEOSettingsPageProps) 
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zu {site.name}
@@ -40,11 +40,11 @@ export default async function SEOSettingsPage({ params }: SEOSettingsPageProps) 
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
           <Search className="h-8 w-8 text-purple-500" />
           SEO Einstellungen
         </h1>
-        <p className="text-slate-400 mt-2">
+        <p className="text-muted-foreground mt-2">
           Globale SEO-Konfiguration für deine Website
         </p>
       </div>
@@ -54,41 +54,41 @@ export default async function SEOSettingsPage({ params }: SEOSettingsPageProps) 
 
       {/* Additional SEO Tools */}
       <div className="mt-8 grid gap-4">
-        <h2 className="text-xl font-semibold text-white">Weitere SEO-Tools</h2>
+        <h2 className="text-xl font-semibold text-foreground">Weitere SEO-Tools</h2>
 
         <Link href={`/dashboard/sites/${siteId}/settings/seo/robots`}>
-          <Card className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-colors cursor-pointer">
+          <Card className="bg-card border-border hover:border-border transition-colors cursor-pointer">
             <CardContent className="flex items-center justify-between p-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-lg bg-purple-500/10">
                   <Bot className="h-6 w-6 text-purple-500" />
                 </div>
                 <div>
-                  <CardTitle className="text-white text-lg">robots.txt</CardTitle>
-                  <CardDescription className="text-slate-400">
+                  <CardTitle className="text-foreground text-lg">robots.txt</CardTitle>
+                  <CardDescription className="text-muted-foreground">
                     Steuere wie Suchmaschinen deine Website crawlen
                   </CardDescription>
                 </div>
               </div>
-              <ChevronRight className="h-5 w-5 text-slate-500" />
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </CardContent>
           </Card>
         </Link>
 
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-card border-border">
           <CardContent className="flex items-center justify-between p-6">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-lg bg-green-500/10">
                 <FileText className="h-6 w-6 text-green-500" />
               </div>
               <div>
-                <CardTitle className="text-white text-lg">XML Sitemap</CardTitle>
-                <CardDescription className="text-slate-400">
+                <CardTitle className="text-foreground text-lg">XML Sitemap</CardTitle>
+                <CardDescription className="text-muted-foreground">
                   Automatisch generiert aus allen publizierten Seiten
                 </CardDescription>
               </div>
             </div>
-            <code className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">
+            <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
               /api/v1/sites/{siteId}/sitemap.xml
             </code>
           </CardContent>

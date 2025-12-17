@@ -49,8 +49,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const menus = await getMenus(siteId)
 
-    // Return in standard API format
-    return successResponse({ data: menus })
+    // Debug logging
+    console.log('[Menus API] Site ID:', siteId)
+    console.log('[Menus API] Menus count:', menus.length)
+    console.log('[Menus API] Menus data:', JSON.stringify(menus, null, 2))
+
+    // Return menus directly - successResponse wraps in { success: true, data: ... }
+    return successResponse(menus)
   } catch (error) {
     console.error('Error fetching menus:', error)
     return serverErrorResponse('Failed to fetch menus')

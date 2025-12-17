@@ -4,11 +4,13 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useEditorStore } from '@/stores/editor-store'
 import { ChatMessage } from './ChatMessage'
 import { PromptBuilder } from './PromptBuilder'
+import WireframeBuildAnimation from './WireframeBuildAnimation'
 import {
   parseOperationFormat,
   extractStreamingHtml,
   applyOperation,
   injectCSSVariables,
+  injectAnimationKeyframes,
 } from '@/lib/ai/html-operations'
 import {
   parseReferenceUpdates,
@@ -44,6 +46,8 @@ import {
   Globe,
   Code,
   Link,
+  MessageSquare,
+  Plus,
 } from 'lucide-react'
 
 export function ChatPanel() {
@@ -57,6 +61,7 @@ export function ChatPanel() {
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Design System Dialog State
   const [designDialogOpen, setDesignDialogOpen] = useState(false)
@@ -77,6 +82,13 @@ export function ChatPanel() {
   // Thinking Mode State
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [currentThinking, setCurrentThinking] = useState('')
+
+  // Streaming Progress State
+  const [streamingStats, setStreamingStats] = useState<{
+    startTime: number
+    charCount: number
+    lastActivity: number
+  } | null>(null)
 
   // Gemini Tools State
   const [googleSearchEnabled, setGoogleSearchEnabled] = useState(false)
@@ -120,6 +132,40 @@ export function ChatPanel() {
   const setGenerating = useEditorStore((s) => s.setGenerating)
   const applyGeneratedHtml = useEditorStore((s) => s.applyGeneratedHtml)
 
+  // Local state to prevent double-clicks before store updates
+  const [isSending, setIsSending] = useState(false)
+
+  // Retry state
+  const [retryCount, setRetryCount] = useState(0)
+  const maxRetries = 1
+
+  // Wireframe Animation State
+  const [activeOperation, setActiveOperation] = useState<{
+    type: string
+    sectionId?: string
+  } | null>(null)
+
+  // Reset isSending and animation when generation completes
+  useEffect(() => {
+    if (!isGenerating) {
+      if (isSending) {
+        setIsSending(false)
+      }
+      // Reset wireframe animation
+      setActiveOperation(null)
+    }
+  }, [isGenerating, isSending])
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
+    }
+  }, [])
+
   // Track if user is near bottom for smart scrolling
   const isUserNearBottom = useRef(true)
   const lastMessageCount = useRef(messages.length)
@@ -139,14 +185,21 @@ export function ChatPanel() {
   }
 
   // Smart auto-scroll: scroll on new message OR content updates during streaming
+  // ABER: Nicht scrollen wenn User aktiv hochgescrollt hat!
   useEffect(() => {
     if (!scrollRef.current) return
 
     const isNewMessage = messages.length > lastMessageCount.current
     lastMessageCount.current = messages.length
 
-    // Scroll to bottom if: new message added OR streaming OR user was already near bottom
-    if (isNewMessage || isStreaming || isUserNearBottom.current) {
+    // Nur scrollen wenn:
+    // 1. Neue Nachricht UND User war near bottom, ODER
+    // 2. Streaming UND User war near bottom
+    // NICHT mehr: "immer wenn isStreaming" - das blockierte manuelles Scrollen!
+    const shouldScroll = (isNewMessage && isUserNearBottom.current) ||
+                         (isStreaming && isUserNearBottom.current)
+
+    if (shouldScroll) {
       // Use requestAnimationFrame for smoother scrolling
       requestAnimationFrame(() => {
         if (scrollRef.current) {
@@ -274,8 +327,8 @@ export function ChatPanel() {
     const headerStyleDesc = setupData.headerSettings.style === 'simple'
       ? 'Standard Layout (Logo links, Navigation rechts)'
       : setupData.headerSettings.style === 'centered'
-      ? 'Zentriertes Layout (Logo und Navigation mittig übereinander)'
-      : 'Mega Menu Layout (mit Dropdown-Panels für Unterseiten)'
+        ? 'Zentriertes Layout (Logo und Navigation mittig übereinander)'
+        : 'Mega Menu Layout (mit Dropdown-Panels für Unterseiten)'
 
     return `${originalPrompt}
 
@@ -366,7 +419,10 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
 
   const handleSend = async (promptOverride?: string, skipSetup?: boolean) => {
     const promptToSend = promptOverride || input.trim()
-    if (!promptToSend || isGenerating) return
+    if (!promptToSend || isGenerating || isSending) return
+
+    // Immediately set sending state to prevent double-clicks
+    setIsSending(true)
 
     // NEU: Prüfe ob Setup nötig ist (nur bei erstem Prompt ohne Custom Tokens)
     // skipSetup = true wenn wir vom Setup Modal kommen
@@ -417,6 +473,14 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
     addMessage({ role: 'user', content: displayContent })
     addMessage({ role: 'assistant', content: '', isStreaming: true })
 
+    // Initialize streaming stats
+    const now = Date.now()
+    setStreamingStats({
+      startTime: now,
+      charCount: 0,
+      lastActivity: now,
+    })
+
     try {
       // Reset thinking content for new request
       setCurrentThinking('')
@@ -443,6 +507,12 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
       // Clear the enhanced prompt ref after using it
       enhancedPromptRef.current = null
 
+      // Abort any existing request before starting new one
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      abortControllerRef.current = new AbortController()
+
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -460,6 +530,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
           googleSearchEnabled,
           codeExecutionEnabled,
         }),
+        signal: abortControllerRef.current.signal,
       })
 
       if (!response.ok) throw new Error('Failed to generate')
@@ -473,13 +544,21 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
       let searchSources: Array<{ title: string; uri: string }> = []
       let executableCode = ''
       let codeResult = ''
+      // Buffer für unvollständige SSE-Chunks (verhindert Datenverlust bei Netzwerk-Glitches)
+      let sseBuffer = ''
+      // Function Call tracking
+      let functionCall: { name: string; args: Record<string, unknown> } | null = null
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
         const chunk = decoder.decode(value)
-        const lines = chunk.split('\n')
+        // Chunk zum Buffer hinzufügen und nach Zeilenumbrüchen splitten
+        sseBuffer += chunk
+        const lines = sseBuffer.split('\n')
+        // Letztes Element behalten (könnte unvollständig sein)
+        sseBuffer = lines.pop() || ''
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -510,8 +589,41 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                 console.log('Code result received:', codeResult.substring(0, 100))
               }
 
+              // Handle Function Calls (structured HTML operations)
+              if (data.type === 'function_call') {
+                functionCall = {
+                  name: data.name,
+                  args: data.args,
+                }
+                console.log('[Function Call]', data.name, data.args)
+
+                // Activate wireframe build animation
+                setActiveOperation({
+                  type: data.name,
+                  sectionId: data.args?.section_id as string || undefined,
+                })
+
+                // Show the message to user during streaming
+                const message = data.args?.message as string || 'Verarbeite...'
+                const msgs = useEditorStore.getState().messages
+                const lastMsg = msgs[msgs.length - 1]
+                if (lastMsg?.role === 'assistant') {
+                  updateMessage(lastMsg.id, {
+                    content: message,
+                    isStreaming: true,
+                  })
+                }
+              }
+
               if (data.type === 'text') {
                 fullContent += data.content
+
+                // Update streaming stats
+                setStreamingStats(prev => prev ? {
+                  ...prev,
+                  charCount: fullContent.length,
+                  lastActivity: Date.now(),
+                } : null)
 
                 // Extract streaming HTML for live preview
                 const streamingHtml = extractStreamingHtml(fullContent)
@@ -534,7 +646,741 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
 
               if (data.type === 'done') {
                 console.log('Full AI response:', fullContent)
+                console.log('Function call:', functionCall)
 
+                // NEU: Function Call Flow (strukturierte Ausgabe)
+                if (functionCall) {
+                  console.log('[Function Call] Processing:', functionCall.name)
+                  const args = functionCall.args as Record<string, string>
+                  const currentHtml = useEditorStore.getState().html
+                  let finalHtml = currentHtml
+                  let displayMessage = args.message || ''
+
+                  switch (functionCall.name) {
+                    case 'create_full_page': {
+                      // Komplette neue Seite
+                      finalHtml = args.html
+                      console.log('[Function Call] create_full_page - HTML length:', finalHtml.length)
+                      break
+                    }
+
+                    case 'replace_section': {
+                      // Section komplett ersetzen
+                      const sectionId = args.section_id
+                      const newHtml = args.html
+                      console.log('[Function Call] replace_section - ID:', sectionId)
+
+                      // Finde und ersetze die Section
+                      const sectionRegex = new RegExp(
+                        `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
+                        'gi'
+                      )
+                      finalHtml = currentHtml.replace(sectionRegex, newHtml)
+
+                      if (finalHtml === currentHtml) {
+                        console.warn('[Function Call] Section not found, trying broader match')
+                        // Fallback: Suche nach id="sectionId" im Element
+                        const broadRegex = new RegExp(
+                          `<[^>]+id=["']${sectionId}["'][^>]*>[\\s\\S]*?(?=<(?:section|footer|header|main|article)[^>]*>|<\\/body>)`,
+                          'gi'
+                        )
+                        finalHtml = currentHtml.replace(broadRegex, newHtml)
+                      }
+                      break
+                    }
+
+                    case 'modify_section': {
+                      // Section modifizieren (gleiche Logik wie replace)
+                      const sectionId = args.section_id
+                      const newHtml = args.html
+                      console.log('[Function Call] modify_section - ID:', sectionId)
+
+                      const sectionRegex = new RegExp(
+                        `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
+                        'gi'
+                      )
+                      finalHtml = currentHtml.replace(sectionRegex, newHtml)
+                      break
+                    }
+
+                    case 'add_section': {
+                      // Neue Section hinzufügen
+                      const position = args.position || 'end'
+                      const newHtml = args.html
+                      console.log('[Function Call] add_section - Position:', position)
+
+                      if (position === 'end') {
+                        // Vor </body> einfügen
+                        finalHtml = currentHtml.replace(/<\/body>/i, `${newHtml}\n</body>`)
+                      } else if (position === 'start') {
+                        // Nach <body> einfügen
+                        finalHtml = currentHtml.replace(/(<body[^>]*>)/i, `$1\n${newHtml}`)
+                      } else if (position.startsWith('after_')) {
+                        // Nach bestimmter Section
+                        const targetId = position.replace('after_', '')
+                        const targetRegex = new RegExp(
+                          `(<(section|div|article)[^>]*id=["']${targetId}["'][^>]*>[\\s\\S]*?<\\/\\2>)`,
+                          'gi'
+                        )
+                        finalHtml = currentHtml.replace(targetRegex, `$1\n${newHtml}`)
+                      } else if (position.startsWith('before_')) {
+                        // Vor bestimmter Section
+                        const targetId = position.replace('before_', '')
+                        const targetRegex = new RegExp(
+                          `(<(section|div|article)[^>]*id=["']${targetId}["'][^>]*>)`,
+                          'gi'
+                        )
+                        finalHtml = currentHtml.replace(targetRegex, `${newHtml}\n$1`)
+                      }
+                      break
+                    }
+
+                    case 'delete_section': {
+                      // Section löschen
+                      const sectionId = args.section_id
+                      console.log('[Function Call] delete_section - ID:', sectionId)
+
+                      const sectionRegex = new RegExp(
+                        `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>\\s*`,
+                        'gi'
+                      )
+                      finalHtml = currentHtml.replace(sectionRegex, '')
+                      break
+                    }
+
+                    case 'update_global_component': {
+                      // Global Header/Footer Update
+                      const componentId = args.component_id
+                      const componentType = args.component_type
+                      const newHtml = args.html
+                      console.log('[Function Call] update_global_component - Type:', componentType, 'ID:', componentId)
+
+                      // Speichere als pending Reference Update
+                      setPendingReferenceUpdates([{
+                        type: 'component',
+                        id: componentId,
+                        componentType: componentType as 'header' | 'footer',
+                        html: newHtml,
+                      }])
+
+                      // Update Message und beende
+                      const msgs = useEditorStore.getState().messages
+                      const lastMsg = msgs[msgs.length - 1]
+                      if (lastMsg?.role === 'assistant') {
+                        updateMessage(lastMsg.id, {
+                          content: displayMessage,
+                          isStreaming: false,
+                          hasReferenceUpdates: true,
+                          referenceUpdates: [{
+                            type: 'component',
+                            id: componentId,
+                            componentType: componentType as 'header' | 'footer',
+                            html: newHtml,
+                          }],
+                          tokensUsed: data.usage?.output_tokens || 0,
+                          model: selectedModel.name,
+                        })
+                      }
+                      setGenerating(false)
+                      setCurrentThinking('')
+                      return
+                    }
+
+                    case 'update_design_token': {
+                      // Design Token Update
+                      const tokenId = args.token_id
+                      const value = args.value
+                      console.log('[Function Call] update_design_token - ID:', tokenId, 'Value:', value)
+
+                      setPendingReferenceUpdates([{
+                        type: 'token',
+                        id: tokenId,
+                        value: value,
+                      }])
+
+                      const msgs = useEditorStore.getState().messages
+                      const lastMsg = msgs[msgs.length - 1]
+                      if (lastMsg?.role === 'assistant') {
+                        updateMessage(lastMsg.id, {
+                          content: displayMessage,
+                          isStreaming: false,
+                          hasReferenceUpdates: true,
+                          referenceUpdates: [{
+                            type: 'token',
+                            id: tokenId,
+                            value: value,
+                          }],
+                          tokensUsed: data.usage?.output_tokens || 0,
+                          model: selectedModel.name,
+                        })
+                      }
+                      setGenerating(false)
+                      setCurrentThinking('')
+                      return
+                    }
+
+                    case 'respond_only': {
+                      // Nur Antwort, kein HTML
+                      console.log('[Function Call] respond_only')
+                      const msgs = useEditorStore.getState().messages
+                      const lastMsg = msgs[msgs.length - 1]
+                      if (lastMsg?.role === 'assistant') {
+                        updateMessage(lastMsg.id, {
+                          content: displayMessage,
+                          isStreaming: false,
+                          tokensUsed: data.usage?.output_tokens || 0,
+                          model: selectedModel.name,
+                        })
+                      }
+                      setGenerating(false)
+                      setCurrentThinking('')
+                      return
+                    }
+
+                    // ============================================
+                    // MENÜ TOOLS
+                    // ============================================
+                    case 'add_menu_item':
+                    case 'remove_menu_item':
+                    case 'reorder_menu': {
+                      console.log('[Function Call] Menu operation:', functionCall.name)
+                      // Menü-Updates werden als Reference Updates behandelt
+                      setPendingReferenceUpdates([{
+                        type: 'menu',
+                        menuId: args.menu_id,
+                        operation: functionCall.name,
+                        ...args,
+                      }])
+                      const msgs = useEditorStore.getState().messages
+                      const lastMsg = msgs[msgs.length - 1]
+                      if (lastMsg?.role === 'assistant') {
+                        updateMessage(lastMsg.id, {
+                          content: displayMessage,
+                          isStreaming: false,
+                          hasReferenceUpdates: true,
+                          referenceUpdates: [{
+                            type: 'menu',
+                            menuId: args.menu_id,
+                            operation: functionCall.name,
+                            ...args,
+                          }],
+                          tokensUsed: data.usage?.output_tokens || 0,
+                          model: selectedModel.name,
+                        })
+                      }
+                      setGenerating(false)
+                      setCurrentThinking('')
+                      return
+                    }
+
+                    // ============================================
+                    // BILD TOOLS
+                    // ============================================
+                    case 'replace_image': {
+                      console.log('[Function Call] replace_image')
+                      const sectionId = args.section_id
+                      const imgSelector = args.image_selector || 'img'
+                      const newSrc = args.new_src
+                      const newAlt = args.new_alt
+
+                      // Finde das Bild und ersetze src/alt
+                      const parser = new DOMParser()
+                      const doc = parser.parseFromString(currentHtml, 'text/html')
+                      const section = doc.getElementById(sectionId)
+                      if (section) {
+                        const img = section.querySelector(imgSelector) as HTMLImageElement
+                        if (img) {
+                          img.src = newSrc
+                          img.alt = newAlt
+                          finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                        }
+                      }
+                      break
+                    }
+
+                    case 'set_background_image': {
+                      console.log('[Function Call] set_background_image')
+                      const sectionId = args.section_id
+                      const imageUrl = args.image_url
+                      const overlay = args.overlay
+                      const position = args.position || 'center'
+
+                      const parser = new DOMParser()
+                      const doc = parser.parseFromString(currentHtml, 'text/html')
+                      const section = doc.getElementById(sectionId)
+                      if (section) {
+                        section.style.backgroundImage = `url('${imageUrl}')`
+                        section.style.backgroundSize = 'cover'
+                        section.style.backgroundPosition = position
+                        if (overlay) {
+                          // Add overlay div
+                          const overlayDiv = doc.createElement('div')
+                          overlayDiv.style.cssText = `position:absolute;inset:0;background:${overlay};`
+                          overlayDiv.className = 'absolute inset-0'
+                          section.style.position = 'relative'
+                          section.insertBefore(overlayDiv, section.firstChild)
+                        }
+                        finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                      }
+                      break
+                    }
+
+                    // ============================================
+                    // SEO TOOLS
+                    // ============================================
+                    case 'update_page_title': {
+                      console.log('[Function Call] update_page_title:', args.title)
+                      finalHtml = currentHtml.replace(
+                        /<title>[^<]*<\/title>/i,
+                        `<title>${args.title}</title>`
+                      )
+                      if (!currentHtml.includes('<title>')) {
+                        finalHtml = finalHtml.replace(
+                          '</head>',
+                          `<title>${args.title}</title>\n</head>`
+                        )
+                      }
+                      break
+                    }
+
+                    case 'update_meta_description': {
+                      console.log('[Function Call] update_meta_description')
+                      const desc = args.description
+                      if (currentHtml.includes('name="description"')) {
+                        finalHtml = currentHtml.replace(
+                          /<meta\s+name=["']description["']\s+content=["'][^"']*["'][^>]*>/i,
+                          `<meta name="description" content="${desc}">`
+                        )
+                      } else {
+                        finalHtml = currentHtml.replace(
+                          '</head>',
+                          `<meta name="description" content="${desc}">\n</head>`
+                        )
+                      }
+                      break
+                    }
+
+                    case 'add_structured_data': {
+                      console.log('[Function Call] add_structured_data:', args.schema_type)
+                      const schemaScript = `<script type="application/ld+json">\n${args.data}\n</script>`
+                      finalHtml = currentHtml.replace('</head>', `${schemaScript}\n</head>`)
+                      break
+                    }
+
+                    // ============================================
+                    // MULTI-ELEMENT TOOLS
+                    // ============================================
+                    case 'change_all_buttons': {
+                      console.log('[Function Call] change_all_buttons')
+                      const primaryClasses = args.primary_classes
+                      const secondaryClasses = args.secondary_classes
+
+                      const parser = new DOMParser()
+                      const doc = parser.parseFromString(currentHtml, 'text/html')
+                      const buttons = doc.querySelectorAll('button, a.btn, [role="button"]')
+
+                      buttons.forEach((btn) => {
+                        // Entferne alte Button-Klassen und füge neue hinzu
+                        const isSecondary = btn.classList.contains('btn-secondary') ||
+                                           btn.classList.contains('secondary') ||
+                                           btn.getAttribute('data-variant') === 'secondary'
+                        const newClasses = isSecondary && secondaryClasses ? secondaryClasses : primaryClasses
+                        btn.className = newClasses
+                      })
+
+                      finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                      break
+                    }
+
+                    case 'update_color_scheme': {
+                      console.log('[Function Call] update_color_scheme')
+                      // Multi-Token Update
+                      const tokenUpdates: Array<{ type: string; id: string; value: string }> = []
+
+                      if (args.primary_color) {
+                        tokenUpdates.push({ type: 'token', id: 'color-brand-primary', value: args.primary_color })
+                      }
+                      if (args.secondary_color) {
+                        tokenUpdates.push({ type: 'token', id: 'color-brand-secondary', value: args.secondary_color })
+                      }
+                      if (args.accent_color) {
+                        tokenUpdates.push({ type: 'token', id: 'color-brand-accent', value: args.accent_color })
+                      }
+                      if (args.background_color) {
+                        tokenUpdates.push({ type: 'token', id: 'color-neutral-background', value: args.background_color })
+                      }
+                      if (args.text_color) {
+                        tokenUpdates.push({ type: 'token', id: 'color-neutral-foreground', value: args.text_color })
+                      }
+
+                      setPendingReferenceUpdates(tokenUpdates)
+                      const msgs = useEditorStore.getState().messages
+                      const lastMsg = msgs[msgs.length - 1]
+                      if (lastMsg?.role === 'assistant') {
+                        updateMessage(lastMsg.id, {
+                          content: displayMessage,
+                          isStreaming: false,
+                          hasReferenceUpdates: true,
+                          referenceUpdates: tokenUpdates,
+                          tokensUsed: data.usage?.output_tokens || 0,
+                          model: selectedModel.name,
+                        })
+                      }
+                      setGenerating(false)
+                      setCurrentThinking('')
+                      return
+                    }
+
+                    // ============================================
+                    // FORM BUILDER
+                    // ============================================
+                    case 'create_form': {
+                      console.log('[Function Call] create_form:', args.form_type)
+                      const fields = args.fields as Array<{
+                        name: string
+                        type: string
+                        label: string
+                        required?: boolean
+                        placeholder?: string
+                      }>
+
+                      // Generiere Formular-HTML
+                      let formHtml = `<form id="contact-form" class="space-y-6">\n`
+                      fields.forEach((field) => {
+                        const required = field.required ? 'required' : ''
+                        const placeholder = field.placeholder || ''
+
+                        formHtml += `  <div>\n`
+                        formHtml += `    <label for="${field.name}" class="block text-sm font-medium mb-2">${field.label}</label>\n`
+
+                        if (field.type === 'textarea') {
+                          formHtml += `    <textarea id="${field.name}" name="${field.name}" rows="4" placeholder="${placeholder}" class="w-full px-4 py-3 rounded-lg border border-[var(--color-neutral-border)] focus:ring-2 focus:ring-[var(--color-brand-primary)] focus:border-transparent" ${required}></textarea>\n`
+                        } else {
+                          formHtml += `    <input type="${field.type}" id="${field.name}" name="${field.name}" placeholder="${placeholder}" class="w-full px-4 py-3 rounded-lg border border-[var(--color-neutral-border)] focus:ring-2 focus:ring-[var(--color-brand-primary)] focus:border-transparent" ${required}>\n`
+                        }
+                        formHtml += `  </div>\n`
+                      })
+                      formHtml += `  <button type="submit" class="w-full bg-[var(--color-brand-primary)] text-white px-6 py-3 rounded-lg font-medium hover:bg-[var(--color-brand-primaryHover)] transition-colors">${args.submit_text}</button>\n`
+                      formHtml += `</form>`
+
+                      // Füge in Section ein oder als neue Section
+                      if (args.section_id) {
+                        const parser = new DOMParser()
+                        const doc = parser.parseFromString(currentHtml, 'text/html')
+                        const section = doc.getElementById(args.section_id)
+                        if (section) {
+                          section.innerHTML += formHtml
+                          finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                        }
+                      } else {
+                        // Als neue Contact Section
+                        const sectionHtml = `
+<section id="contact" class="py-24 bg-[var(--color-neutral-muted)]">
+  <div class="max-w-xl mx-auto px-4">
+    <h2 class="text-3xl font-bold text-center mb-8">Kontakt</h2>
+    ${formHtml}
+  </div>
+</section>`
+                        finalHtml = currentHtml.replace(/<\/body>/i, `${sectionHtml}\n</body>`)
+                      }
+                      break
+                    }
+
+                    case 'add_form_field': {
+                      console.log('[Function Call] add_form_field')
+                      // Form Field hinzufügen - vereinfacht
+                      const fieldHtml = `
+<div>
+  <label for="${args.field_name}" class="block text-sm font-medium mb-2">${args.field_label}</label>
+  <input type="${args.field_type}" id="${args.field_name}" name="${args.field_name}" class="w-full px-4 py-3 rounded-lg border border-[var(--color-neutral-border)] focus:ring-2 focus:ring-[var(--color-brand-primary)]" ${args.required ? 'required' : ''}>
+</div>`
+
+                      const parser = new DOMParser()
+                      const doc = parser.parseFromString(currentHtml, 'text/html')
+                      const form = doc.querySelector(args.form_selector)
+                      if (form) {
+                        const submitBtn = form.querySelector('button[type="submit"]')
+                        if (submitBtn) {
+                          submitBtn.insertAdjacentHTML('beforebegin', fieldHtml)
+                        } else {
+                          form.innerHTML += fieldHtml
+                        }
+                        finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                      }
+                      break
+                    }
+
+                    // ============================================
+                    // ANIMATION TOOLS
+                    // ============================================
+                    case 'add_animation': {
+                      console.log('[Function Call] add_animation:', args.animation_type)
+                      const animType = args.animation_type
+                      const duration = args.duration || '0.6s'
+                      const delay = args.delay || '0s'
+                      const trigger = args.trigger || 'load'
+
+                      // CSS für Animation
+                      const animationCSS = `
+<style>
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideLeft { from { opacity: 0; transform: translateX(50px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideRight { from { opacity: 0; transform: translateX(-50px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes zoomIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+.animate-on-load { animation-fill-mode: both; }
+</style>`
+
+                      const animationMap: Record<string, string> = {
+                        'fade-in': 'fadeIn',
+                        'fade-up': 'fadeUp',
+                        'fade-down': 'fadeDown',
+                        'slide-left': 'slideLeft',
+                        'slide-right': 'slideRight',
+                        'zoom-in': 'zoomIn',
+                        'bounce': 'bounce',
+                        'pulse': 'pulse',
+                      }
+
+                      const animName = animationMap[animType] || 'fadeIn'
+
+                      const parser = new DOMParser()
+                      const doc = parser.parseFromString(currentHtml, 'text/html')
+                      const element = doc.querySelector(args.element_selector)
+
+                      if (element) {
+                        element.classList.add('animate-on-load')
+                        ;(element as HTMLElement).style.animation = `${animName} ${duration} ${delay} ease-out`
+
+                        // Füge CSS hinzu wenn nicht vorhanden
+                        if (!currentHtml.includes('@keyframes fadeIn')) {
+                          const head = doc.querySelector('head')
+                          if (head) {
+                            head.insertAdjacentHTML('beforeend', animationCSS)
+                          }
+                        }
+
+                        finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                      }
+                      break
+                    }
+
+                    case 'add_scroll_animations': {
+                      console.log('[Function Call] add_scroll_animations')
+                      const sectionId = args.section_id
+                      const style = args.animation_style || 'stagger'
+                      const staggerDelay = args.stagger_delay || '0.1s'
+
+                      // Intersection Observer Script für Scroll-Animationen
+                      const scrollScript = `
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('animate-visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('#${sectionId} .animate-on-scroll').forEach(el => {
+    observer.observe(el);
+  });
+});
+</script>
+<style>
+.animate-on-scroll { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.animate-visible { opacity: 1; transform: translateY(0); }
+</style>`
+
+                      const parser = new DOMParser()
+                      const doc = parser.parseFromString(currentHtml, 'text/html')
+                      const section = doc.getElementById(sectionId)
+
+                      if (section) {
+                        // Füge animate-on-scroll zu Kindern hinzu
+                        const children = section.querySelectorAll(':scope > div > *')
+                        let delayMs = 0
+                        children.forEach((child, index) => {
+                          child.classList.add('animate-on-scroll')
+                          if (style === 'stagger') {
+                            ;(child as HTMLElement).style.transitionDelay = `${delayMs}ms`
+                            delayMs += parseInt(staggerDelay) * 1000 || 100
+                          }
+                        })
+
+                        // Script hinzufügen
+                        if (!currentHtml.includes('animate-on-scroll')) {
+                          doc.body.insertAdjacentHTML('beforeend', scrollScript)
+                        }
+
+                        finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                      }
+                      break
+                    }
+
+                    // ============================================
+                    // RESPONSIVE TOOLS
+                    // ============================================
+                    case 'adjust_mobile':
+                    case 'adjust_breakpoint': {
+                      console.log('[Function Call] Responsive adjustment:', functionCall.name)
+                      // Diese verwenden das html Feld direkt wie modify_section
+                      if (args.html) {
+                        const sectionId = args.section_id
+                        const sectionRegex = new RegExp(
+                          `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
+                          'gi'
+                        )
+                        finalHtml = currentHtml.replace(sectionRegex, args.html)
+                      } else if (args.add_classes) {
+                        // Klassen hinzufügen
+                        const parser = new DOMParser()
+                        const doc = parser.parseFromString(currentHtml, 'text/html')
+                        const element = doc.querySelector(args.element_selector)
+                        if (element) {
+                          const newClasses = args.add_classes.split(' ')
+                          newClasses.forEach((c: string) => element.classList.add(c))
+                          if (args.remove_classes) {
+                            const removeClasses = args.remove_classes.split(' ')
+                            removeClasses.forEach((c: string) => element.classList.remove(c))
+                          }
+                          finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                        }
+                      }
+                      break
+                    }
+
+                    // ============================================
+                    // COMPONENT LIBRARY
+                    // ============================================
+                    case 'save_as_component': {
+                      console.log('[Function Call] save_as_component:', args.component_name)
+                      // Triggere Component-Save Dialog
+                      const parser = new DOMParser()
+                      const doc = parser.parseFromString(currentHtml, 'text/html')
+                      const section = doc.getElementById(args.section_id)
+
+                      if (section) {
+                        // Speichere als pending action - wird vom User bestätigt
+                        setPendingReferenceUpdates([{
+                          type: 'save_component',
+                          sectionId: args.section_id,
+                          componentName: args.component_name,
+                          category: args.category,
+                          html: section.outerHTML,
+                        }])
+                      }
+
+                      const msgs = useEditorStore.getState().messages
+                      const lastMsg = msgs[msgs.length - 1]
+                      if (lastMsg?.role === 'assistant') {
+                        updateMessage(lastMsg.id, {
+                          content: displayMessage + '\n\n_Klicke auf "Anwenden" um die Komponente zu speichern._',
+                          isStreaming: false,
+                          hasReferenceUpdates: true,
+                          referenceUpdates: [{
+                            type: 'save_component',
+                            sectionId: args.section_id,
+                            componentName: args.component_name,
+                            category: args.category,
+                          }],
+                          tokensUsed: data.usage?.output_tokens || 0,
+                          model: selectedModel.name,
+                        })
+                      }
+                      setGenerating(false)
+                      setCurrentThinking('')
+                      return
+                    }
+
+                    case 'insert_component': {
+                      console.log('[Function Call] insert_component:', args.component_id)
+                      // TODO: Lade Komponente aus DB und füge ein
+                      displayMessage += '\n\n_Komponenten-Einfügung wird noch implementiert._'
+                      break
+                    }
+
+                    // ============================================
+                    // UTILITY TOOLS
+                    // ============================================
+                    case 'update_text': {
+                      console.log('[Function Call] update_text:', args.element_selector)
+                      const parser = new DOMParser()
+                      const doc = parser.parseFromString(currentHtml, 'text/html')
+                      const element = doc.querySelector(args.element_selector)
+                      if (element) {
+                        element.textContent = args.new_text
+                        finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                      }
+                      break
+                    }
+
+                    case 'update_link': {
+                      console.log('[Function Call] update_link:', args.link_selector)
+                      const parser = new DOMParser()
+                      const doc = parser.parseFromString(currentHtml, 'text/html')
+                      const link = doc.querySelector(args.link_selector) as HTMLAnchorElement
+                      if (link) {
+                        link.href = args.new_url
+                        if (args.new_text) {
+                          link.textContent = args.new_text
+                        }
+                        if (args.open_in_new_tab) {
+                          link.target = '_blank'
+                          link.rel = 'noopener noreferrer'
+                        }
+                        finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
+                      }
+                      break
+                    }
+
+                    default:
+                      console.warn('[Function Call] Unknown function:', functionCall.name)
+                  }
+
+                  // Verarbeite HTML-Änderungen (für create_full_page, replace_section, etc.)
+                  if (finalHtml !== currentHtml) {
+                    // Injiziere fehlende Animation Keyframes
+                    finalHtml = injectAnimationKeyframes(finalHtml)
+                    console.log('[Function Call] HTML changed, length:', finalHtml.length)
+
+                    // Global Components Detection (für neue Seiten)
+                    if (functionCall.name === 'create_full_page') {
+                      const extracted = extractGlobalComponents(finalHtml)
+                      const hasNewHeader = extracted.header && extracted.header.confidence >= 50
+                      const hasNewFooter = extracted.footer && extracted.footer.confidence >= 50
+
+                      if (hasNewHeader || hasNewFooter) {
+                        setDetectedHeader(hasNewHeader ? extracted.header : null)
+                        setDetectedFooter(hasNewFooter ? extracted.footer : null)
+                        setPendingFinalHtml(finalHtml)
+                        setGlobalComponentsDialogOpen(true)
+                      }
+                    }
+
+                    // Update Message
+                    const msgs = useEditorStore.getState().messages
+                    const lastMsg = msgs[msgs.length - 1]
+                    if (lastMsg?.role === 'assistant') {
+                      updateMessage(lastMsg.id, {
+                        content: displayMessage,
+                        generatedHtml: finalHtml,
+                        isStreaming: false,
+                        tokensUsed: data.usage?.output_tokens || 0,
+                        model: selectedModel.name,
+                      })
+                    }
+                  }
+
+                  setGenerating(false)
+                  setCurrentThinking('')
+                  return
+                }
+
+                // LEGACY: Fallback auf Text-Parsing wenn kein Function Call
                 // NEU: Zuerst auf Reference Updates pruefen
                 const refParseResult = parseReferenceUpdates(fullContent)
                 console.log('Reference updates parsed:', refParseResult)
@@ -580,9 +1426,22 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                 let displayMessage = fullContent
 
                 if (parsed) {
+                  // Debug: Log parsed HTML before applying
+                  console.log('[DEBUG] parsed.html has DOCTYPE:', parsed.html?.includes('<!DOCTYPE'))
+                  console.log('[DEBUG] parsed.html has script:', parsed.html?.includes('<script'))
+                  console.log('[DEBUG] parsed.html length:', parsed.html?.length)
+
                   // Apply the operation
                   finalHtml = applyOperation(currentHtml, parsed)
                   displayMessage = parsed.message || fullContent
+
+                  // Injiziere fehlende Animation Keyframes
+                  finalHtml = injectAnimationKeyframes(finalHtml)
+
+                  // Debug: Log after applyOperation
+                  console.log('[DEBUG] finalHtml has DOCTYPE:', finalHtml.includes('<!DOCTYPE'))
+                  console.log('[DEBUG] finalHtml has script:', finalHtml.includes('<script'))
+                  console.log('[DEBUG] finalHtml length:', finalHtml.length)
                   console.log('Applied operation, HTML changed:', finalHtml !== currentHtml)
 
                   // GLOBAL COMPONENTS HANDLING
@@ -667,13 +1526,72 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
 
               if (data.type === 'error') throw new Error(data.message)
             } catch (e) {
-              if (e instanceof SyntaxError) continue
+              if (e instanceof SyntaxError) {
+                // Mit SSE-Buffer sollte das selten passieren, aber loggen für Debugging
+                console.warn('[SSE] Incomplete chunk received, will be buffered:', line.slice(0, 100))
+                continue
+              }
               throw e
             }
           }
         }
       }
     } catch (error) {
+      // Handle different error types gracefully
+      if (error instanceof Error) {
+        // User cancelled or component unmounted - no error message needed
+        if (error.name === 'AbortError') {
+          console.log('Generation cancelled by user')
+          const msgs = useEditorStore.getState().messages
+          const lastMsg = msgs[msgs.length - 1]
+          if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+            // Remove the empty streaming message
+            updateMessage(lastMsg.id, {
+              content: '_Generierung abgebrochen._',
+              isStreaming: false,
+            })
+          }
+          return
+        }
+
+        // Connection timeout/terminated - auto-retry once
+        if (error.message.includes('terminated') || error.message.includes('Load failed')) {
+          console.error('Generation timeout:', error, `(retry ${retryCount}/${maxRetries})`)
+
+          if (retryCount < maxRetries) {
+            // Auto-retry
+            const msgs = useEditorStore.getState().messages
+            const lastMsg = msgs[msgs.length - 1]
+            if (lastMsg?.role === 'assistant') {
+              updateMessage(lastMsg.id, {
+                content: '⏳ Verbindung unterbrochen - versuche erneut...',
+                isStreaming: true,
+              })
+            }
+
+            // Increment retry count and retry after short delay
+            setRetryCount(prev => prev + 1)
+            setTimeout(() => {
+              handleSend(promptOverride, skipSetup)
+            }, 1000)
+            return
+          }
+
+          // Max retries reached - show error
+          const msgs = useEditorStore.getState().messages
+          const lastMsg = msgs[msgs.length - 1]
+          if (lastMsg?.role === 'assistant') {
+            updateMessage(lastMsg.id, {
+              content: 'Die Verbindung wurde unterbrochen. Das kann bei sehr langen Generierungen passieren. Versuche es mit einem kürzeren Prompt oder teile die Anfrage in mehrere Schritte auf.',
+              isStreaming: false,
+            })
+          }
+          setRetryCount(0) // Reset for next request
+          return
+        }
+      }
+
+      // Generic error fallback
       console.error('Generation error:', error)
       const msgs = useEditorStore.getState().messages
       const lastMsg = msgs[msgs.length - 1]
@@ -685,6 +1603,12 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
       }
     } finally {
       setGenerating(false)
+      // Clear abort controller reference
+      abortControllerRef.current = null
+      // Reset retry count on completion (success or final failure)
+      setRetryCount(0)
+      // Clear streaming stats
+      setStreamingStats(null)
     }
   }
 
@@ -786,9 +1710,36 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
   const currentModelSupportsThinking = models.find(m => m.id === selectedModel.id)?.supportsThinking ?? false
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden">
+    <div className="flex flex-col h-full bg-white dark:bg-zinc-900 overflow-hidden">
+      {/* Chat Header Bar - visually connected to Toolbar */}
+      <div className="h-12 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-3 bg-white dark:bg-zinc-900 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Chat</span>
+        </div>
+        <button
+          onClick={() => {
+            // Clear chat - reset messages
+            const store = useEditorStore.getState()
+            if (store.clearMessages) {
+              store.clearMessages()
+            }
+          }}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Neuer Chat
+        </button>
+      </div>
+
       {/* Messages Area */}
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden relative">
+        {/* Wireframe Build Animation Overlay */}
+        <WireframeBuildAnimation
+          isActive={activeOperation !== null}
+          operationType={activeOperation?.type}
+          sectionId={activeOperation?.sectionId}
+        />
         <div className="p-4 space-y-6 min-w-0">
           {/* Empty State */}
           {messages.length === 0 && (
@@ -796,10 +1747,10 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
               <div className="w-16 h-16 mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                 <Wand2 className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-lg font-semibold text-zinc-800 mb-2">
+              <h3 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100 mb-2">
                 Was möchtest du erstellen?
               </h3>
-              <p className="text-sm text-zinc-500 max-w-xs">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-xs">
                 Beschreibe deine Webseite und ich generiere sie für dich.
               </p>
 
@@ -814,7 +1765,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                   <button
                     key={prompt}
                     onClick={() => setInput(`Erstelle eine ${prompt}`)}
-                    className="px-3 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-full transition-colors cursor-pointer"
+                    className="px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
                   >
                     {prompt}
                   </button>
@@ -844,194 +1795,158 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                     setSiteSetupModalOpen(true)
                   }}
                 />
+                {/* Show Streaming Status for active streaming */}
+                {isLastMessage && isStreamingAssistant && streamingStats && (
+                  <div className="mt-2">
+                    <StreamingStatus stats={streamingStats} />
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-zinc-100 p-4 bg-white">
-        {/* URL Detection Badge */}
-        {detectedUrls.length > 0 && (
-          <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-            <Link className="h-4 w-4 text-blue-600" />
-            <span className="text-xs text-blue-700">
-              {detectedUrls.length} URL{detectedUrls.length > 1 ? 's' : ''} erkannt - Design wird analysiert
-            </span>
-            <div className="flex-1" />
-            <div className="flex flex-wrap gap-1 max-w-xs">
-              {detectedUrls.slice(0, 3).map((url, i) => (
-                <span key={i} className="text-xs text-blue-600 truncate max-w-32">
-                  {new URL(url).hostname}
+      {/* Input Area - Figma Style: Large container with buttons inside */}
+      <div className="p-3 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">
+        {/* Main Input Container - like Figma */}
+        <div className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl">
+          {/* URL Detection & References - inside container */}
+          {(detectedUrls.length > 0 || selectedReferences.length > 0) && (
+            <div className="px-3 pt-2 flex flex-wrap gap-1.5">
+              {detectedUrls.length > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-xs">
+                  <Link className="h-3 w-3" />
+                  {detectedUrls.length} URL
                 </span>
-              ))}
-              {detectedUrls.length > 3 && (
-                <span className="text-xs text-blue-500">+{detectedUrls.length - 3}</span>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Selected References Badges */}
-        {selectedReferences.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            <span className="text-xs text-zinc-500">Referenzen:</span>
-            {selectedReferences.map((ref) => (
-              <ReferenceBadge
-                key={`${ref.category}-${ref.id}`}
-                reference={ref}
-                onRemove={() => removeReference(ref)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Input Container */}
-        <div className="relative mb-3">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Beschreibe, was du erstellen möchtest... (@ für Seiten-Referenz)"
-            rows={1}
-            disabled={isGenerating}
-            className="w-full px-4 py-3 pr-24 text-sm bg-zinc-50 border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white placeholder:text-zinc-400 disabled:opacity-50 transition-colors"
-          />
-
-          {/* Reference Dropdown */}
-          {showReferenceDropdown && siteId && (
-            <div className="absolute bottom-full left-0 mb-1 w-full z-50">
-              <ReferenceDropdown
-                siteId={siteId}
-                currentPageHtml={html}
-                isOpen={showReferenceDropdown}
-                searchQuery={referenceSearchQuery}
-                position={{ top: 0, left: 0 }}
-                onSelect={handleReferenceSelect}
-                onClose={() => setShowReferenceDropdown(false)}
-              />
+              {selectedReferences.map((ref) => (
+                <ReferenceBadge
+                  key={`${ref.category}-${ref.id}`}
+                  reference={ref}
+                  onRemove={() => removeReference(ref)}
+                />
+              ))}
             </div>
           )}
 
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            <button
-              className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors cursor-pointer"
-              title="Datei anhängen"
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
+          {/* Textarea */}
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Beschreibe Änderungen..."
+              rows={2}
+              disabled={isGenerating}
+              className="w-full px-3 py-3 text-sm bg-transparent border-0 resize-none focus:outline-none focus:ring-0 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-zinc-800 dark:text-zinc-200 disabled:opacity-50"
+            />
+
+            {/* Reference Dropdown */}
+            {showReferenceDropdown && siteId && (
+              <div className="absolute bottom-full left-0 mb-1 w-full z-50">
+                <ReferenceDropdown
+                  siteId={siteId}
+                  currentPageHtml={html}
+                  isOpen={showReferenceDropdown}
+                  searchQuery={referenceSearchQuery}
+                  position={{ top: 0, left: 0 }}
+                  onSelect={handleReferenceSelect}
+                  onClose={() => setShowReferenceDropdown(false)}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Bar with Tools - inside container */}
+          <div className="flex items-center justify-between px-2 py-2 border-t border-zinc-200 dark:border-zinc-700">
+            <div className="flex items-center gap-0.5">
+              {/* Add/Prompt Builder */}
+              <button
+                onClick={() => setPromptBuilderOpen(true)}
+                className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors cursor-pointer"
+                title="Prompt Builder"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+
+              {/* Model Selector - full name */}
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setModelDropdownOpen(!modelDropdownOpen)
+                  }}
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors cursor-pointer"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span className="font-medium">{selectedModel.name}</span>
+                  <ChevronDown className="h-3 w-3 text-zinc-400" />
+                </button>
+
+                {modelDropdownOpen && (
+                  <div className="absolute bottom-full left-0 mb-1 py-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg min-w-48 z-50">
+                    {models.map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          setSelectedModel(model)
+                          setModelDropdownOpen(false)
+                        }}
+                        className={`w-full px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer ${selectedModel.id === model.id ? 'bg-zinc-100 dark:bg-zinc-700' : ''}`}
+                      >
+                        <div className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{model.name}</div>
+                        <div className="text-xs text-zinc-400">{model.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-600 mx-1" />
+
+              {/* Tool Toggles */}
+              {currentModelSupportsThinking && (
+                <button
+                  onClick={() => setThinkingEnabled(!thinkingEnabled)}
+                  className={`p-1.5 rounded transition-colors cursor-pointer ${thinkingEnabled ? 'text-purple-500 bg-purple-100 dark:bg-purple-900/40' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                  title="Thinking Mode"
+                >
+                  <Brain className="h-4 w-4" />
+                </button>
+              )}
+
+              <button
+                onClick={() => setGoogleSearchEnabled(!googleSearchEnabled)}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${googleSearchEnabled ? 'text-green-500 bg-green-100 dark:bg-green-900/40' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                title="Web Search"
+              >
+                <Globe className="h-4 w-4" />
+              </button>
+
+              <button
+                onClick={() => setCodeExecutionEnabled(!codeExecutionEnabled)}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${codeExecutionEnabled ? 'text-amber-500 bg-amber-100 dark:bg-amber-900/40' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                title="Code Execution"
+              >
+                <Code className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Send Button */}
             <button
               onClick={() => handleSend()}
-              disabled={(!input.trim() && selectedReferences.length === 0) || isGenerating}
-              className="p-2 bg-blue-500 hover:bg-blue-600 disabled:bg-zinc-200 disabled:cursor-not-allowed text-white disabled:text-zinc-400 rounded-lg transition-colors cursor-pointer"
+              disabled={(!input.trim() && selectedReferences.length === 0) || isGenerating || isSending}
+              className="p-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:bg-zinc-300 dark:disabled:bg-zinc-600 disabled:text-zinc-500 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed"
             >
-              {isGenerating ? (
+              {(isGenerating || isSending) ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
               )}
             </button>
           </div>
-        </div>
-
-        {/* Bottom Actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Prompt Builder */}
-            <button
-              onClick={() => setPromptBuilderOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors cursor-pointer"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Prompt Builder
-            </button>
-
-            {/* Model Selector */}
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setModelDropdownOpen(!modelDropdownOpen)
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors cursor-pointer"
-              >
-                <span>{selectedModel.name}</span>
-                <ChevronDown className="h-3 w-3" />
-              </button>
-
-              {modelDropdownOpen && (
-                <div className="absolute bottom-full left-0 mb-1 py-1 bg-white border border-zinc-200 rounded-lg shadow-lg min-w-48 z-50">
-                  {models.map((model) => (
-                    <button
-                      key={model.id}
-                      onClick={() => {
-                        setSelectedModel(model)
-                        setModelDropdownOpen(false)
-                      }}
-                      className={`w-full px-3 py-2 text-left hover:bg-zinc-50 transition-colors cursor-pointer ${
-                        selectedModel.id === model.id
-                          ? 'bg-blue-50'
-                          : ''
-                      }`}
-                    >
-                      <div className="text-xs font-medium text-zinc-800">{model.name}</div>
-                      <div className="text-xs text-zinc-500">{model.description}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Thinking Mode Toggle - nur bei unterstützten Models */}
-            {currentModelSupportsThinking && (
-              <button
-                onClick={() => setThinkingEnabled(!thinkingEnabled)}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  thinkingEnabled
-                    ? 'text-purple-700 bg-purple-100 hover:bg-purple-200'
-                    : 'text-zinc-500 bg-zinc-100 hover:bg-zinc-200'
-                }`}
-                title={thinkingEnabled ? 'Thinking Mode aktiv (klicken zum deaktivieren)' : 'Thinking Mode aktivieren'}
-              >
-                <Brain className="h-4 w-4" />
-              </button>
-            )}
-
-            {/* Google Search Toggle */}
-            <button
-              onClick={() => setGoogleSearchEnabled(!googleSearchEnabled)}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                googleSearchEnabled
-                  ? 'text-green-700 bg-green-100 hover:bg-green-200'
-                  : 'text-zinc-500 bg-zinc-100 hover:bg-zinc-200'
-              }`}
-              title={googleSearchEnabled ? 'Google Search aktiv' : 'Google Search aktivieren'}
-            >
-              <Globe className="h-4 w-4" />
-            </button>
-
-            {/* Code Execution Toggle */}
-            <button
-              onClick={() => setCodeExecutionEnabled(!codeExecutionEnabled)}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                codeExecutionEnabled
-                  ? 'text-amber-700 bg-amber-100 hover:bg-amber-200'
-                  : 'text-zinc-500 bg-zinc-100 hover:bg-zinc-200'
-              }`}
-              title={codeExecutionEnabled ? 'Code Execution aktiv' : 'Code Execution aktivieren (Python)'}
-            >
-              <Code className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Token/Character Count */}
-          {input.length > 0 && (
-            <span className="text-xs text-zinc-400">
-              {input.length} Zeichen
-            </span>
-          )}
         </div>
       </div>
 
@@ -1063,8 +1978,11 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
         onSave={async (headerName, footerName) => {
           if (!siteId) return
 
+          console.log('[GlobalComponents] Starting save...', { headerName, footerName })
+
           // Save header as global component
           if (headerName && detectedHeader) {
+            console.log('[GlobalComponents] Saving header...', detectedHeader.html.substring(0, 100))
             const result = await saveGlobalComponent({
               siteId,
               name: headerName,
@@ -1072,13 +1990,12 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
               position: 'header',
               setAsDefault: true,
             })
-            if (result.success) {
-              console.log('Header saved:', result.componentId)
-            }
+            console.log('[GlobalComponents] Header save result:', result)
           }
 
           // Save footer as global component
           if (footerName && detectedFooter) {
+            console.log('[GlobalComponents] Saving footer...', detectedFooter.html.substring(0, 100))
             const result = await saveGlobalComponent({
               siteId,
               name: footerName,
@@ -1086,22 +2003,27 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
               position: 'footer',
               setAsDefault: true,
             })
-            if (result.success) {
-              console.log('Footer saved:', result.componentId)
-            }
+            console.log('[GlobalComponents] Footer save result:', result)
           }
 
           // Remove saved header/footer from pending HTML and apply
           if (pendingFinalHtml) {
+            console.log('[GlobalComponents] Removing header/footer from HTML...')
             const cleanedHtml = removeHeaderFooterFromHtml(pendingFinalHtml, {
               removeHeader: !!headerName && !!detectedHeader,
               removeFooter: !!footerName && !!detectedFooter,
             })
+            console.log('[GlobalComponents] Cleaned HTML length:', cleanedHtml.length)
             applyGeneratedHtml(cleanedHtml)
           }
 
           // Reload global components
+          console.log('[GlobalComponents] Reloading global components...')
           await loadGlobalComponents()
+
+          // Debug: Check what was loaded
+          const state = useEditorStore.getState()
+          console.log('[GlobalComponents] After reload - Header:', !!state.globalHeader, 'Footer:', !!state.globalFooter)
 
           // Reset state
           setDetectedHeader(null)
@@ -1313,6 +2235,51 @@ Disallow: /wp-includes/`
 }
 
 /**
+ * StreamingStatus - Shows real-time streaming progress
+ */
+function StreamingStatus({ stats }: { stats: { startTime: number; charCount: number; lastActivity: number } }) {
+  const [, forceUpdate] = useState(0)
+
+  // Update every second for elapsed time
+  useEffect(() => {
+    const interval = setInterval(() => forceUpdate(n => n + 1), 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const now = Date.now()
+  const elapsedSec = Math.floor((now - stats.startTime) / 1000)
+  const lastActivitySec = Math.floor((now - stats.lastActivity) / 1000)
+
+  // Format elapsed time
+  const formatTime = (sec: number) => {
+    if (sec < 60) return `${sec}s`
+    const min = Math.floor(sec / 60)
+    const s = sec % 60
+    return `${min}m ${s}s`
+  }
+
+  // Determine status color based on last activity
+  const isStale = lastActivitySec > 10
+  const statusColor = isStale ? 'text-amber-600' : 'text-emerald-600'
+  const dotColor = isStale ? 'bg-amber-500' : 'bg-emerald-500'
+
+  return (
+    <div className="flex items-center gap-3 text-xs text-zinc-500 px-1 py-1">
+      <div className="flex items-center gap-1.5">
+        <div className={`w-2 h-2 rounded-full ${dotColor} ${!isStale ? 'animate-pulse' : ''}`} />
+        <span className={statusColor}>
+          {isStale ? `Warte... (${lastActivitySec}s)` : 'Empfange Daten'}
+        </span>
+      </div>
+      <span className="text-zinc-400">•</span>
+      <span>{formatTime(elapsedSec)}</span>
+      <span className="text-zinc-400">•</span>
+      <span>{(stats.charCount / 1000).toFixed(1)}k Zeichen</span>
+    </div>
+  )
+}
+
+/**
  * ThinkingDisplay - Shows AI reasoning process during generation
  */
 function ThinkingDisplay({ content, isComplete }: { content: string; isComplete?: boolean }) {
@@ -1326,11 +2293,10 @@ function ThinkingDisplay({ content, isComplete }: { content: string; isComplete?
   }, [isComplete])
 
   return (
-    <div className={`border rounded-xl overflow-hidden transition-all ${
-      isComplete
-        ? 'border-purple-200/50 bg-purple-50/30'
-        : 'border-purple-300 bg-purple-50/50 shadow-sm'
-    }`}>
+    <div className={`border rounded-xl overflow-hidden transition-all ${isComplete
+      ? 'border-purple-200/50 bg-purple-50/30'
+      : 'border-purple-300 bg-purple-50/50 shadow-sm'
+      }`}>
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}

@@ -363,7 +363,7 @@ export function LayersPanel() {
       <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-zinc-400" />
-          <span className="text-sm font-medium text-white">Layers</span>
+          <span className="text-sm font-medium text-white">Ebenen</span>
         </div>
         <button
           onClick={() => setShowLayersPanel(false)}

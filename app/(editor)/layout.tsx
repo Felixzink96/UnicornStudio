@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { ThemeProvider } from 'next-themes'
 
 export default async function EditorLayout({
   children,
@@ -16,5 +17,14 @@ export default async function EditorLayout({
     redirect('/login')
   }
 
-  return <>{children}</>
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      {children}
+    </ThemeProvider>
+  )
 }

@@ -152,7 +152,7 @@ export default async function IntegrationsPage() {
       {/* Back Link */}
       <Link
         href="/dashboard/sites"
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zum Dashboard
@@ -160,11 +160,11 @@ export default async function IntegrationsPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
           <Puzzle className="h-8 w-8 text-purple-500" />
           Integrationen
         </h1>
-        <p className="text-slate-400 mt-2">
+        <p className="text-muted-foreground mt-2">
           Plugins und Integrationen für externe Plattformen
         </p>
       </div>
@@ -172,7 +172,7 @@ export default async function IntegrationsPage() {
       {/* Connected WordPress Sites */}
       {wordpressSites.length > 0 && (
         <div className="mb-12">
-          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
             <Globe className="h-5 w-5 text-blue-500" />
             Verbundene WordPress Sites
           </h2>
@@ -183,7 +183,7 @@ export default async function IntegrationsPage() {
               const neverPushed = !site.last_pushed_at
 
               return (
-                <Card key={site.id} className="bg-slate-900 border-slate-800">
+                <Card key={site.id} className="bg-card border-border">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
@@ -194,8 +194,8 @@ export default async function IntegrationsPage() {
                           </svg>
                         </div>
                         <div>
-                          <h3 className="font-medium text-white">{site.name}</h3>
-                          <p className="text-sm text-slate-400">{site.wordpress.domain}</p>
+                          <h3 className="font-medium text-foreground">{site.name}</h3>
+                          <p className="text-sm text-muted-foreground">{site.wordpress.domain}</p>
                         </div>
                       </div>
                       {/* Status Badge */}
@@ -209,7 +209,7 @@ export default async function IntegrationsPage() {
                           ) : isOutdated ? (
                             <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20">
                               <AlertCircle className="h-3 w-3 mr-1" />
-                              Anderungen
+                              Änderungen
                             </Badge>
                           ) : (
                             <Badge className="bg-green-500/10 text-green-400 border-green-500/20">
@@ -231,7 +231,7 @@ export default async function IntegrationsPage() {
                     </div>
                     {/* Last Sync Info */}
                     {site.last_pushed_at && (
-                      <p className="text-xs text-slate-500 mt-3">
+                      <p className="text-xs text-muted-foreground mt-3">
                         Letzter Push: {new Date(site.last_pushed_at).toLocaleString('de-DE')}
                       </p>
                     )}
@@ -245,9 +245,9 @@ export default async function IntegrationsPage() {
 
       {/* Available Plugins */}
       <div className="mb-12">
-        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+        <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
           <Check className="h-5 w-5 text-green-500" />
-          Verfugbar
+          Verfügbar
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {stablePlugins.map((plugin) => (
@@ -258,7 +258,7 @@ export default async function IntegrationsPage() {
 
       {/* Coming Soon */}
       <div>
-        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+        <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
           <Clock className="h-5 w-5 text-yellow-500" />
           In Entwicklung
         </h2>
@@ -270,15 +270,15 @@ export default async function IntegrationsPage() {
       </div>
 
       {/* API Information */}
-      <div className="mt-12 bg-slate-800/30 rounded-xl border border-slate-700 p-6">
-        <h3 className="text-lg font-semibold text-white mb-2">REST API</h3>
-        <p className="text-slate-400 mb-4">
+      <div className="mt-12 bg-muted/30 rounded-xl border border-border p-6">
+        <h3 className="text-lg font-semibold text-foreground mb-2">REST API</h3>
+        <p className="text-muted-foreground mb-4">
           Du kannst auch direkt die REST API nutzen, um deine eigene Integration zu bauen.
         </p>
         <div className="flex gap-4">
           <Link
             href="/dashboard/settings/api-keys"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-muted hover:bg-accent rounded-lg text-foreground transition-colors"
           >
             API Keys verwalten
           </Link>

@@ -368,6 +368,13 @@ export function ChatMessage({ message, onOpenSetup }: ChatMessageProps) {
         }
       }
 
+      // Debug: Log what we're applying
+      console.log('[Apply] Final HTML length:', finalHtml.length)
+      console.log('[Apply] Has DOCTYPE:', finalHtml.includes('<!DOCTYPE'))
+      console.log('[Apply] Has script tag:', finalHtml.includes('<script'))
+      console.log('[Apply] Has header tag:', finalHtml.includes('<header'))
+      console.log('[Apply] Has footer tag:', finalHtml.includes('<footer'))
+
       // Apply to editor
       applyGeneratedHtml(finalHtml)
 
@@ -406,51 +413,34 @@ export function ChatMessage({ message, onOpenSetup }: ChatMessageProps) {
     return { messageText: message.content, styleReferences: [] }
   }, [message.content])
 
-  // User Message
+  // User Message - Figma Style: Light gray background, left-aligned
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end w-full">
-        <div className="max-w-[85%] space-y-2">
+      <div className="w-full">
+        <div className="space-y-2">
           {/* Style References Badge */}
           {styleReferences.length > 0 && (
-            <div className="flex justify-end">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg text-xs font-medium">
-                <Layers className="h-3 w-3" />
-                <span>Style von {styleReferences.join(', ')}</span>
-              </div>
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-purple-50 text-purple-600 rounded text-xs font-medium">
+              <Layers className="h-3 w-3" />
+              <span>Style von {styleReferences.join(', ')}</span>
             </div>
           )}
-          <div className="bg-blue-500 text-white rounded-2xl rounded-br-md px-4 py-3">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word' }}>
+          {/* User message with light gray background - Figma Style */}
+          <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg px-4 py-3">
+            <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word' }}>
               {messageText}
             </p>
           </div>
-          <div className="flex items-center justify-end gap-2">
-            <span className="text-xs text-zinc-400">
-              {message.timestamp ? formatTime(message.timestamp) : ''}
-            </span>
-            <div className="flex items-center gap-0.5">
-              <button
-                onClick={handleCopy}
-                className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-md transition-colors"
-                title="Kopieren"
-              >
-                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              </button>
-              <button
-                className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-md transition-colors"
-                title="Erneut senden"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={handleDelete}
-                className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                title="Löschen"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
+          {/* Minimal meta info */}
+          <div className="flex items-center gap-2 text-xs text-zinc-400">
+            {message.timestamp && <span>{formatTime(message.timestamp)}</span>}
+            <button
+              onClick={handleCopy}
+              className="p-1 text-zinc-400 hover:text-zinc-600 rounded transition-colors"
+              title="Kopieren"
+            >
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            </button>
           </div>
         </div>
       </div>
@@ -735,7 +725,7 @@ ${rawPreviewHtml}
                       {showCode ? (
                         <>
                           <Eye className="h-3 w-3" />
-                          <span>Preview</span>
+                          <span>Vorschau</span>
                         </>
                       ) : (
                         <>

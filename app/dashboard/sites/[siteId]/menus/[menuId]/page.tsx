@@ -232,17 +232,17 @@ export default function MenuEditorPage() {
   if (!menu) {
     return (
       <div className="p-8 text-center">
-        <p className="text-slate-500">Menü nicht gefunden</p>
+        <p className="text-muted-foreground">Menü nicht gefunden</p>
       </div>
     )
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-8 mx-auto">
       {/* Back Link */}
       <Link
         href={`/dashboard/sites/${siteId}/menus`}
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
         Zurück zu Menüs
@@ -251,17 +251,16 @@ export default function MenuEditorPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Menu className="h-8 w-8 text-purple-500" />
             {menu.name}
           </h1>
-          <p className="text-slate-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             {menu.position || 'Benutzerdefiniert'} • {menu.items?.length || 0} Items
           </p>
         </div>
         <Button
           onClick={() => setShowAddItem(true)}
-          className="bg-purple-600 hover:bg-purple-700"
         >
           <Plus className="h-4 w-4 mr-2" />
           Item hinzufügen
@@ -270,13 +269,13 @@ export default function MenuEditorPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Menu Items */}
-        <div className="bg-slate-900 rounded-lg border border-slate-800 p-5">
-          <h2 className="font-semibold text-white mb-4">Menü Items</h2>
+        <div className="bg-card rounded-lg border border-border p-5">
+          <h2 className="font-semibold text-foreground mb-4">Menü Items</h2>
 
           {/* Items List */}
           <div className="space-y-2">
             {(!menu.items || menu.items.length === 0) ? (
-              <div className="py-8 text-center text-slate-500 text-sm">
+              <div className="py-8 text-center text-muted-foreground text-sm">
                 Noch keine Items - füge das erste hinzu
               </div>
             ) : (
@@ -287,23 +286,23 @@ export default function MenuEditorPage() {
                   onDragStart={() => handleDragStart(item.id)}
                   onDragOver={(e) => handleDragOver(e, item.id)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-3 p-3 bg-slate-800 rounded-lg border border-slate-700 cursor-move group hover:border-slate-600 transition-colors ${
+                  className={`flex items-center gap-3 p-3 bg-muted rounded-lg border border-border cursor-move group hover:bg-accent transition-colors ${
                     draggedItem === item.id ? 'opacity-50' : ''
                   }`}
                 >
-                  <GripVertical className="h-4 w-4 text-slate-600 group-hover:text-slate-400" />
+                  <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-muted-foreground" />
 
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-white truncate">{item.label}</div>
-                    <div className="text-xs text-slate-500 truncate">{getItemUrl(item)}</div>
+                    <div className="font-medium text-foreground truncate">{item.label}</div>
+                    <div className="text-xs text-muted-foreground truncate">{getItemUrl(item)}</div>
                   </div>
 
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => setEditingItem(item)}
-                      className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+                      className="p-1.5 hover:bg-accent rounded transition-colors"
                     >
-                      <Settings className="h-4 w-4 text-slate-400" />
+                      <Settings className="h-4 w-4 text-muted-foreground" />
                     </button>
                     <button
                       onClick={() => deleteItem(item.id)}
@@ -319,8 +318,8 @@ export default function MenuEditorPage() {
         </div>
 
         {/* Available Pages */}
-        <div className="bg-slate-900 rounded-lg border border-slate-800 p-5">
-          <h2 className="font-semibold text-white mb-4">Verfügbare Seiten</h2>
+        <div className="bg-card rounded-lg border border-border p-5">
+          <h2 className="font-semibold text-foreground mb-4">Verfügbare Seiten</h2>
           <div className="space-y-2">
             {pages.map((page) => {
               const isInMenu = menu.items?.some((i) => i.pageId === page.id)
@@ -339,30 +338,30 @@ export default function MenuEditorPage() {
                   disabled={isInMenu}
                   className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
                     isInMenu
-                      ? 'bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed'
-                      : 'bg-slate-800 border-slate-700 hover:border-slate-600 cursor-pointer'
+                      ? 'bg-muted/50 border-border opacity-50 cursor-not-allowed'
+                      : 'bg-muted border-border hover:bg-accent cursor-pointer'
                   }`}
                 >
-                  <FileText className="h-4 w-4 text-slate-500" />
+                  <FileText className="h-4 w-4 text-muted-foreground" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-white truncate">{page.name}</div>
-                    <div className="text-xs text-slate-500">/{page.slug || ''}</div>
+                    <div className="font-medium text-foreground truncate">{page.name}</div>
+                    <div className="text-xs text-muted-foreground">/{page.slug || ''}</div>
                   </div>
                   {isInMenu && (
-                    <span className="text-xs text-slate-500">Im Menü</span>
+                    <span className="text-xs text-muted-foreground">Im Menü</span>
                   )}
                 </button>
               )
             })}
 
             {/* Quick Add Buttons */}
-            <div className="pt-4 border-t border-slate-800 space-y-2">
+            <div className="pt-4 border-t border-border space-y-2">
               <button
                 onClick={() => {
                   setNewItemType('external')
                   setShowAddItem(true)
                 }}
-                className="w-full flex items-center gap-3 p-3 rounded-lg border border-dashed border-slate-700 hover:border-slate-600 text-slate-400 hover:text-white transition-colors"
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-dashed border-border hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               >
                 <ExternalLink className="h-4 w-4" />
                 Externer Link
@@ -372,7 +371,7 @@ export default function MenuEditorPage() {
                   setNewItemType('anchor')
                   setShowAddItem(true)
                 }}
-                className="w-full flex items-center gap-3 p-3 rounded-lg border border-dashed border-slate-700 hover:border-slate-600 text-slate-400 hover:text-white transition-colors"
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-dashed border-border hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Hash className="h-4 w-4" />
                 Anker Link
@@ -384,25 +383,25 @@ export default function MenuEditorPage() {
 
       {/* Add Item Modal */}
       <Dialog open={showAddItem} onOpenChange={setShowAddItem}>
-        <DialogContent className="bg-slate-900 border-slate-800">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="text-white">Item hinzufügen</DialogTitle>
+            <DialogTitle className="text-foreground">Item hinzufügen</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Label</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Label</label>
               <Input
                 value={newItemLabel}
                 onChange={(e) => setNewItemLabel(e.target.value)}
                 placeholder="Menü-Bezeichnung"
-                className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
                 autoFocus
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Link-Typ</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Link-Typ</label>
               <div className="flex gap-2">
                 {[
                   { type: 'page', icon: FileText, label: 'Seite' },
@@ -414,8 +413,8 @@ export default function MenuEditorPage() {
                     onClick={() => setNewItemType(type as 'page' | 'external' | 'anchor')}
                     className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border transition-colors ${
                       newItemType === type
-                        ? 'border-purple-500 bg-purple-500/10 text-white'
-                        : 'border-slate-700 text-slate-400 hover:border-slate-600 hover:text-white'
+                        ? 'border-purple-500 bg-purple-500/10 text-foreground'
+                        : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -427,11 +426,11 @@ export default function MenuEditorPage() {
 
             {newItemType === 'page' && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Seite</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Seite</label>
                 <select
                   value={newItemPageId}
                   onChange={(e) => setNewItemPageId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3 py-2 bg-muted border border-border text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="">Seite wählen...</option>
                   {pages.map((page) => (
@@ -445,29 +444,29 @@ export default function MenuEditorPage() {
 
             {newItemType === 'external' && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">URL</label>
+                <label className="block text-sm font-medium text-foreground mb-2">URL</label>
                 <Input
                   type="url"
                   value={newItemUrl}
                   onChange={(e) => setNewItemUrl(e.target.value)}
                   placeholder="https://example.com"
-                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
                 />
               </div>
             )}
 
             {newItemType === 'anchor' && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Anker</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Anker</label>
                 <div className="flex items-center">
-                  <span className="px-3 py-2 bg-slate-700 border border-r-0 border-slate-600 rounded-l-lg text-slate-400">
+                  <span className="px-3 py-2 bg-muted border border-r-0 border-border rounded-l-lg text-muted-foreground">
                     #
                   </span>
                   <Input
                     value={newItemAnchor}
                     onChange={(e) => setNewItemAnchor(e.target.value)}
                     placeholder="section-name"
-                    className="rounded-l-none bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                    className="rounded-l-none bg-muted border-border text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
               </div>
@@ -481,14 +480,13 @@ export default function MenuEditorPage() {
                 setShowAddItem(false)
                 resetNewItemForm()
               }}
-              className="text-slate-400 hover:text-white hover:bg-slate-800"
+              className="text-muted-foreground hover:text-foreground hover:bg-accent"
             >
               Abbrechen
             </Button>
             <Button
               onClick={addItem}
               disabled={!newItemLabel.trim()}
-              className="bg-purple-600 hover:bg-purple-700"
             >
               Hinzufügen
             </Button>
@@ -498,47 +496,47 @@ export default function MenuEditorPage() {
 
       {/* Edit Item Modal */}
       <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
-        <DialogContent className="bg-slate-900 border-slate-800">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="text-white">Item bearbeiten</DialogTitle>
+            <DialogTitle className="text-foreground">Item bearbeiten</DialogTitle>
           </DialogHeader>
 
           {editingItem && (
             <div className="space-y-4 mt-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Label</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Label</label>
                 <Input
                   value={editingItem.label}
                   onChange={(e) =>
                     setEditingItem({ ...editingItem, label: e.target.value })
                   }
-                  className="bg-slate-800 border-slate-700 text-white"
+                  className="bg-muted border-border text-foreground"
                 />
               </div>
 
               {editingItem.linkType === 'external' && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">URL</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">URL</label>
                   <Input
                     type="url"
                     value={editingItem.externalUrl || ''}
                     onChange={(e) =>
                       setEditingItem({ ...editingItem, externalUrl: e.target.value })
                     }
-                    className="bg-slate-800 border-slate-700 text-white"
+                    className="bg-muted border-border text-foreground"
                   />
                 </div>
               )}
 
               {editingItem.linkType === 'anchor' && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Anker</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">Anker</label>
                   <Input
                     value={editingItem.anchor || ''}
                     onChange={(e) =>
                       setEditingItem({ ...editingItem, anchor: e.target.value })
                     }
-                    className="bg-slate-800 border-slate-700 text-white"
+                    className="bg-muted border-border text-foreground"
                   />
                 </div>
               )}
@@ -549,13 +547,12 @@ export default function MenuEditorPage() {
             <Button
               variant="ghost"
               onClick={() => setEditingItem(null)}
-              className="text-slate-400 hover:text-white hover:bg-slate-800"
+              className="text-muted-foreground hover:text-foreground hover:bg-accent"
             >
               Abbrechen
             </Button>
             <Button
               onClick={() => editingItem && updateItem(editingItem)}
-              className="bg-purple-600 hover:bg-purple-700"
             >
               Speichern
             </Button>

@@ -478,18 +478,7 @@ class Unicorn_Studio_API_Client {
      * @return array|WP_Error
      */
     public function get_page($page_id) {
-        $endpoint = '/pages/' . $page_id;
-        $url = $this->base_url . '/sites/' . $this->site_id . $endpoint;
-        error_log('[Unicorn Studio DEBUG] get_page URL: ' . $url);
-        error_log('[Unicorn Studio DEBUG] API Key: ' . substr($this->api_key, 0, 10) . '...');
-        error_log('[Unicorn Studio DEBUG] Site ID: ' . $this->site_id);
-
-        $result = $this->request($endpoint);
-        error_log('[Unicorn Studio DEBUG] get_page result type: ' . gettype($result));
-        if (is_array($result)) {
-            error_log('[Unicorn Studio DEBUG] get_page result keys: ' . implode(', ', array_keys($result)));
-        }
-        return $result;
+        return $this->request('/pages/' . $page_id);
     }
 
     /**

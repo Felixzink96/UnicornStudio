@@ -15,6 +15,8 @@ import {
   ArrowLeft,
   Database,
   Menu,
+  Mail,
+  Image,
 } from 'lucide-react'
 import type { ContentType } from '@/types/cms'
 
@@ -29,20 +31,22 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
 
   const mainNavigation = [
     { name: 'Übersicht', href: `/dashboard/sites/${siteId}`, icon: Database },
-    { name: 'Pages', href: `/dashboard/sites/${siteId}/pages`, icon: FileText },
+    { name: 'Seiten', href: `/dashboard/sites/${siteId}/pages`, icon: FileText },
     { name: 'Menüs', href: `/dashboard/sites/${siteId}/menus`, icon: Menu },
+    { name: 'Formulare', href: `/dashboard/sites/${siteId}/forms`, icon: Mail },
+    { name: 'Medien', href: `/dashboard/sites/${siteId}/media`, icon: Image },
   ]
 
   const cmsNavigation = [
-    { name: 'Content Types', href: `/dashboard/sites/${siteId}/builder/content-types`, icon: Layers },
-    { name: 'Taxonomies', href: `/dashboard/sites/${siteId}/taxonomies`, icon: FolderTree },
-    { name: 'Components', href: `/dashboard/sites/${siteId}/components`, icon: Puzzle },
-    { name: 'Templates', href: `/dashboard/sites/${siteId}/templates`, icon: LayoutTemplate },
+    { name: 'Inhaltstypen', href: `/dashboard/sites/${siteId}/builder/content-types`, icon: Layers },
+    { name: 'Taxonomien', href: `/dashboard/sites/${siteId}/taxonomies`, icon: FolderTree },
+    { name: 'Komponenten', href: `/dashboard/sites/${siteId}/components`, icon: Puzzle },
+    { name: 'Vorlagen', href: `/dashboard/sites/${siteId}/templates`, icon: LayoutTemplate },
   ]
 
   const designNavigation = [
-    { name: 'Design Variables', href: `/dashboard/sites/${siteId}/variables`, icon: Palette },
-    { name: 'SEO Settings', href: `/dashboard/sites/${siteId}/settings/seo`, icon: Search },
+    { name: 'Design-Variablen', href: `/dashboard/sites/${siteId}/variables`, icon: Palette },
+    { name: 'SEO-Einstellungen', href: `/dashboard/sites/${siteId}/settings/seo`, icon: Search },
     { name: 'Einstellungen', href: `/dashboard/sites/${siteId}/settings`, icon: Settings },
   ]
 
@@ -54,17 +58,17 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
   }
 
   return (
-    <div className="flex h-full w-56 flex-col bg-slate-900 border-r border-slate-800">
+    <div className="flex h-full w-56 flex-col bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800">
       {/* Back to Sites */}
-      <div className="p-3 border-b border-slate-800">
+      <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
         <Link
           href="/dashboard/sites"
-          className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Alle Sites
         </Link>
-        <h2 className="text-white font-semibold mt-2 truncate">{siteName}</h2>
+        <h2 className="text-zinc-900 dark:text-zinc-100 font-semibold mt-2 truncate">{siteName}</h2>
       </div>
 
       {/* Navigation */}
@@ -78,8 +82,8 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
               className={cn(
                 'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 isActive(item.href)
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
               )}
             >
               <item.icon className="h-4 w-4" />
@@ -91,7 +95,7 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
         {/* Content Types */}
         {contentTypes.length > 0 && (
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 px-2">
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-500 uppercase tracking-wider mb-2 px-2">
               Inhalte
             </p>
             {contentTypes.map((ct) => (
@@ -101,8 +105,8 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
                 className={cn(
                   'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                   pathname.includes(`/content/${ct.slug}`)
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
                 )}
               >
                 <FileText className="h-4 w-4" />
@@ -114,7 +118,7 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
 
         {/* CMS */}
         <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 px-2">
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-500 uppercase tracking-wider mb-2 px-2">
             CMS
           </p>
           {cmsNavigation.map((item) => (
@@ -124,8 +128,8 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
               className={cn(
                 'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 isActive(item.href)
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
               )}
             >
               <item.icon className="h-4 w-4" />
@@ -136,7 +140,7 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
 
         {/* Design & Settings */}
         <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 px-2">
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-500 uppercase tracking-wider mb-2 px-2">
             Design & Settings
           </p>
           {designNavigation.map((item) => (
@@ -146,8 +150,8 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
               className={cn(
                 'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                 isActive(item.href)
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
               )}
             >
               <item.icon className="h-4 w-4" />

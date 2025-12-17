@@ -256,20 +256,9 @@ export default function PreviewPage() {
     const overlay = e.currentTarget
     const rect = overlay.getBoundingClientRect()
 
-    // Finde das iframe um die Scroll-Position zu berücksichtigen
-    const iframe = overlay.parentElement?.querySelector('iframe') as HTMLIFrameElement
-    const scrollTop = iframe?.contentWindow?.scrollY || 0
-    const scrollLeft = iframe?.contentWindow?.scrollX || 0
-    const contentHeight = iframe?.contentDocument?.body?.scrollHeight || rect.height
-    const contentWidth = iframe?.contentDocument?.body?.scrollWidth || rect.width
-
-    // Berechne Position relativ zum gesamten Dokument, nicht nur zum Viewport
-    const clickX = e.clientX - rect.left + scrollLeft
-    const clickY = e.clientY - rect.top + scrollTop
-
-    // Prozent relativ zur Gesamthöhe/-breite des Dokuments
-    const x = (clickX / contentWidth) * 100
-    const y = (clickY / contentHeight) * 100
+    // Einfache Prozent-Berechnung relativ zum sichtbaren Container
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    const y = ((e.clientY - rect.top) / rect.height) * 100
 
     setNewCommentPos({ x, y })
   }
@@ -379,26 +368,10 @@ export default function PreviewPage() {
   )
 
   // Berechne die sichtbare Position eines Pins basierend auf Scroll
-  // Die Position wurde als % der Gesamtdokument-Größe gespeichert
-  // Wir müssen sie jetzt als Pixel-Offset vom sichtbaren Bereich berechnen
+  // Einfache Lösung: Nutze Prozent-Werte direkt - der Container clipt automatisch
   const calculatePinPosition = (posX: number, posY: number) => {
-    if (!iframeSize.width || !iframeSize.height) {
-      // Fallback: Wenn keine iframe-Größe bekannt, nutze einfache Prozent
-      return { left: `${posX}%`, top: `${posY}%`, visible: true }
-    }
-
-    // Position im Dokument (in Pixeln)
-    const docX = (posX / 100) * iframeSize.width
-    const docY = (posY / 100) * iframeSize.height
-
-    // Position relativ zum sichtbaren Bereich (Pixel)
-    const visibleX = docX - iframeScroll.left
-    const visibleY = docY - iframeScroll.top
-
-    // Prüfe ob im sichtbaren Bereich
-    const visible = visibleX >= -50 && visibleY >= -50
-
-    return { left: `${visibleX}px`, top: `${visibleY}px`, visible }
+    // Einfach Prozent-Werte verwenden - funktioniert immer
+    return { left: `${posX}%`, top: `${posY}%` }
   }
 
   // Render helper functions - Comment markers (show when comments visible OR when adding comment)
@@ -408,7 +381,7 @@ export default function PreviewPage() {
         const pos = calculatePinPosition(comment.position_x, comment.position_y)
         const isOnCurrentPage = comment.page_id === currentPage?.id || !comment.page_id
 
-        return isOnCurrentPage && pos.visible ? (
+        return isOnCurrentPage ? (
           <div
             key={comment.id}
             className={`absolute cursor-pointer transition-transform hover:scale-110 ${

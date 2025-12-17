@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,7 +13,7 @@ import {
   Puzzle,
 } from 'lucide-react'
 import { PagesList } from './PagesList'
-import type { Site, Page } from '@/types/database'
+import { getSiteById, getPagesBySite } from '@/lib/supabase/cached-queries'
 
 interface SitePageProps {
   params: Promise<{ siteId: string }>
@@ -22,30 +21,16 @@ interface SitePageProps {
 
 export default async function SitePage({ params }: SitePageProps) {
   const { siteId } = await params
-  const supabase = await createClient()
 
-  // Get site
-  const { data: siteData, error } = await supabase
-    .from('sites')
-    .select('*')
-    .eq('id', siteId)
-    .single()
+  // Cached queries - Site wurde schon im Layout geladen, wird hier wiederverwendet
+  const [site, pages] = await Promise.all([
+    getSiteById(siteId),
+    getPagesBySite(siteId),
+  ])
 
-  if (error || !siteData) {
+  if (!site) {
     notFound()
   }
-
-  const site = siteData as Site
-
-  // Get pages
-  const { data: pagesData } = await supabase
-    .from('pages')
-    .select('*')
-    .eq('site_id', siteId)
-    .order('is_home', { ascending: false })
-    .order('created_at', { ascending: true })
-
-  const pages = (pagesData || []) as Page[]
 
   const statusColors: Record<string, string> = {
     draft: 'bg-yellow-500/10 text-yellow-500',

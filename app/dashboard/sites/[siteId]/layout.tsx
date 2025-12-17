@@ -1,7 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { SiteSidebar } from '@/components/dashboard/SiteSidebar'
-import type { ContentType } from '@/types/cms'
+import { getSiteById, getContentTypesBySite } from '@/lib/supabase/cached-queries'
 
 interface SiteLayoutProps {
   children: React.ReactNode
@@ -10,27 +9,16 @@ interface SiteLayoutProps {
 
 export default async function SiteLayout({ children, params }: SiteLayoutProps) {
   const { siteId } = await params
-  const supabase = await createClient()
 
-  // Get site
-  const { data: site, error: siteError } = await supabase
-    .from('sites')
-    .select('id, name')
-    .eq('id', siteId)
-    .single()
+  // Cached queries - werden nur 1x pro Request ausgeführt
+  const [site, contentTypes] = await Promise.all([
+    getSiteById(siteId),
+    getContentTypesBySite(siteId),
+  ])
 
-  if (siteError || !site) {
+  if (!site) {
     notFound()
   }
-
-  // Get content types for this site
-  const { data: contentTypesData } = await supabase
-    .from('content_types')
-    .select('*')
-    .eq('site_id', siteId)
-    .order('name', { ascending: true })
-
-  const contentTypes = (contentTypesData || []) as ContentType[]
 
   return (
     <div className="flex h-full">

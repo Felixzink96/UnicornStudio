@@ -23,26 +23,27 @@ export default async function SitesPage() {
     .eq('organization_id', profile!.organization_id!)
     .order('updated_at', { ascending: false })
 
-  // Load home page HTML for each site (for preview thumbnails)
-  const sitesWithPreviews: SiteWithPreview[] = await Promise.all(
-    (sites || []).map(async (site) => {
-      const { data: homePage } = await supabase
+  // Load ALL home pages in ONE query (statt N+1 Queries)
+  const siteIds = (sites || []).map(s => s.id)
+  const { data: homePages } = siteIds.length > 0
+    ? await supabase
         .from('pages')
-        .select('html_content')
-        .eq('site_id', site.id)
+        .select('site_id, html_content')
+        .in('site_id', siteIds)
         .eq('is_home', true)
-        .single()
+    : { data: [] }
 
-      // Cast integrations from Json to expected type
-      const integrations = site.integrations as SiteWithPreview['integrations']
-
-      return {
-        ...site,
-        integrations,
-        homePageHtml: homePage?.html_content || null,
-      }
-    })
+  // Map home pages by site_id for O(1) lookup
+  const homePageMap = new Map(
+    (homePages || []).map(p => [p.site_id, p.html_content])
   )
+
+  // Combine sites with their home page HTML
+  const sitesWithPreviews: SiteWithPreview[] = (sites || []).map((site) => ({
+    ...site,
+    integrations: site.integrations as SiteWithPreview['integrations'],
+    homePageHtml: homePageMap.get(site.id) || null,
+  }))
 
   return (
     <SitesList

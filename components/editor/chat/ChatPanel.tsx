@@ -847,8 +847,8 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                       // Menü-Updates werden als Reference Updates behandelt
                       setPendingReferenceUpdates([{
                         type: 'menu',
-                        menuId: args.menu_id,
-                        operation: functionCall.name,
+                        id: args.menu_id,
+                        action: functionCall.name === 'add_menu_item' ? 'add' : functionCall.name === 'remove_menu_item' ? 'remove' : 'reorder',
                         ...args,
                       }])
                       const msgs = useEditorStore.getState().messages
@@ -860,8 +860,8 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                           hasReferenceUpdates: true,
                           referenceUpdates: [{
                             type: 'menu',
-                            menuId: args.menu_id,
-                            operation: functionCall.name,
+                            id: args.menu_id,
+                            action: functionCall.name === 'add_menu_item' ? 'add' : functionCall.name === 'remove_menu_item' ? 'remove' : 'reorder',
                             ...args,
                           }],
                           tokensUsed: data.usage?.output_tokens || 0,

@@ -995,7 +995,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                     case 'update_color_scheme': {
                       console.log('[Function Call] update_color_scheme')
                       // Multi-Token Update
-                      const tokenUpdates: Array<{ type: string; id: string; value: string }> = []
+                      const tokenUpdates: Array<{ type: 'token'; id: string; value: string }> = []
 
                       if (args.primary_color) {
                         tokenUpdates.push({ type: 'token', id: 'color-brand-primary', value: args.primary_color })

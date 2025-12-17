@@ -88,6 +88,8 @@ export default function PreviewPage() {
   const [newCommentAuthor, setNewCommentAuthor] = useState('')
   const [newCommentContent, setNewCommentContent] = useState('')
   const [editingComment, setEditingComment] = useState<Comment | null>(null)
+  const [iframeScroll, setIframeScroll] = useState({ top: 0, left: 0 })
+  const [iframeSize, setIframeSize] = useState({ width: 0, height: 0 })
 
   const supabase = createClient()
 
@@ -253,21 +255,62 @@ export default function PreviewPage() {
 
     const overlay = e.currentTarget
     const rect = overlay.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * 100
-    const y = ((e.clientY - rect.top) / rect.height) * 100
+
+    // Finde das iframe um die Scroll-Position zu berücksichtigen
+    const iframe = overlay.parentElement?.querySelector('iframe') as HTMLIFrameElement
+    const scrollTop = iframe?.contentWindow?.scrollY || 0
+    const scrollLeft = iframe?.contentWindow?.scrollX || 0
+    const contentHeight = iframe?.contentDocument?.body?.scrollHeight || rect.height
+    const contentWidth = iframe?.contentDocument?.body?.scrollWidth || rect.width
+
+    // Berechne Position relativ zum gesamten Dokument, nicht nur zum Viewport
+    const clickX = e.clientX - rect.left + scrollLeft
+    const clickY = e.clientY - rect.top + scrollTop
+
+    // Prozent relativ zur Gesamthöhe/-breite des Dokuments
+    const x = (clickX / contentWidth) * 100
+    const y = (clickY / contentHeight) * 100
 
     setNewCommentPos({ x, y })
   }
 
+  // Handle iframe load - setup scroll listener
+  const handleIframeLoad = (iframe: HTMLIFrameElement | null) => {
+    if (!iframe?.contentWindow || !iframe?.contentDocument) return
+
+    const updateScrollAndSize = () => {
+      setIframeScroll({
+        top: iframe.contentWindow?.scrollY || 0,
+        left: iframe.contentWindow?.scrollX || 0,
+      })
+      setIframeSize({
+        width: iframe.contentDocument?.body?.scrollWidth || iframe.clientWidth,
+        height: iframe.contentDocument?.body?.scrollHeight || iframe.clientHeight,
+      })
+    }
+
+    // Initial size
+    updateScrollAndSize()
+
+    // Listen for scroll
+    iframe.contentWindow.addEventListener('scroll', updateScrollAndSize)
+
+    // Cleanup on unmount
+    return () => {
+      iframe.contentWindow?.removeEventListener('scroll', updateScrollAndSize)
+    }
+  }
+
   // Render preview content wrapper with click overlay for comments
   const renderPreviewContent = (content: string) => (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full overflow-hidden">
       <iframe
         srcDoc={content}
         className="w-full h-full border-0"
         style={{
           pointerEvents: (newCommentPos || editingComment) ? 'none' : 'auto',
         }}
+        onLoad={(e) => handleIframeLoad(e.currentTarget)}
       />
       {/* Click overlay for comments - only active when adding comment and no form open */}
       {isAddingComment && isAuthenticated && !newCommentPos && !editingComment && (
@@ -335,19 +378,45 @@ export default function PreviewPage() {
     </svg>
   )
 
+  // Berechne die sichtbare Position eines Pins basierend auf Scroll
+  // Die Position wurde als % der Gesamtdokument-Größe gespeichert
+  // Wir müssen sie jetzt als Pixel-Offset vom sichtbaren Bereich berechnen
+  const calculatePinPosition = (posX: number, posY: number) => {
+    if (!iframeSize.width || !iframeSize.height) {
+      // Fallback: Wenn keine iframe-Größe bekannt, nutze einfache Prozent
+      return { left: `${posX}%`, top: `${posY}%`, visible: true }
+    }
+
+    // Position im Dokument (in Pixeln)
+    const docX = (posX / 100) * iframeSize.width
+    const docY = (posY / 100) * iframeSize.height
+
+    // Position relativ zum sichtbaren Bereich (Pixel)
+    const visibleX = docX - iframeScroll.left
+    const visibleY = docY - iframeScroll.top
+
+    // Prüfe ob im sichtbaren Bereich
+    const visible = visibleX >= -50 && visibleY >= -50
+
+    return { left: `${visibleX}px`, top: `${visibleY}px`, visible }
+  }
+
   // Render helper functions - Comment markers (show when comments visible OR when adding comment)
   const renderComments = () => (
     <>
-      {(showComments || isAddingComment) && comments.map((comment, index) => (
-        comment.page_id === currentPage?.id || !comment.page_id ? (
+      {(showComments || isAddingComment) && comments.map((comment, index) => {
+        const pos = calculatePinPosition(comment.position_x, comment.position_y)
+        const isOnCurrentPage = comment.page_id === currentPage?.id || !comment.page_id
+
+        return isOnCurrentPage && pos.visible ? (
           <div
             key={comment.id}
             className={`absolute cursor-pointer transition-transform hover:scale-110 ${
               comment.status === 'resolved' ? 'opacity-50' : ''
             }`}
             style={{
-              left: `${comment.position_x}%`,
-              top: `${comment.position_y}%`,
+              left: pos.left,
+              top: pos.top,
               transform: 'translate(-50%, -100%)',
               zIndex: editingComment?.id === comment.id ? 60 : 10,
             }}
@@ -362,15 +431,17 @@ export default function PreviewPage() {
             />
           </div>
         ) : null
-      ))}
+      })}
 
       {/* Edit comment modal - same as new comment form */}
-      {editingComment && (
+      {editingComment && (() => {
+        const editPos = calculatePinPosition(editingComment.position_x, editingComment.position_y)
+        return (
         <div
           className="absolute bg-white rounded-lg shadow-xl p-4 w-64 z-50"
           style={{
-            left: `${Math.min(editingComment.position_x, 70)}%`,
-            top: `${editingComment.position_y}%`,
+            left: editPos.left,
+            top: editPos.top,
             transform: 'translateY(8px)',
           }}
           onClick={(e) => e.stopPropagation()}
@@ -431,7 +502,8 @@ export default function PreviewPage() {
             Speichern
           </Button>
         </div>
-      )}
+        )
+      })()}
     </>
   )
 
@@ -450,33 +522,36 @@ export default function PreviewPage() {
     </svg>
   )
 
-  const renderNewCommentForm = () => (
-    <>
-      {newCommentPos && (
-        <>
-          {/* New pin at click position */}
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              left: `${newCommentPos.x}%`,
-              top: `${newCommentPos.y}%`,
-              transform: 'translate(-50%, -100%)',
-            }}
-          >
-            <NewPinIcon />
-          </div>
+  const renderNewCommentForm = () => {
+    if (!newCommentPos) return null
 
-          {/* Comment form */}
-          <div
-            className="absolute bg-white rounded-lg shadow-xl p-4 w-64 z-50"
-            style={{
-              left: `${Math.min(newCommentPos.x, 70)}%`,
-              top: `${newCommentPos.y}%`,
-              marginTop: '20px',
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
+    const newPinPos = calculatePinPosition(newCommentPos.x, newCommentPos.y)
+
+    return (
+      <>
+        {/* New pin at click position */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left: newPinPos.left,
+            top: newPinPos.top,
+            transform: 'translate(-50%, -100%)',
+          }}
+        >
+          <NewPinIcon />
+        </div>
+
+        {/* Comment form */}
+        <div
+          className="absolute bg-white rounded-lg shadow-xl p-4 w-64 z-50"
+          style={{
+            left: newPinPos.left,
+            top: newPinPos.top,
+            marginTop: '20px',
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
             <div className="flex justify-between items-center mb-3">
               <span className="font-medium text-sm text-zinc-900">Neue Anmerkung</span>
               <button
@@ -538,9 +613,8 @@ export default function PreviewPage() {
             </Button>
           </div>
         </>
-      )}
-    </>
-  )
+    )
+  }
 
 
   // Loading screen

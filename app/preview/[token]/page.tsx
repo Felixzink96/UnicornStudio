@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Monitor, Tablet, Smartphone, Lock, Eye, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,13 @@ interface Site {
   global_footer_id: string | null
 }
 
+interface GlobalComponent {
+  id: string
+  html: string | null
+  css: string | null
+  js: string | null
+}
+
 interface Comment {
   id: string
   page_id: string | null
@@ -47,7 +54,6 @@ interface Comment {
 type Viewport = 'desktop' | 'tablet' | 'mobile'
 type DeviceMockup = 'none' | 'iphone' | 'ipad' | 'macbook'
 
-// Mockup-specific widths
 const MOCKUP_SIZES = {
   macbook: { width: 'w-[900px] max-w-[90vw]' },
   ipad: { width: 'w-[600px] max-w-[80vw]' },
@@ -62,8 +68,8 @@ const VIEWPORT_WIDTHS: Record<Viewport, string> = {
 
 export default function PreviewPage() {
   const params = useParams()
-  const searchParams = useSearchParams()
   const token = params.token as string
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const [shareLink, setShareLink] = useState<ShareLink | null>(null)
   const [site, setSite] = useState<Site | null>(null)
@@ -72,6 +78,10 @@ export default function PreviewPage() {
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Global Components (Header/Footer)
+  const [globalHeader, setGlobalHeader] = useState<GlobalComponent | null>(null)
+  const [globalFooter, setGlobalFooter] = useState<GlobalComponent | null>(null)
 
   // Password protection
   const [needsPassword, setNeedsPassword] = useState(false)
@@ -88,8 +98,10 @@ export default function PreviewPage() {
   const [newCommentAuthor, setNewCommentAuthor] = useState('')
   const [newCommentContent, setNewCommentContent] = useState('')
   const [editingComment, setEditingComment] = useState<Comment | null>(null)
-  const [iframeScroll, setIframeScroll] = useState({ top: 0, left: 0 })
-  const [iframeSize, setIframeSize] = useState({ width: 0, height: 0 })
+
+  // Pin Container Transform (for scroll sync)
+  const [pinContainerTransform, setPinContainerTransform] = useState('translate(0px, 0px)')
+  const [iframeDocSize, setIframeDocSize] = useState({ width: 0, height: 0 })
 
   const supabase = createClient()
 
@@ -118,7 +130,6 @@ export default function PreviewPage() {
           return
         }
 
-        // Check expiration
         if (link.expires_at && new Date(link.expires_at) < new Date()) {
           setError('Dieser Link ist abgelaufen')
           setLoading(false)
@@ -127,7 +138,6 @@ export default function PreviewPage() {
 
         setShareLink(link)
 
-        // Check if password required
         if (link.password_hash) {
           const savedAuth = sessionStorage.getItem(`preview-auth-${token}`)
           if (savedAuth === 'true') {
@@ -139,14 +149,12 @@ export default function PreviewPage() {
           setIsAuthenticated(true)
         }
 
-        // Increment view count
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
           .from('share_links')
           .update({ view_count: link.view_count + 1 })
           .eq('id', link.id)
 
-        // Always load site data for blurred background preview
         await loadSiteData(link, !link.password_hash || sessionStorage.getItem(`preview-auth-${token}`) === 'true')
       } catch (err) {
         console.error('Error loading share link:', err)
@@ -159,9 +167,8 @@ export default function PreviewPage() {
     loadShareLink()
   }, [token])
 
-  // Load site and pages after authentication
+  // Load site data including Header/Footer
   const loadSiteData = useCallback(async (link: ShareLink, loadComments: boolean = true) => {
-    // Load site
     const { data: siteData } = await supabase
       .from('sites')
       .select('id, name, global_header_id, global_footer_id')
@@ -171,9 +178,24 @@ export default function PreviewPage() {
     if (siteData) {
       setSite(siteData)
 
+      // Load Header/Footer components
+      const componentIds = [siteData.global_header_id, siteData.global_footer_id].filter(Boolean) as string[]
+      if (componentIds.length > 0) {
+        const { data: components } = await supabase
+          .from('components')
+          .select('id, html, css, js')
+          .in('id', componentIds)
+
+        if (components) {
+          const header = components.find(c => c.id === siteData.global_header_id)
+          const footer = components.find(c => c.id === siteData.global_footer_id)
+          if (header) setGlobalHeader(header)
+          if (footer) setGlobalFooter(footer)
+        }
+      }
+
       // Load pages
       if (link.page_id) {
-        // Single page share
         const { data: pageData } = await supabase
           .from('pages')
           .select('id, name, slug, html_content')
@@ -185,7 +207,6 @@ export default function PreviewPage() {
           setCurrentPage(pageData as Page)
         }
       } else {
-        // All pages share
         const { data: pagesData } = await supabase
           .from('pages')
           .select('id, name, slug, html_content')
@@ -198,7 +219,7 @@ export default function PreviewPage() {
         }
       }
 
-      // Load comments only if authenticated
+      // Load comments
       if (loadComments && link.allow_comments) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: commentsData } = await (supabase as any)
@@ -219,7 +240,6 @@ export default function PreviewPage() {
     e.preventDefault()
     if (!shareLink || !password) return
 
-    // Hash password
     const encoder = new TextEncoder()
     const data = encoder.encode(password)
     const hashBuffer = await crypto.subtle.digest('SHA-256', data)
@@ -231,7 +251,6 @@ export default function PreviewPage() {
       setNeedsPassword(false)
       sessionStorage.setItem(`preview-auth-${token}`, 'true')
 
-      // Load comments after authentication
       if (shareLink.allow_comments) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: commentsData } = await (supabase as any)
@@ -249,94 +268,102 @@ export default function PreviewPage() {
     }
   }
 
-  // Handle comment click on overlay
+  // Handle comment click - Position in Pixel relativ zum Dokument
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isAddingComment || !shareLink?.allow_comments) return
 
     const overlay = e.currentTarget
     const rect = overlay.getBoundingClientRect()
+    const iframe = iframeRef.current
 
-    // Einfache Prozent-Berechnung relativ zum sichtbaren Container
-    const x = ((e.clientX - rect.left) / rect.width) * 100
-    const y = ((e.clientY - rect.top) / rect.height) * 100
+    // Get scroll position from iframe
+    const scrollTop = iframe?.contentWindow?.scrollY || 0
+    const scrollLeft = iframe?.contentWindow?.scrollX || 0
 
-    setNewCommentPos({ x, y })
+    // Position = Click-Position + Scroll = absolute Dokument-Position (in Pixel)
+    const docX = (e.clientX - rect.left) + scrollLeft
+    const docY = (e.clientY - rect.top) + scrollTop
+
+    setNewCommentPos({ x: docX, y: docY })
   }
 
-  // Handle iframe load - setup scroll listener
-  const handleIframeLoad = (iframe: HTMLIFrameElement | null) => {
+  // Setup iframe scroll listener
+  const handleIframeLoad = useCallback((iframe: HTMLIFrameElement | null) => {
     if (!iframe?.contentWindow || !iframe?.contentDocument) return
 
     const updateScrollAndSize = () => {
-      setIframeScroll({
-        top: iframe.contentWindow?.scrollY || 0,
-        left: iframe.contentWindow?.scrollX || 0,
-      })
-      setIframeSize({
+      const scrollX = iframe.contentWindow?.scrollX || 0
+      const scrollY = iframe.contentWindow?.scrollY || 0
+
+      // Update pin container transform (Figma-Ansatz)
+      setPinContainerTransform(`translate(${-scrollX}px, ${-scrollY}px)`)
+
+      // Update document size for position calculations
+      setIframeDocSize({
         width: iframe.contentDocument?.body?.scrollWidth || iframe.clientWidth,
         height: iframe.contentDocument?.body?.scrollHeight || iframe.clientHeight,
       })
     }
 
-    // Initial size
     updateScrollAndSize()
+    iframe.contentWindow.addEventListener('scroll', updateScrollAndSize, { passive: true })
 
-    // Listen for scroll
-    iframe.contentWindow.addEventListener('scroll', updateScrollAndSize)
-
-    // Cleanup on unmount
     return () => {
       iframe.contentWindow?.removeEventListener('scroll', updateScrollAndSize)
     }
-  }
+  }, [])
 
-  // Handle wheel events on overlay - forward to iframe
+  // Forward wheel events to iframe
   const handleOverlayWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    const iframe = e.currentTarget.parentElement?.querySelector('iframe')
+    const iframe = iframeRef.current
     if (iframe?.contentWindow) {
       iframe.contentWindow.scrollBy(e.deltaX, e.deltaY)
     }
   }
 
-  // Render preview content wrapper with click overlay for comments
-  const renderPreviewContent = (content: string) => (
-    <div className="relative w-full h-full overflow-hidden">
-      <iframe
-        srcDoc={content}
-        className="w-full h-full border-0"
-        style={{
-          pointerEvents: (newCommentPos || editingComment) ? 'none' : 'auto',
-        }}
-        onLoad={(e) => handleIframeLoad(e.currentTarget)}
-      />
-      {/* Click overlay for comments - forwards scroll events to iframe */}
-      {isAddingComment && isAuthenticated && !newCommentPos && !editingComment && (
-        <div
-          className="absolute inset-0 cursor-crosshair bg-blue-500/5 border-2 border-blue-500/20 border-dashed"
-          onClick={handleOverlayClick}
-          onWheel={handleOverlayWheel}
-        />
-      )}
-      {/* Backdrop zum Schließen von Formularen */}
-      {(newCommentPos || editingComment) && (
-        <div
-          className="absolute inset-0 bg-black/10"
-          onClick={() => {
-            setNewCommentPos(null)
-            setEditingComment(null)
-          }}
-        />
-      )}
-      {renderComments()}
-      {renderNewCommentForm()}
-    </div>
-  )
+  // Build full HTML content with Header/Footer
+  const buildFullHtml = useCallback((pageContent: string) => {
+    const headerHtml = globalHeader?.html || ''
+    const footerHtml = globalFooter?.html || ''
+    const headerCss = globalHeader?.css || ''
+    const footerCss = globalFooter?.css || ''
+    const headerJs = globalHeader?.js || ''
+    const footerJs = globalFooter?.js || ''
+
+    // Combine CSS
+    const combinedCss = [headerCss, footerCss].filter(Boolean).join('\n')
+    const combinedJs = [headerJs, footerJs].filter(Boolean).join('\n')
+
+    // If page already has full HTML structure, inject header/footer
+    if (pageContent.includes('<body')) {
+      return pageContent
+        .replace(/<body[^>]*>/, `$&\n${headerHtml}`)
+        .replace(/<\/body>/, `${footerHtml}\n</body>`)
+        .replace(/<\/head>/, `<style>${combinedCss}</style>\n</head>`)
+        .replace(/<\/body>/, `<script>${combinedJs}</script>\n</body>`)
+    }
+
+    // Otherwise wrap in full HTML
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>${combinedCss}</style>
+</head>
+<body>
+  ${headerHtml}
+  ${pageContent}
+  ${footerHtml}
+  <script>${combinedJs}</script>
+</body>
+</html>`
+  }, [globalHeader, globalFooter])
 
   // Submit comment
   const handleCommentSubmit = async () => {
     if (!newCommentPos || !newCommentAuthor || !newCommentContent || !shareLink) return
 
-    // Save author name for next time
     localStorage.setItem('unicorn-comment-author', newCommentAuthor)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -347,8 +374,8 @@ export default function PreviewPage() {
         page_id: currentPage?.id || null,
         author_name: newCommentAuthor,
         content: newCommentContent,
-        position_x: newCommentPos.x,
-        position_y: newCommentPos.y,
+        position_x: newCommentPos.x,  // Pixel!
+        position_y: newCommentPos.y,  // Pixel!
         status: 'open',
       })
       .select()
@@ -365,242 +392,279 @@ export default function PreviewPage() {
   // Pin SVG component
   const PinIcon = ({ number, color = '#3b82f6' }: { number: number; color?: string }) => (
     <svg width="28" height="36" viewBox="0 0 28 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
-      {/* Pin shape */}
       <path
         d="M14 0C6.268 0 0 6.268 0 14c0 7.732 14 22 14 22s14-14.268 14-22C28 6.268 21.732 0 14 0z"
         fill={color}
       />
-      {/* Inner circle */}
       <circle cx="14" cy="12" r="7" fill="white" />
-      {/* Number */}
       <text x="14" y="16" textAnchor="middle" fontSize="10" fontWeight="600" fill={color}>
         {number}
       </text>
     </svg>
   )
 
-  // Berechne die sichtbare Position eines Pins basierend auf Scroll
-  // Einfache Lösung: Nutze Prozent-Werte direkt - der Container clipt automatisch
-  const calculatePinPosition = (posX: number, posY: number) => {
-    // Einfach Prozent-Werte verwenden - funktioniert immer
-    return { left: `${posX}%`, top: `${posY}%` }
-  }
-
-  // Render helper functions - Comment markers (show when comments visible OR when adding comment)
-  const renderComments = () => (
-    <>
-      {(showComments || isAddingComment) && comments.map((comment, index) => {
-        const pos = calculatePinPosition(comment.position_x, comment.position_y)
-        const isOnCurrentPage = comment.page_id === currentPage?.id || !comment.page_id
-
-        return isOnCurrentPage ? (
-          <div
-            key={comment.id}
-            className={`absolute cursor-pointer transition-transform hover:scale-110 ${
-              comment.status === 'resolved' ? 'opacity-50' : ''
-            }`}
-            style={{
-              left: pos.left,
-              top: pos.top,
-              transform: 'translate(-50%, -100%)',
-              zIndex: editingComment?.id === comment.id ? 60 : 10,
-            }}
-            onClick={(e) => {
-              e.stopPropagation()
-              setEditingComment(editingComment?.id === comment.id ? null : comment)
-            }}
-          >
-            <PinIcon
-              number={index + 1}
-              color={comment.status === 'open' ? '#3b82f6' : '#9ca3af'}
-            />
-          </div>
-        ) : null
-      })}
-
-      {/* Edit comment modal - same as new comment form */}
-      {editingComment && (() => {
-        const editPos = calculatePinPosition(editingComment.position_x, editingComment.position_y)
-        return (
-        <div
-          className="absolute bg-white rounded-lg shadow-xl p-4 w-64 z-50"
-          style={{
-            left: editPos.left,
-            top: editPos.top,
-            transform: 'translateY(8px)',
-          }}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div className="flex justify-between items-center mb-3">
-            <span className="font-medium text-sm text-zinc-900">Anmerkung bearbeiten</span>
-            <button
-              onClick={() => setEditingComment(null)}
-              className="text-zinc-400 hover:text-zinc-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 mb-2 text-sm text-zinc-600">
-            <span>Von</span>
-            <span className="font-medium text-zinc-900">{editingComment.author_name}</span>
-          </div>
-
-          <textarea
-            value={editingComment.content}
-            onChange={(e) => setEditingComment({ ...editingComment, content: e.target.value })}
-            className="w-full border border-zinc-200 rounded px-3 py-2 text-sm mb-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            rows={3}
-          />
-
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-zinc-400">
-              {new Date(editingComment.created_at).toLocaleDateString('de-DE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              })}
-            </span>
-            {editingComment.status === 'open' ? (
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Offen</span>
-            ) : (
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Erledigt</span>
-            )}
-          </div>
-
-          <Button
-            size="sm"
-            className="w-full"
-            onClick={async () => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              await (supabase as any)
-                .from('share_comments')
-                .update({ content: editingComment.content })
-                .eq('id', editingComment.id)
-              setComments(comments.map(c =>
-                c.id === editingComment.id ? { ...c, content: editingComment.content } : c
-              ))
-              setEditingComment(null)
-            }}
-          >
-            Speichern
-          </Button>
-        </div>
-        )
-      })()}
-    </>
-  )
-
   // New pin SVG (with + symbol)
   const NewPinIcon = () => (
     <svg width="28" height="36" viewBox="0 0 28 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg">
-      {/* Pin shape */}
       <path
         d="M14 0C6.268 0 0 6.268 0 14c0 7.732 14 22 14 22s14-14.268 14-22C28 6.268 21.732 0 14 0z"
         fill="#3b82f6"
       />
-      {/* Inner circle */}
       <circle cx="14" cy="12" r="7" fill="white" />
-      {/* Plus symbol */}
       <path d="M14 8v8M10 12h8" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" />
     </svg>
   )
 
-  const renderNewCommentForm = () => {
-    if (!newCommentPos) return null
-
-    const newPinPos = calculatePinPosition(newCommentPos.x, newCommentPos.y)
-
-    return (
-      <>
-        {/* New pin at click position */}
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            left: newPinPos.left,
-            top: newPinPos.top,
-            transform: 'translate(-50%, -100%)',
-          }}
-        >
-          <NewPinIcon />
-        </div>
-
-        {/* Comment form */}
-        <div
-          className="absolute bg-white rounded-lg shadow-xl p-4 w-64 z-50"
-          style={{
-            left: newPinPos.left,
-            top: newPinPos.top,
-            marginTop: '20px',
-          }}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-medium text-sm text-zinc-900">Neue Anmerkung</span>
-              <button
-                onClick={() => setNewCommentPos(null)}
-                className="text-zinc-400 hover:text-zinc-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="mb-2">
-              {newCommentAuthor ? (
-                <div className="flex items-center gap-2 text-sm text-zinc-600">
-                  <span>Als</span>
-                  <span className="font-medium text-zinc-900">{newCommentAuthor}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewCommentAuthor('')
-                      setTimeout(() => {
-                        const input = document.querySelector('input[placeholder="Dein Name"]') as HTMLInputElement
-                        input?.focus()
-                      }, 10)
-                    }}
-                    className="text-xs text-blue-500 hover:underline"
-                  >
-                    ändern
-                  </button>
-                </div>
-              ) : (
-                <input
-                  key="comment-author-input"
-                  type="text"
-                  placeholder="Dein Name"
-                  value={newCommentAuthor}
-                  onChange={(e) => setNewCommentAuthor(e.target.value)}
-                  onBlur={(e) => {
-                    // Prevent closing when clicking inside the form
-                    e.stopPropagation()
-                  }}
-                  className="w-full border border-zinc-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                />
-              )}
-            </div>
-            <textarea
-              placeholder="Kommentar schreiben..."
-              value={newCommentContent}
-              onChange={(e) => setNewCommentContent(e.target.value)}
-              className="w-full border border-zinc-200 rounded px-3 py-2 text-sm mb-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              rows={3}
-              autoFocus
-            />
-            <Button
-              size="sm"
-              className="w-full"
-              onClick={handleCommentSubmit}
-              disabled={!newCommentAuthor || !newCommentContent}
-            >
-              Absenden
-            </Button>
-          </div>
-        </>
-    )
+  // Migrate old percent-based positions to pixels
+  const getPixelPosition = (comment: Comment) => {
+    // Old comments have percent values (0-100), new ones have pixel values (typically > 100)
+    // Heuristic: if both x and y are <= 100, assume percent
+    if (comment.position_x <= 100 && comment.position_y <= 100 && iframeDocSize.width > 0) {
+      return {
+        x: (comment.position_x / 100) * iframeDocSize.width,
+        y: (comment.position_y / 100) * iframeDocSize.height,
+      }
+    }
+    return { x: comment.position_x, y: comment.position_y }
   }
 
+  // Render preview content with pin overlay
+  const renderPreviewContent = (content: string) => {
+    const fullHtml = buildFullHtml(content)
+
+    return (
+      <div className="relative w-full h-full overflow-hidden">
+        <iframe
+          ref={iframeRef}
+          srcDoc={fullHtml}
+          className="w-full h-full border-0"
+          style={{
+            pointerEvents: (newCommentPos || editingComment) ? 'none' : 'auto',
+          }}
+          onLoad={(e) => handleIframeLoad(e.currentTarget)}
+        />
+
+        {/* Click overlay for adding comments */}
+        {isAddingComment && isAuthenticated && !newCommentPos && !editingComment && (
+          <div
+            className="absolute inset-0 cursor-crosshair bg-blue-500/5 border-2 border-blue-500/20 border-dashed"
+            onClick={handleOverlayClick}
+            onWheel={handleOverlayWheel}
+          />
+        )}
+
+        {/* Backdrop for closing forms */}
+        {(newCommentPos || editingComment) && (
+          <div
+            className="absolute inset-0 bg-black/10"
+            onClick={() => {
+              setNewCommentPos(null)
+              setEditingComment(null)
+            }}
+          />
+        )}
+
+        {/* PIN CONTAINER - transforms with iframe scroll (Figma approach) */}
+        <div
+          className="absolute inset-0 pointer-events-none overflow-visible"
+          style={{
+            transform: pinContainerTransform,
+            transformOrigin: 'top left',
+          }}
+        >
+          {/* Render existing pins */}
+          {(showComments || isAddingComment) && comments.map((comment, index) => {
+            const isOnCurrentPage = comment.page_id === currentPage?.id || !comment.page_id
+            if (!isOnCurrentPage) return null
+
+            const pos = getPixelPosition(comment)
+
+            return (
+              <div
+                key={comment.id}
+                className={`absolute cursor-pointer pointer-events-auto transition-transform hover:scale-110 ${
+                  comment.status === 'resolved' ? 'opacity-50' : ''
+                }`}
+                style={{
+                  left: `${pos.x}px`,
+                  top: `${pos.y}px`,
+                  transform: 'translate(-50%, -100%)',
+                  zIndex: editingComment?.id === comment.id ? 60 : 10,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setEditingComment(editingComment?.id === comment.id ? null : comment)
+                }}
+              >
+                <PinIcon
+                  number={index + 1}
+                  color={comment.status === 'open' ? '#3b82f6' : '#9ca3af'}
+                />
+              </div>
+            )
+          })}
+
+          {/* New pin being placed */}
+          {newCommentPos && (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: `${newCommentPos.x}px`,
+                top: `${newCommentPos.y}px`,
+                transform: 'translate(-50%, -100%)',
+              }}
+            >
+              <NewPinIcon />
+            </div>
+          )}
+        </div>
+
+        {/* Edit comment form (outside pin container so it doesn't transform) */}
+        {editingComment && (() => {
+          const pos = getPixelPosition(editingComment)
+          const iframe = iframeRef.current
+          const scrollX = iframe?.contentWindow?.scrollX || 0
+          const scrollY = iframe?.contentWindow?.scrollY || 0
+
+          // Visible position = doc position - scroll
+          const visibleX = pos.x - scrollX
+          const visibleY = pos.y - scrollY
+
+          return (
+            <div
+              className="absolute bg-white rounded-lg shadow-xl p-4 w-64 z-50 pointer-events-auto"
+              style={{
+                left: `${Math.min(visibleX, window.innerWidth - 280)}px`,
+                top: `${visibleY + 10}px`,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <span className="font-medium text-sm text-zinc-900">Anmerkung bearbeiten</span>
+                <button
+                  onClick={() => setEditingComment(null)}
+                  className="text-zinc-400 hover:text-zinc-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 mb-2 text-sm text-zinc-600">
+                <span>Von</span>
+                <span className="font-medium text-zinc-900">{editingComment.author_name}</span>
+              </div>
+
+              <textarea
+                value={editingComment.content}
+                onChange={(e) => setEditingComment({ ...editingComment, content: e.target.value })}
+                className="w-full border border-zinc-200 rounded px-3 py-2 text-sm mb-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                rows={3}
+              />
+
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-zinc-400">
+                  {new Date(editingComment.created_at).toLocaleDateString('de-DE')}
+                </span>
+                {editingComment.status === 'open' ? (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Offen</span>
+                ) : (
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Erledigt</span>
+                )}
+              </div>
+
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={async () => {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  await (supabase as any)
+                    .from('share_comments')
+                    .update({ content: editingComment.content })
+                    .eq('id', editingComment.id)
+                  setComments(comments.map(c =>
+                    c.id === editingComment.id ? { ...c, content: editingComment.content } : c
+                  ))
+                  setEditingComment(null)
+                }}
+              >
+                Speichern
+              </Button>
+            </div>
+          )
+        })()}
+
+        {/* New comment form */}
+        {newCommentPos && (() => {
+          const iframe = iframeRef.current
+          const scrollX = iframe?.contentWindow?.scrollX || 0
+          const scrollY = iframe?.contentWindow?.scrollY || 0
+
+          const visibleX = newCommentPos.x - scrollX
+          const visibleY = newCommentPos.y - scrollY
+
+          return (
+            <div
+              className="absolute bg-white rounded-lg shadow-xl p-4 w-64 z-50 pointer-events-auto"
+              style={{
+                left: `${Math.min(visibleX, window.innerWidth - 280)}px`,
+                top: `${visibleY + 10}px`,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <span className="font-medium text-sm text-zinc-900">Neue Anmerkung</span>
+                <button
+                  onClick={() => setNewCommentPos(null)}
+                  className="text-zinc-400 hover:text-zinc-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="mb-2">
+                {newCommentAuthor ? (
+                  <div className="flex items-center gap-2 text-sm text-zinc-600">
+                    <span>Als</span>
+                    <span className="font-medium text-zinc-900">{newCommentAuthor}</span>
+                    <button
+                      type="button"
+                      onClick={() => setNewCommentAuthor('')}
+                      className="text-xs text-blue-500 hover:underline"
+                    >
+                      ändern
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Dein Name"
+                    value={newCommentAuthor}
+                    onChange={(e) => setNewCommentAuthor(e.target.value)}
+                    className="w-full border border-zinc-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                )}
+              </div>
+              <textarea
+                placeholder="Kommentar schreiben..."
+                value={newCommentContent}
+                onChange={(e) => setNewCommentContent(e.target.value)}
+                className="w-full border border-zinc-200 rounded px-3 py-2 text-sm mb-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                rows={3}
+                autoFocus
+              />
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={handleCommentSubmit}
+                disabled={!newCommentAuthor || !newCommentContent}
+              >
+                Absenden
+              </Button>
+            </div>
+          )
+        })()}
+      </div>
+    )
+  }
 
   // Loading screen
   if (loading) {
@@ -681,7 +745,6 @@ export default function PreviewPage() {
             </button>
           </div>
 
-          {/* Mockup selector */}
           <select
             value={mockup}
             onChange={(e) => setMockup(e.target.value as DeviceMockup)}
@@ -693,7 +756,6 @@ export default function PreviewPage() {
             {viewport === 'tablet' && <option value="ipad">iPad</option>}
           </select>
 
-          {/* Comments toggle - only show when authenticated */}
           {shareLink?.allow_comments && isAuthenticated && (
             <>
               <Button
@@ -723,7 +785,6 @@ export default function PreviewPage() {
 
       {/* Preview Area */}
       <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
-        {/* Render with Device Mockup */}
         {mockup === 'macbook' ? (
           <div className={MOCKUP_SIZES.macbook.width}>
             <MacBookMockup>
@@ -743,7 +804,6 @@ export default function PreviewPage() {
             </IPhoneMockup>
           </div>
         ) : (
-          /* No mockup - plain viewport */
           <div
             className="relative transition-all duration-300"
             style={{
@@ -791,10 +851,9 @@ export default function PreviewPage() {
         </div>
       )}
 
-      {/* Password overlay - shown on top of blurred preview */}
+      {/* Password overlay */}
       {needsPassword && !isAuthenticated && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Gradient blur backdrop */}
           <div
             className="absolute inset-0"
             style={{
@@ -804,7 +863,6 @@ export default function PreviewPage() {
             }}
           />
 
-          {/* Password form */}
           <div className="relative bg-zinc-900 rounded-xl p-8 max-w-md w-full border border-zinc-800 shadow-2xl">
             <div className="flex items-center justify-center w-12 h-12 bg-zinc-800 rounded-full mb-6 mx-auto">
               <Lock className="w-6 h-6 text-zinc-400" />

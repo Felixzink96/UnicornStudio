@@ -290,6 +290,14 @@ export default function PreviewPage() {
     }
   }
 
+  // Handle wheel events on overlay - forward to iframe
+  const handleOverlayWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const iframe = e.currentTarget.parentElement?.querySelector('iframe')
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.scrollBy(e.deltaX, e.deltaY)
+    }
+  }
+
   // Render preview content wrapper with click overlay for comments
   const renderPreviewContent = (content: string) => (
     <div className="relative w-full h-full overflow-hidden">
@@ -301,19 +309,23 @@ export default function PreviewPage() {
         }}
         onLoad={(e) => handleIframeLoad(e.currentTarget)}
       />
-      {/* Click overlay for comments - only active when adding comment and no form open */}
+      {/* Click overlay for comments - forwards scroll events to iframe */}
       {isAddingComment && isAuthenticated && !newCommentPos && !editingComment && (
         <div
-          className="absolute inset-0 cursor-crosshair bg-blue-500/5"
+          className="absolute inset-0 cursor-crosshair bg-blue-500/5 border-2 border-blue-500/20 border-dashed"
           onClick={handleOverlayClick}
+          onWheel={handleOverlayWheel}
         />
       )}
-      {/* Block scrolling when comment form is open */}
+      {/* Backdrop zum Schließen von Formularen */}
       {(newCommentPos || editingComment) && (
-        <div className="absolute inset-0" onClick={() => {
-          setNewCommentPos(null)
-          setEditingComment(null)
-        }} />
+        <div
+          className="absolute inset-0 bg-black/10"
+          onClick={() => {
+            setNewCommentPos(null)
+            setEditingComment(null)
+          }}
+        />
       )}
       {renderComments()}
       {renderNewCommentForm()}

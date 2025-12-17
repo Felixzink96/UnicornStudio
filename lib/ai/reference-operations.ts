@@ -12,6 +12,7 @@ export type ReferenceUpdateType =
   | 'menu'
   | 'entry'
   | 'page' // Normales Seiten-HTML (OPERATION)
+  | 'save_component' // Speichert Section als wiederverwendbare Komponente
 
 // Basis-Interface fuer alle Updates
 export interface BaseReferenceUpdate {
@@ -67,6 +68,15 @@ export interface PageUpdate extends BaseReferenceUpdate {
   html: string
 }
 
+// Save Component Update (speichert Section als wiederverwendbare Komponente)
+export interface SaveComponentUpdate extends BaseReferenceUpdate {
+  type: 'save_component'
+  sectionId: string
+  componentName: string
+  category: string
+  html?: string
+}
+
 // Union Type
 export type ReferenceUpdate =
   | ComponentUpdate
@@ -75,6 +85,7 @@ export type ReferenceUpdate =
   | MenuUpdate
   | EntryUpdate
   | PageUpdate
+  | SaveComponentUpdate
 
 // Parse Result
 export interface ParseResult {
@@ -482,6 +493,7 @@ export function groupUpdatesByType(updates: ReferenceUpdate[]): Record<Reference
     menu: [],
     entry: [],
     page: [],
+    save_component: [],
   }
 
   for (const update of updates) {

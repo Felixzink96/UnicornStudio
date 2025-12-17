@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { Json } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -87,9 +88,19 @@ export function FormConfigPanel({
     setError(null)
 
     try {
+      // Erst aktuelle content holen, dann mit form_config mergen
+      const { data: existingComponent } = await supabase
+        .from('components')
+        .select('content')
+        .eq('id', componentId)
+        .single()
+
+      const existingContent = (existingComponent?.content || {}) as Record<string, unknown>
+      const updatedContent = { ...existingContent, form_config: config }
+
       const { error: dbError } = await supabase
         .from('components')
-        .update({ form_config: config })
+        .update({ content: updatedContent as unknown as Json })
         .eq('id', componentId)
 
       if (dbError) throw dbError

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { Json } from '@/types/database'
 import {
   Dialog,
   DialogContent,
@@ -129,7 +130,7 @@ export function EditComponentDialog({
       setDescription(data.description || '')
       setCategory(data.category || '')
       setType(data.type as 'element' | 'block' | 'section' | 'layout')
-      setProps((data.props || []) as ComponentProp[])
+      setProps((data.props || []) as unknown as ComponentProp[])
     } catch (err) {
       console.error('Error loading component:', err)
       setError('Fehler beim Laden der Komponente')
@@ -155,7 +156,7 @@ export function EditComponentDialog({
           description: description.trim() || null,
           category: category || null,
           type: type as 'element' | 'block' | 'section' | 'layout',
-          props: props,
+          props: props as unknown as Json,
           updated_at: new Date().toISOString(),
         })
         .eq('id', componentId)

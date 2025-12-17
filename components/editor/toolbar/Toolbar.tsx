@@ -363,7 +363,7 @@ export function Toolbar({ siteId }: ToolbarProps) {
         siteId={siteId}
         onComplete={() => {
           // Reload WordPress config
-          wordpress.loadConfig?.()
+          wordpress.refresh?.()
         }}
       />
     </TooltipProvider>

@@ -13,18 +13,19 @@ export interface PageVersion {
 
 /**
  * Get all versions for a page
+ * Note: page_versions table may not be in TypeScript types yet
  */
 export async function getPageVersions(pageId: string): Promise<PageVersion[]> {
   const supabase = createClient()
 
-  const { data, error } = await supabase
-    .from('page_versions')
+  const { data, error } = await (supabase as ReturnType<typeof createClient>)
+    .from('page_versions' as 'pages')
     .select('*')
     .eq('page_id', pageId)
     .order('version_number', { ascending: false })
 
   if (error) throw error
-  return data as PageVersion[]
+  return (data || []) as unknown as PageVersion[]
 }
 
 /**
@@ -36,15 +37,15 @@ export async function getPageVersion(
 ): Promise<PageVersion | null> {
   const supabase = createClient()
 
-  const { data, error } = await supabase
-    .from('page_versions')
+  const { data, error } = await (supabase as ReturnType<typeof createClient>)
+    .from('page_versions' as 'pages')
     .select('*')
     .eq('page_id', pageId)
     .eq('version_number', versionNumber)
     .single()
 
   if (error && error.code !== 'PGRST116') throw error
-  return data as PageVersion | null
+  return data as unknown as PageVersion | null
 }
 
 /**
@@ -56,7 +57,8 @@ export async function restorePageVersion(
 ): Promise<void> {
   const supabase = createClient()
 
-  const { error } = await supabase.rpc('restore_page_version', {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).rpc('restore_page_version', {
     target_page_id: pageId,
     target_version: versionNumber,
   })
@@ -70,8 +72,8 @@ export async function restorePageVersion(
 export async function getLatestVersionNumber(pageId: string): Promise<number> {
   const supabase = createClient()
 
-  const { data, error } = await supabase
-    .from('page_versions')
+  const { data, error } = await (supabase as ReturnType<typeof createClient>)
+    .from('page_versions' as 'pages')
     .select('version_number')
     .eq('page_id', pageId)
     .order('version_number', { ascending: false })
@@ -79,7 +81,8 @@ export async function getLatestVersionNumber(pageId: string): Promise<number> {
     .single()
 
   if (error && error.code !== 'PGRST116') throw error
-  return data?.version_number || 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any)?.version_number || 0
 }
 
 /**

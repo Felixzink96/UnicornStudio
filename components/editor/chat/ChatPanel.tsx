@@ -1036,7 +1036,8 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                     // ============================================
                     case 'create_form': {
                       console.log('[Function Call] create_form:', args.form_type)
-                      const fields = (Array.isArray(args.fields) ? args.fields : []) as Array<{
+                      const rawFields = args.fields
+                      const fields = (typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields) as Array<{
                         name: string
                         type: string
                         label: string
@@ -1267,6 +1268,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Speichere als pending action - wird vom User bestätigt
                         setPendingReferenceUpdates([{
                           type: 'save_component',
+                          id: args.section_id,
                           sectionId: args.section_id,
                           componentName: args.component_name,
                           category: args.category,
@@ -1283,6 +1285,7 @@ document.addEventListener('DOMContentLoaded', function() {
                           hasReferenceUpdates: true,
                           referenceUpdates: [{
                             type: 'save_component',
+                            id: args.section_id,
                             sectionId: args.section_id,
                             componentName: args.component_name,
                             category: args.category,

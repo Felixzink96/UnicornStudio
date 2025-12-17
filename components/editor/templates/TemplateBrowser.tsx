@@ -84,21 +84,21 @@ export function TemplateBrowser({ siteId, onInsert, onClose }: TemplateBrowserPr
   async function loadData() {
     setLoading(true)
     try {
-      // Load categories
-      const { data: cats } = await supabase
-        .from('template_categories')
+      // Load categories (table may not exist in types yet)
+      const { data: cats } = await (supabase as ReturnType<typeof createClient>)
+        .from('template_categories' as 'templates')
         .select('*')
         .order('sort_order')
 
       // Load templates (global and site-specific)
       const { data: tmpl } = await supabase
         .from('templates')
-        .select('id, name, description, html_content, css, js, category, tags, thumbnail_url')
+        .select('id, name, description, html, css, js, category, tags, thumbnail_url')
         .or(`site_id.is.null,site_id.eq.${siteId}`)
         .order('name')
 
-      setCategories(cats || [])
-      setTemplates(tmpl || [])
+      setCategories((cats || []) as unknown as TemplateCategory[])
+      setTemplates((tmpl || []) as unknown as Template[])
     } catch (error) {
       console.error('Error loading templates:', error)
     } finally {

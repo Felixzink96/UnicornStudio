@@ -1036,7 +1036,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                     // ============================================
                     case 'create_form': {
                       console.log('[Function Call] create_form:', args.form_type)
-                      const fields = args.fields as Array<{
+                      const fields = (Array.isArray(args.fields) ? args.fields : []) as Array<{
                         name: string
                         type: string
                         label: string

@@ -102,6 +102,7 @@ export default function PreviewPage() {
   // Pin Container Transform (for scroll sync)
   const [pinContainerTransform, setPinContainerTransform] = useState('translate(0px, 0px)')
   const [iframeDocSize, setIframeDocSize] = useState({ width: 0, height: 0 })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const supabase = createClient()
 
@@ -321,6 +322,24 @@ export default function PreviewPage() {
     }
   }
 
+  // Scroll to a specific comment pin
+  const scrollToComment = (comment: Comment) => {
+    const iframe = iframeRef.current
+    if (!iframe?.contentWindow) return
+
+    const pos = getPixelPosition(comment)
+    const containerHeight = iframe.clientHeight
+
+    // Scroll so pin is centered vertically (minus some offset for the pin itself)
+    const targetY = Math.max(0, pos.y - containerHeight / 2)
+
+    iframe.contentWindow.scrollTo({
+      top: targetY,
+      left: 0,
+      behavior: 'smooth'
+    })
+  }
+
   // Build full HTML content with Header/Footer
   const buildFullHtml = useCallback((pageContent: string) => {
     const headerHtml = globalHeader?.html || ''
@@ -362,30 +381,35 @@ export default function PreviewPage() {
 
   // Submit comment
   const handleCommentSubmit = async () => {
-    if (!newCommentPos || !newCommentAuthor || !newCommentContent || !shareLink) return
+    if (!newCommentPos || !newCommentAuthor || !newCommentContent || !shareLink || isSubmitting) return
 
+    setIsSubmitting(true)
     localStorage.setItem('unicorn-comment-author', newCommentAuthor)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
-      .from('share_comments')
-      .insert({
-        share_link_id: shareLink.id,
-        page_id: currentPage?.id || null,
-        author_name: newCommentAuthor,
-        content: newCommentContent,
-        position_x: newCommentPos.x,  // Pixel!
-        position_y: newCommentPos.y,  // Pixel!
-        status: 'open',
-      })
-      .select()
-      .single()
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('share_comments')
+        .insert({
+          share_link_id: shareLink.id,
+          page_id: currentPage?.id || null,
+          author_name: newCommentAuthor,
+          content: newCommentContent,
+          position_x: newCommentPos.x,  // Pixel!
+          position_y: newCommentPos.y,  // Pixel!
+          status: 'open',
+        })
+        .select()
+        .single()
 
-    if (!error && data) {
-      setComments([...comments, data])
-      setNewCommentPos(null)
-      setNewCommentContent('')
-      setIsAddingComment(false)
+      if (!error && data) {
+        setComments([...comments, data])
+        setNewCommentPos(null)
+        setNewCommentContent('')
+        setIsAddingComment(false)
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -655,9 +679,19 @@ export default function PreviewPage() {
                 size="sm"
                 className="w-full"
                 onClick={handleCommentSubmit}
-                disabled={!newCommentAuthor || !newCommentContent}
+                disabled={!newCommentAuthor || !newCommentContent || isSubmitting}
               >
-                Absenden
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Wird gesendet...
+                  </span>
+                ) : (
+                  'Absenden'
+                )}
               </Button>
             </div>
           )
@@ -825,16 +859,17 @@ export default function PreviewPage() {
             <h3 className="font-medium text-white">Anmerkungen ({comments.length})</h3>
           </div>
           <div className="p-2 space-y-2">
-            {comments.map(comment => (
+            {comments.map((comment, index) => (
               <div
                 key={comment.id}
-                className={`p-3 rounded-lg ${
+                className={`p-3 rounded-lg cursor-pointer transition-colors hover:bg-zinc-700 ${
                   comment.status === 'open' ? 'bg-zinc-800' : 'bg-zinc-800/50'
                 }`}
+                onClick={() => scrollToComment(comment)}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold text-white">
-                    {comment.author_name[0].toUpperCase()}
+                    {index + 1}
                   </div>
                   <span className="text-sm font-medium text-white">{comment.author_name}</span>
                   {comment.status === 'resolved' && (

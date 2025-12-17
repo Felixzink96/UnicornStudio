@@ -189,25 +189,25 @@ export function PublishDropdown({
 
       {/* Result Notification */}
       {showResult && lastResult && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-md">
+        <div className="fixed bottom-4 right-4 z-50 max-w-md w-[400px]">
           <div className={`relative p-4 pr-10 rounded-lg shadow-lg border ${
             lastResult.success
               ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
               : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
           }`}>
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 overflow-hidden">
               {lastResult.success ? (
                 <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
               ) : (
                 <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
               )}
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className={`text-sm font-semibold ${
                   lastResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
                 }`}>
                   {lastResult.success ? 'Push erfolgreich' : 'Push fehlgeschlagen'}
                 </div>
-                <div className={`text-xs mt-1 ${
+                <div className={`text-xs mt-1 break-words ${
                   lastResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
                 }`}>
                   {lastResult.message}
@@ -229,7 +229,7 @@ export function PublishDropdown({
                   </div>
                 )}
                 {lastResult.errors && lastResult.errors.length > 0 && (
-                  <div className="mt-2 text-xs text-red-600 dark:text-red-400">
+                  <div className="mt-2 text-xs text-red-600 dark:text-red-400 break-words">
                     Fehler: {lastResult.errors.join(', ')}
                   </div>
                 )}
@@ -239,7 +239,7 @@ export function PublishDropdown({
                     <summary className="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                       Debug Info (klicken zum öffnen)
                     </summary>
-                    <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono overflow-auto max-h-64">
+                    <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono overflow-auto max-h-64 break-all">
                       {lastResult.wordpressDebug.result?.debug ? (
                         <div className="space-y-2">
                           {/* Status */}

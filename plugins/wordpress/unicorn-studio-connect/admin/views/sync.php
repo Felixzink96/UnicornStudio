@@ -195,28 +195,57 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
             </h2>
 
             <?php
-            // Check if header/footer HTML contains unresolved menu placeholders
+            // Check if header/footer HTML contains menu placeholders
             $global_header = Unicorn_Studio_Global_Components::get_global_header();
             $global_footer = Unicorn_Studio_Global_Components::get_global_footer();
             $header_has_placeholder = $global_header && strpos($global_header['html'] ?? '', '{{menu:') !== false;
             $footer_has_placeholder = $global_footer && strpos($global_footer['html'] ?? '', '{{menu:') !== false;
+
+            // Check if menus are synced (placeholders will be replaced at runtime)
+            $synced_menus = get_option('unicorn_studio_menus', []);
+            $has_header_menu = false;
+            $has_footer_menu = false;
+
+            if (!empty($synced_menus) && is_array($synced_menus)) {
+                foreach ($synced_menus as $menu) {
+                    $slug = $menu['slug'] ?? '';
+                    $position = $menu['position'] ?? '';
+                    $has_items = !empty($menu['items']);
+
+                    if ($has_items && ($slug === 'header-menu' || $position === 'header')) {
+                        $has_header_menu = true;
+                    }
+                    if ($has_items && ($slug === 'footer-menu' || $position === 'footer')) {
+                        $has_footer_menu = true;
+                    }
+                }
+            }
+
+            // Only show warning if placeholder exists but menu is NOT synced
+            $header_needs_menu = $header_has_placeholder && !$has_header_menu;
+            $footer_needs_menu = $footer_has_placeholder && !$has_footer_menu;
             ?>
 
             <div class="unicorn-components-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
                 <!-- Header Status -->
-                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_header'] ? ($header_has_placeholder ? '#fff3cd' : '#d4edda') : '#fff3cd'; ?>; border-radius: 8px;">
+                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_header'] ? ($header_needs_menu ? '#fff3cd' : '#d4edda') : '#fff3cd'; ?>; border-radius: 8px;">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                        <span class="dashicons dashicons-<?php echo $status['has_header'] ? ($header_has_placeholder ? 'warning' : 'yes-alt') : 'warning'; ?>" style="color: <?php echo $status['has_header'] && !$header_has_placeholder ? '#28a745' : '#856404'; ?>;"></span>
+                        <span class="dashicons dashicons-<?php echo $status['has_header'] ? ($header_needs_menu ? 'warning' : 'yes-alt') : 'warning'; ?>" style="color: <?php echo $status['has_header'] && !$header_needs_menu ? '#28a745' : '#856404'; ?>;"></span>
                         <strong><?php esc_html_e('Header', 'unicorn-studio'); ?></strong>
                     </div>
                     <?php if ($status['has_header']) : ?>
-                        <p style="margin: 0; font-size: 13px; color: <?php echo $header_has_placeholder ? '#856404' : '#155724'; ?>;">
+                        <p style="margin: 0; font-size: 13px; color: <?php echo $header_needs_menu ? '#856404' : '#155724'; ?>;">
                             <?php echo esc_html($status['header_name'] ?: 'Global Header'); ?>
                         </p>
-                        <?php if ($header_has_placeholder) : ?>
+                        <?php if ($header_has_placeholder && $has_header_menu) : ?>
+                            <p style="margin: 5px 0 0 0; font-size: 12px; color: #155724;">
+                                <span class="dashicons dashicons-yes" style="font-size: 14px;"></span>
+                                <?php esc_html_e('Menü verknüpft (wird zur Laufzeit ersetzt)', 'unicorn-studio'); ?>
+                            </p>
+                        <?php elseif ($header_needs_menu) : ?>
                             <p style="margin: 5px 0 0 0; font-size: 12px; color: #856404;">
                                 <span class="dashicons dashicons-warning" style="font-size: 14px;"></span>
-                                <?php esc_html_e('Menü-Placeholder nicht ersetzt! Bitte erneut pushen.', 'unicorn-studio'); ?>
+                                <?php esc_html_e('Menü nicht gefunden! Bitte Menus synchronisieren.', 'unicorn-studio'); ?>
                             </p>
                         <?php endif; ?>
                     <?php else : ?>
@@ -227,19 +256,24 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                 </div>
 
                 <!-- Footer Status -->
-                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_footer'] ? ($footer_has_placeholder ? '#fff3cd' : '#d4edda') : '#fff3cd'; ?>; border-radius: 8px;">
+                <div class="unicorn-component-item" style="padding: 15px; background: <?php echo $status['has_footer'] ? ($footer_needs_menu ? '#fff3cd' : '#d4edda') : '#fff3cd'; ?>; border-radius: 8px;">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                        <span class="dashicons dashicons-<?php echo $status['has_footer'] ? ($footer_has_placeholder ? 'warning' : 'yes-alt') : 'warning'; ?>" style="color: <?php echo $status['has_footer'] && !$footer_has_placeholder ? '#28a745' : '#856404'; ?>;"></span>
+                        <span class="dashicons dashicons-<?php echo $status['has_footer'] ? ($footer_needs_menu ? 'warning' : 'yes-alt') : 'warning'; ?>" style="color: <?php echo $status['has_footer'] && !$footer_needs_menu ? '#28a745' : '#856404'; ?>;"></span>
                         <strong><?php esc_html_e('Footer', 'unicorn-studio'); ?></strong>
                     </div>
                     <?php if ($status['has_footer']) : ?>
-                        <p style="margin: 0; font-size: 13px; color: <?php echo $footer_has_placeholder ? '#856404' : '#155724'; ?>;">
+                        <p style="margin: 0; font-size: 13px; color: <?php echo $footer_needs_menu ? '#856404' : '#155724'; ?>;">
                             <?php echo esc_html($status['footer_name'] ?: 'Global Footer'); ?>
                         </p>
-                        <?php if ($footer_has_placeholder) : ?>
+                        <?php if ($footer_has_placeholder && $has_footer_menu) : ?>
+                            <p style="margin: 5px 0 0 0; font-size: 12px; color: #155724;">
+                                <span class="dashicons dashicons-yes" style="font-size: 14px;"></span>
+                                <?php esc_html_e('Menü verknüpft (wird zur Laufzeit ersetzt)', 'unicorn-studio'); ?>
+                            </p>
+                        <?php elseif ($footer_needs_menu) : ?>
                             <p style="margin: 5px 0 0 0; font-size: 12px; color: #856404;">
                                 <span class="dashicons dashicons-warning" style="font-size: 14px;"></span>
-                                <?php esc_html_e('Menü-Placeholder nicht ersetzt! Bitte erneut pushen.', 'unicorn-studio'); ?>
+                                <?php esc_html_e('Menü nicht gefunden! Bitte Menus synchronisieren.', 'unicorn-studio'); ?>
                             </p>
                         <?php endif; ?>
                     <?php else : ?>
@@ -259,20 +293,15 @@ $taxonomies = unicorn_studio()->taxonomies->get_all();
                 </div>
             <?php endif; ?>
 
-            <?php if ($header_has_placeholder || $footer_has_placeholder) : ?>
-                <div class="notice notice-error inline" style="margin-top: 15px;">
+            <?php if ($header_needs_menu || $footer_needs_menu) : ?>
+                <div class="notice notice-warning inline" style="margin-top: 15px;">
                     <p>
-                        <span class="dashicons dashicons-warning"></span>
-                        <strong><?php esc_html_e('Problem erkannt:', 'unicorn-studio'); ?></strong>
-                        <?php esc_html_e('Die Navigation wurde nicht korrekt in den Header/Footer eingefügt. Das kann passieren wenn:', 'unicorn-studio'); ?>
+                        <span class="dashicons dashicons-info"></span>
+                        <strong><?php esc_html_e('Menüs nicht synchronisiert:', 'unicorn-studio'); ?></strong>
+                        <?php esc_html_e('Die Header/Footer enthalten Menü-Platzhalter, aber die Menüs sind noch nicht synchronisiert.', 'unicorn-studio'); ?>
                     </p>
-                    <ul style="margin: 10px 0 0 20px; list-style: disc;">
-                        <li><?php esc_html_e('Keine Menus in Unicorn Studio angelegt sind', 'unicorn-studio'); ?></li>
-                        <li><?php esc_html_e('Der Menu-Slug nicht übereinstimmt (z.B. "header-menu")', 'unicorn-studio'); ?></li>
-                        <li><?php esc_html_e('Die Menus Tabelle noch nicht existiert (neue Migration)', 'unicorn-studio'); ?></li>
-                    </ul>
                     <p style="margin-top: 10px;">
-                        <?php esc_html_e('Lösung: In Unicorn Studio ein Menu mit dem Slug "header-menu" anlegen und erneut pushen.', 'unicorn-studio'); ?>
+                        <?php esc_html_e('Lösung: Klicke oben auf "Menus" um die Menüs zu synchronisieren.', 'unicorn-studio'); ?>
                     </p>
                 </div>
             <?php endif; ?>

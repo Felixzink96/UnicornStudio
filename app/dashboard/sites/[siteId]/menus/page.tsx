@@ -59,8 +59,10 @@ export default function MenusPage() {
     try {
       const response = await fetch(`/api/v1/sites/${siteId}/menus`)
       if (response.ok) {
-        const data = await response.json()
-        setMenus(data)
+        const result = await response.json()
+        // API returns { success: true, data: [...] }
+        const menus = result.data || result || []
+        setMenus(Array.isArray(menus) ? menus : [])
       }
     } catch (error) {
       console.error('Failed to load menus:', error)

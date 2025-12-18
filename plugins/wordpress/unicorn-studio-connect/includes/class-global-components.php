@@ -215,6 +215,9 @@ class Unicorn_Studio_Global_Components {
 
         $html = $header['html'];
 
+        // Replace menu placeholders
+        $html = self::replace_menu_placeholders($html);
+
         if ($echo) {
             echo $html;
             return null;
@@ -267,6 +270,9 @@ class Unicorn_Studio_Global_Components {
         }
 
         $html = $footer['html'];
+
+        // Replace menu placeholders
+        $html = self::replace_menu_placeholders($html);
 
         if ($echo) {
             echo $html;
@@ -446,6 +452,94 @@ class Unicorn_Studio_Global_Components {
     public static function get_component_by_id(string $component_id): ?array {
         $components = self::get_all_stored_components();
         return $components[$component_id] ?? null;
+    }
+
+    /**
+     * Replace menu placeholders in HTML with actual WordPress menu content
+     *
+     * Placeholders format: {{menu:slug}} where slug is the menu slug (e.g., header-menu, footer-menu)
+     *
+     * @param string $html HTML containing menu placeholders
+     * @return string HTML with menu placeholders replaced
+     */
+    public static function replace_menu_placeholders(string $html): string {
+        // Pattern to match {{menu:slug}} where slug can contain letters, numbers, and hyphens
+        $pattern = '/\{\{menu:([\w-]+)\}\}/';
+
+        return preg_replace_callback($pattern, function($matches) {
+            $menu_slug = $matches[1];
+
+            // Map common slug patterns to WordPress menu locations
+            $location_map = [
+                'header-menu' => 'unicorn-header',
+                'header'      => 'unicorn-header',
+                'footer-menu' => 'unicorn-footer',
+                'footer'      => 'unicorn-footer',
+                'mobile-menu' => 'unicorn-mobile',
+                'mobile'      => 'unicorn-mobile',
+            ];
+
+            // Derive base position from slug (e.g., 'header-menu' -> 'header')
+            $derived_position = preg_replace('/-menu$/', '', $menu_slug);
+            if (!isset($location_map[$derived_position])) {
+                $location_map[$derived_position] = 'unicorn-' . $derived_position;
+            }
+
+            // Try to get menu by slug first
+            $menu = wp_get_nav_menu_object($menu_slug);
+
+            // If not found, try mapped location
+            if (!$menu && isset($location_map[$menu_slug])) {
+                $locations = get_nav_menu_locations();
+                $location = $location_map[$menu_slug];
+                if (isset($locations[$location])) {
+                    $menu = wp_get_nav_menu_object($locations[$location]);
+                }
+            }
+
+            // If still not found, try derived position
+            if (!$menu && isset($location_map[$derived_position])) {
+                $locations = get_nav_menu_locations();
+                $location = $location_map[$derived_position];
+                if (isset($locations[$location])) {
+                    $menu = wp_get_nav_menu_object($locations[$location]);
+                }
+            }
+
+            if (!$menu) {
+                // Return empty string if no menu found (placeholder removed)
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log("[Unicorn Menu] Menu not found for slug: {$menu_slug}");
+                }
+                return '';
+            }
+
+            // Get menu items
+            $menu_items = wp_get_nav_menu_items($menu->term_id);
+
+            if (empty($menu_items)) {
+                return '';
+            }
+
+            // Render menu items as simple links (matching the AI-generated structure)
+            $output = '';
+            foreach ($menu_items as $item) {
+                // Skip child items (we'll handle them with parent)
+                if ($item->menu_item_parent != 0) {
+                    continue;
+                }
+
+                $url = $item->url;
+                $label = $item->title;
+                $target = $item->target ? ' target="' . esc_attr($item->target) . '"' : '';
+                $classes = !empty($item->classes) ? ' class="' . esc_attr(implode(' ', array_filter($item->classes))) . '"' : '';
+
+                // Simple link output - inherits styling from parent container
+                $output .= '<a href="' . esc_url($url) . '"' . $target . $classes . '>' . esc_html($label) . '</a>' . "\n";
+            }
+
+            return $output;
+        }, $html);
     }
 
     /**

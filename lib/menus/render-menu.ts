@@ -159,8 +159,11 @@ export function injectMenusIntoHtml(
 
   while ((match = menuRegex.exec(html)) !== null) {
     const identifier = match[1]
+    // Try to find menu by: exact slug, exact position, or derived position
+    // e.g., 'header-menu' should match slug='header-menu', position='header-menu', OR position='header'
+    const derivedPosition = identifier.replace(/-menu$/, '') // 'header-menu' -> 'header'
     const menu = menus.find(
-      (m) => m.slug === identifier || m.position === identifier
+      (m) => m.slug === identifier || m.position === identifier || m.position === derivedPosition
     )
 
     if (menu) {

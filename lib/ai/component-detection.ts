@@ -21,11 +21,14 @@ const HEADER_INDICATORS = {
     'header-',
     'fixed top-',
     'sticky top-',
+    'z-[100]',
+    'z-[99]',
+    'z-50',
   ],
   // IDs
-  ids: ['header', 'navbar', 'navigation', 'main-header', 'site-header', 'top-nav'],
+  ids: ['header', 'navbar', 'navigation', 'main-header', 'site-header', 'top-nav', 'main-header', 'site-header'],
   // Content Keywords
-  keywords: ['logo', 'menu', 'navigation', 'login', 'sign up', 'burger'],
+  keywords: ['logo', 'menu', 'navigation', 'login', 'sign up', 'burger', '{{menu:header-menu}}', 'mobile-menu'],
 }
 
 /**
@@ -70,11 +73,13 @@ export function detectHeader(html: string): ComponentDetectionResult {
   const indicators: string[] = []
   let score = 0
 
-  // Check Tags
+  // Check Tags - <header> Tag ist der stärkste Indikator
   for (const tag of HEADER_INDICATORS.tags) {
     if (lowerHtml.includes(tag.toLowerCase())) {
-      score += 30
-      indicators.push(`Tag: ${tag}`)
+      // <header> Tag ist eindeutig ein Header
+      const tagScore = tag === '<header' ? 50 : 30
+      score += tagScore
+      indicators.push(`Tag: ${tag} (+${tagScore})`)
     }
   }
 

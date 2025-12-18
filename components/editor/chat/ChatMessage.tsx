@@ -23,7 +23,8 @@ import {
 import type { ChatMessage as ChatMessageType } from '@/types/editor'
 import type { DesignVariables } from '@/types/cms'
 import { removeHeaderFooterFromHtml, extractGlobalComponents, injectCSSVariables } from '@/lib/ai/html-operations'
-import type { ReferenceUpdate, ComponentUpdate } from '@/lib/ai/reference-operations'
+import type { ReferenceUpdate, ComponentUpdate, MenuUpdate } from '@/lib/ai/reference-operations'
+import { executeMenuOperation } from '@/lib/ai/menu-operations'
 import { createClient } from '@/lib/supabase/client'
 
 interface ChatMessageProps {
@@ -290,8 +291,143 @@ export function ChatMessage({ message, onOpenSetup }: ChatMessageProps) {
           }
 
           case 'menu': {
-            // Menu updates would require more complex handling
-            console.log('MENU_UPDATE not yet implemented:', update)
+            const menuUpdate = update as MenuUpdate
+            const siteId = useEditorStore.getState().siteId
+            const menus = useEditorStore.getState().menus
+            const pages = useEditorStore.getState().pages
+
+            if (!siteId) {
+              console.warn('MENU_UPDATE: No siteId available')
+              break
+            }
+
+            // Find the menu name from the id
+            const targetMenu = menus.find(m => m.id === menuUpdate.id)
+            const menuName = targetMenu?.name || menuUpdate.id
+
+            console.log('Applying MENU_UPDATE:', menuUpdate.id, menuUpdate.action)
+
+            // Convert MenuUpdate to MenuOperation format
+            const menuOperation = {
+              menu: menuName,
+              action: menuUpdate.action,
+              items: menuUpdate.items?.map(item => ({
+                label: item.label,
+                page: item.page,
+                url: item.url,
+                position: item.position
+              }))
+            }
+
+            // Execute the menu operation
+            const result = await executeMenuOperation(
+              menuOperation,
+              siteId,
+              pages.map(p => ({ id: p.id, name: p.name, slug: p.slug })),
+              menus.map(m => ({ id: m.id, name: m.name, slug: m.slug }))
+            )
+
+            console.log('MENU_UPDATE result:', result)
+
+            // Reload menus in store after update
+            if (result.success) {
+              // Use any cast since menus table isn't in generated types
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { data: menusData } = await (supabase as any)
+                .from('menus')
+                .select(`
+                  id,
+                  name,
+                  slug,
+                  position,
+                  settings,
+                  menu_items (
+                    id,
+                    menu_id,
+                    parent_id,
+                    label,
+                    link_type,
+                    external_url,
+                    anchor,
+                    page_id,
+                    content_type_slug,
+                    icon,
+                    description,
+                    target,
+                    position,
+                    pages:page_id (slug, name)
+                  )
+                `)
+                .eq('site_id', siteId)
+                .order('name')
+
+              if (menusData) {
+                // Types for raw menu data from database
+                interface RawMenuItem {
+                  id: string
+                  menu_id: string
+                  parent_id: string | null
+                  label: string
+                  link_type: string
+                  external_url: string | null
+                  anchor: string | null
+                  page_id: string | null
+                  content_type_slug: string | null
+                  icon: string | null
+                  description: string | null
+                  target: string
+                  position: number
+                  pages: { slug: string; name: string } | null
+                }
+                interface RawMenu {
+                  id: string
+                  name: string
+                  slug: string
+                  position: string
+                  settings: Record<string, unknown> | null
+                  menu_items: RawMenuItem[]
+                }
+
+                // Process raw data to MenuWithItems format
+                const processedMenus = (menusData as RawMenu[]).map((menu) => {
+                  const rawItems = (menu.menu_items || []) as RawMenuItem[]
+                  const items = rawItems.map((item) => ({
+                    id: item.id,
+                    menuId: item.menu_id,
+                    parentId: item.parent_id || undefined,
+                    linkType: item.link_type as 'page' | 'external' | 'anchor' | 'archive',
+                    pageId: item.page_id || undefined,
+                    externalUrl: item.external_url || undefined,
+                    anchor: item.anchor || undefined,
+                    contentTypeSlug: item.content_type_slug || undefined,
+                    label: item.label,
+                    icon: item.icon || undefined,
+                    description: item.description || undefined,
+                    target: (item.target || '_self') as '_self' | '_blank',
+                    position: item.position,
+                    createdAt: '',
+                    updatedAt: '',
+                    pageSlug: item.pages?.slug,
+                    pageName: item.pages?.name,
+                  }))
+                  return {
+                    id: menu.id,
+                    siteId,
+                    name: menu.name,
+                    slug: menu.slug,
+                    description: undefined,
+                    position: menu.position as 'header' | 'footer' | 'mobile' | 'custom',
+                    settings: (menu.settings || {}) as Record<string, unknown>,
+                    createdAt: '',
+                    updatedAt: '',
+                    items,
+                  }
+                })
+
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                useEditorStore.setState({ menus: processedMenus as any })
+              }
+            }
             break
           }
 

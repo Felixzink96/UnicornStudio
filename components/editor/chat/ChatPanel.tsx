@@ -7,7 +7,6 @@ import { PromptBuilder } from './PromptBuilder'
 import WireframeBuildAnimation from './WireframeBuildAnimation'
 import {
   parseOperationFormat,
-  extractStreamingHtml,
   applyOperation,
   injectCSSVariables,
   injectAnimationKeyframes,
@@ -673,18 +672,17 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                   lastActivity: Date.now(),
                 } : null)
 
-                // Extract streaming HTML for live preview
-                const streamingHtml = extractStreamingHtml(fullContent)
+                // Bei Function Calling: Zeige keinen Text während wir auf FC warten
+                // Der Function Call Handler zeigt dann die richtige Message
+                const hasOtherTools = googleSearchEnabled || codeExecutionEnabled
 
                 const msgs = useEditorStore.getState().messages
                 const lastMsg = msgs[msgs.length - 1]
                 if (lastMsg?.role === 'assistant') {
                   updateMessage(lastMsg.id, {
-                    content: fullContent,
-                    // Show streaming HTML in preview
-                    generatedHtml: streamingHtml || undefined,
+                    // Text nur zeigen wenn andere Tools aktiv (kein FC erwartet)
+                    content: hasOtherTools ? fullContent : '',
                     isStreaming: true,
-                    // Include tool outputs as they come in
                     searchSources: searchSources.length > 0 ? searchSources : undefined,
                     executableCode: executableCode || undefined,
                     codeResult: codeResult || undefined,
@@ -696,7 +694,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                 console.log('Full AI response:', fullContent)
                 console.log('Function call:', functionCall)
 
-                // NEU: Function Call Flow (strukturierte Ausgabe)
+                // Function Call Flow (strukturierte Ausgabe)
                 if (functionCall) {
                   console.log('[Function Call] Processing:', functionCall.name)
                   const args = functionCall.args as Record<string, string>

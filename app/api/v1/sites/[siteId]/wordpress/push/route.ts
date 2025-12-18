@@ -402,26 +402,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       // Send components if found
       if (header || footer) {
-        // Send individual component events
-        if (header) {
-          await sendWebhook(webhookUrl, headers, {
-            event: 'component.updated',
-            site_id: siteId,
-            data: header,
-          })
-        }
-        if (footer) {
-          await sendWebhook(webhookUrl, headers, {
-            event: 'component.updated',
-            site_id: siteId,
-            data: footer,
-          })
-        }
+        // NOTE: We do NOT send individual component.updated events for header/footer
+        // because global_components.sync sends the HTML with menu placeholders replaced.
+        // Sending component.updated would overwrite with original HTML containing placeholders.
 
         // Inject menus into header/footer HTML before sending to WordPress
         // Check if header/footer have menu placeholders
         const headerHasPlaceholder = header?.html?.includes('{{menu:') || false
         const footerHasPlaceholder = footer?.html?.includes('{{menu:') || false
+
+        // Log menu details for debugging
+        console.log(`[WordPress Push] Menus available: ${menus.length}`)
+        menus.forEach(m => {
+          console.log(`[WordPress Push] Menu: slug="${m.slug}", position="${m.position}", items=${m.items?.length || 0}`)
+        })
+        console.log(`[WordPress Push] Header has placeholder: ${headerHasPlaceholder}`)
+        console.log(`[WordPress Push] Footer has placeholder: ${footerHasPlaceholder}`)
 
         const headerHtmlWithMenus = header?.html ? injectMenusIntoHtml(header.html, menus, {
           containerClass: 'flex items-center gap-6',
@@ -437,6 +433,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         // Check if placeholders were replaced
         const headerPlaceholderReplaced = headerHasPlaceholder && !headerHtmlWithMenus?.includes('{{menu:')
         const footerPlaceholderReplaced = footerHasPlaceholder && !footerHtmlWithMenus?.includes('{{menu:')
+
+        console.log(`[WordPress Push] Header placeholder replaced: ${headerPlaceholderReplaced}`)
+        console.log(`[WordPress Push] Footer placeholder replaced: ${footerPlaceholderReplaced}`)
 
         // Send global_components.sync event with all components grouped
         await sendWebhook(webhookUrl, headers, {

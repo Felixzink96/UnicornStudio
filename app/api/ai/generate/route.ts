@@ -475,12 +475,12 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
     const tools: Array<Record<string, unknown>> = []
 
     // Check if other tools are enabled (Function Calling can't be combined with these)
-    const hasOtherTools = googleSearchEnabled || codeExecutionEnabled || extractUrls(prompt).length > 0
+    // Note: URL Context CAN be combined with function calling
+    const hasIncompatibleTools = googleSearchEnabled || codeExecutionEnabled
 
-    // ONLY add HTML operation tools if no other tools are enabled
-    // Gemini doesn't support mixing function calling with other tools
+    // ONLY add HTML operation tools if no incompatible tools are enabled
     let useFunctionCalling = false
-    if (!hasOtherTools) {
+    if (!hasIncompatibleTools) {
       tools.push({
         functionDeclarations: htmlOperationTools
       })
@@ -490,12 +490,13 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
       console.log('[AI] Function Calling disabled - using text-based output (other tools active)')
     }
 
-    // URL Context: Auto-detect URLs in prompt
-    const detectedUrls = extractUrls(prompt)
-    if (detectedUrls.length > 0) {
-      tools.push({ urlContext: {} })
-      console.log('URL Context enabled for:', detectedUrls)
-    }
+    // URL Context: Disabled for now - was causing issues with function calling
+    // Only enable if user explicitly requests it in the future
+    // const detectedUrls = extractUrls(prompt)
+    // if (detectedUrls.length > 0) {
+    //   tools.push({ urlContext: {} })
+    //   console.log('URL Context enabled for:', detectedUrls)
+    // }
 
     // Google Search Grounding
     if (googleSearchEnabled) {

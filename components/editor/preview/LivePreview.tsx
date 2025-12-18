@@ -59,6 +59,10 @@ export function LivePreview() {
   const lastMessage = messages[messages.length - 1]
   const isCurrentlyStreaming = lastMessage?.isStreaming || false
 
+  // Wireframe nur bei komplett neuer Website zeigen, nicht bei Änderungen
+  const hasExistingContent = html.includes('<section') || html.includes('<main') || html.includes('<header')
+  const showWireframe = isCurrentlyStreaming && !hasExistingContent
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     x: number
@@ -1438,8 +1442,8 @@ export function LivePreview() {
       onClick={handleContainerClick}
       className="h-full w-full bg-zinc-950 flex items-center justify-center overflow-auto relative"
     >
-      {/* Wireframe Build Animation während AI generiert */}
-      <FullPageWireframe isActive={isCurrentlyStreaming} />
+      {/* Wireframe Build Animation nur bei neuer Website, nicht bei Änderungen */}
+      <FullPageWireframe isActive={showWireframe} />
 
       <div
         className={`h-full transition-all duration-300 ${isResponsive ? 'my-4 rounded-lg overflow-hidden shadow-2xl border border-zinc-700' : ''}`}

@@ -330,6 +330,49 @@ export function parseOperationFormat(content: string): ParsedOperation | null {
 
 // Extract HTML from streaming content for live preview
 export function extractStreamingHtml(content: string): string | null {
+  // Try JSON format first (when AI outputs {"action": "...", "action_input": {"html": "..."}})
+  try {
+    // Look for JSON with html field
+    const jsonMatch = content.match(/\{[\s\S]*"html"\s*:\s*"/)
+    if (jsonMatch) {
+      // Try to extract HTML from JSON string
+      const htmlStart = content.indexOf('"html"')
+      if (htmlStart !== -1) {
+        // Find the value after "html":
+        const valueStart = content.indexOf(':', htmlStart) + 1
+        // Skip whitespace and opening quote
+        let i = valueStart
+        while (i < content.length && (content[i] === ' ' || content[i] === '"')) i++
+        if (content[i - 1] === '"') {
+          // Extract until closing quote (handling escaped quotes)
+          let html = ''
+          let escaped = false
+          for (; i < content.length; i++) {
+            if (escaped) {
+              if (content[i] === 'n') html += '\n'
+              else if (content[i] === 't') html += '\t'
+              else if (content[i] === '"') html += '"'
+              else if (content[i] === '\\') html += '\\'
+              else html += content[i]
+              escaped = false
+            } else if (content[i] === '\\') {
+              escaped = true
+            } else if (content[i] === '"') {
+              break // End of string
+            } else {
+              html += content[i]
+            }
+          }
+          if (html.includes('<')) {
+            return cleanOperationMetadataFromHtml(html)
+          }
+        }
+      }
+    }
+  } catch {
+    // JSON parsing failed, continue with other methods
+  }
+
   // Try to find HTML after the second ---
   const parts = content.split(/\n---\n/)
 

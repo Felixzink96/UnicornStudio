@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { ThemeProvider } from 'next-themes'
 
@@ -7,14 +8,21 @@ export default async function EditorLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  // Check if this is a WordPress token request (set by middleware)
+  const headersList = await headers()
+  const isWpTokenBypass = headersList.get('x-wp-token-bypass') === 'true'
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Skip auth check for WordPress iframe requests
+  if (!isWpTokenBypass) {
+    const supabase = await createClient()
 
-  if (!user) {
-    redirect('/login')
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      redirect('/login')
+    }
   }
 
   return (

@@ -27,6 +27,11 @@ class Unicorn_Studio_Admin {
         add_filter('page_row_actions', [$this, 'add_row_action'], 10, 2);
         add_filter('post_row_actions', [$this, 'add_row_action'], 10, 2);
 
+        // Add admin bar button (like Elementor)
+        add_action('admin_bar_menu', [$this, 'add_admin_bar_button'], 100);
+        add_action('admin_head', [$this, 'admin_bar_styles']);
+        add_action('wp_head', [$this, 'admin_bar_styles']);
+
         // Intercept editor page early to prevent WP admin wrapper
         add_action('admin_init', [$this, 'maybe_render_fullscreen_editor']);
     }
@@ -300,5 +305,110 @@ class Unicorn_Studio_Admin {
         }
 
         return admin_url('admin.php?page=unicorn-studio-editor&post_id=' . $post_id);
+    }
+
+    /**
+     * Add Unicorn Studio button to admin bar (like Elementor)
+     *
+     * @param WP_Admin_Bar $admin_bar Admin bar object
+     */
+    public function add_admin_bar_button($admin_bar) {
+        // Only show on page edit screens or frontend page views
+        $post_id = $this->get_current_post_id();
+        if (!$post_id) {
+            return;
+        }
+
+        // Check if this page has a Unicorn Studio ID
+        $unicorn_id = get_post_meta($post_id, '_unicorn_studio_id', true);
+        $site_id = get_option('unicorn_studio_site_id');
+
+        if (!$unicorn_id || !$site_id) {
+            return;
+        }
+
+        // Check user permissions
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        // Build editor URL
+        $editor_url = admin_url('admin.php?page=unicorn-studio-editor&post_id=' . $post_id);
+
+        // Add the main button
+        $admin_bar->add_node([
+            'id'    => 'unicorn-studio-edit',
+            'title' => '<span class="ab-icon"></span><span class="ab-label">' . __('Mit Unicorn Studio bearbeiten', 'unicorn-studio') . '</span>',
+            'href'  => $editor_url,
+            'meta'  => [
+                'class' => 'unicorn-studio-admin-bar-button',
+                'title' => __('Diese Seite mit Unicorn Studio bearbeiten', 'unicorn-studio'),
+            ],
+        ]);
+    }
+
+    /**
+     * Get current post ID from admin or frontend context
+     *
+     * @return int|false Post ID or false
+     */
+    private function get_current_post_id() {
+        // Admin: Check for post.php?post=123
+        if (is_admin()) {
+            global $pagenow, $post;
+
+            // Page/post edit screen
+            if ($pagenow === 'post.php' && isset($_GET['post'])) {
+                return intval($_GET['post']);
+            }
+
+            // If we have a global $post
+            if ($post && $post->ID) {
+                return $post->ID;
+            }
+
+            return false;
+        }
+
+        // Frontend: Get the queried object
+        if (is_singular('page')) {
+            return get_queried_object_id();
+        }
+
+        return false;
+    }
+
+    /**
+     * Add styles for admin bar button
+     */
+    public function admin_bar_styles() {
+        // Only output if user can edit pages
+        if (!current_user_can('edit_pages')) {
+            return;
+        }
+        ?>
+        <style>
+            #wpadminbar .unicorn-studio-admin-bar-button > a {
+                background: linear-gradient(135deg, #9333ea 0%, #c084fc 100%) !important;
+                color: #ffffff !important;
+            }
+            #wpadminbar .unicorn-studio-admin-bar-button > a:hover {
+                background: linear-gradient(135deg, #7e22ce 0%, #a855f7 100%) !important;
+            }
+            #wpadminbar .unicorn-studio-admin-bar-button .ab-icon::before {
+                content: '\f116';
+                top: 3px;
+                font-family: dashicons;
+            }
+            #wpadminbar .unicorn-studio-admin-bar-button .ab-label {
+                margin-left: 4px;
+            }
+            @media screen and (max-width: 782px) {
+                #wpadminbar .unicorn-studio-admin-bar-button .ab-label {
+                    display: none;
+                }
+            }
+        </style>
+        <?php
     }
 }

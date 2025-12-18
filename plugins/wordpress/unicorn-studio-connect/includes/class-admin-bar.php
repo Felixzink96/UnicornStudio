@@ -36,14 +36,12 @@ class Unicorn_Studio_Admin_Bar {
             return;
         }
 
-        // Add floating button on frontend
-        add_action('wp_footer', [$this, 'render_floating_button']);
-
-        // Add to WordPress admin bar
+        // Add to WordPress admin bar (frontend view)
         add_action('admin_bar_menu', [$this, 'add_admin_bar_item'], 100);
 
         // Enqueue styles
         add_action('wp_enqueue_scripts', [$this, 'enqueue_styles']);
+        add_action('wp_head', [$this, 'admin_bar_inline_styles']);
     }
 
     /**
@@ -54,7 +52,7 @@ class Unicorn_Studio_Admin_Bar {
     }
 
     /**
-     * Get edit URL for current page
+     * Get edit URL for current page (uses WordPress admin iframe editor)
      */
     private function get_edit_url(): ?string {
         global $post;
@@ -64,85 +62,20 @@ class Unicorn_Studio_Admin_Bar {
         }
 
         // Get Unicorn Studio IDs from post meta
-        // Note: _unicorn_studio_id is the page ID in Unicorn Studio (set by sync)
         $unicorn_page_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
         $unicorn_site_id = get_option('unicorn_studio_site_id');
 
-        if (!$unicorn_site_id) {
+        if (!$unicorn_site_id || !$unicorn_page_id) {
             return null;
         }
 
-        // If we have a specific page ID, link to that page in editor
-        if ($unicorn_page_id) {
-            return sprintf(
-                '%s/editor/%s/%s',
-                rtrim($this->app_url, '/'),
-                $unicorn_site_id,
-                $unicorn_page_id
-            );
-        }
-
-        // Otherwise link to site dashboard
-        return sprintf(
-            '%s/dashboard/sites/%s',
-            rtrim($this->app_url, '/'),
-            $unicorn_site_id
-        );
+        // Return WordPress admin iframe editor URL
+        return admin_url('admin.php?page=unicorn-studio-editor&post_id=' . $post->ID);
     }
 
     /**
-     * Render the floating edit button
-     */
-    public function render_floating_button() {
-        if (!$this->can_edit()) {
-            return;
-        }
-
-        // Only show on Unicorn Studio pages
-        if (!function_exists('unicorn_is_unicorn_page') || !unicorn_is_unicorn_page()) {
-            // Still show for all pages if site is connected
-            $site_id = get_option('unicorn_studio_site_id');
-            if (!$site_id) {
-                return;
-            }
-        }
-
-        $edit_url = $this->get_edit_url();
-        if (!$edit_url) {
-            return;
-        }
-
-        // Check if floating button is enabled (default: true)
-        $enabled = Unicorn_Studio::get_option('show_floating_button', true);
-        if (!$enabled) {
-            return;
-        }
-
-        ?>
-        <div id="unicorn-studio-floating-btn" class="unicorn-floating-btn">
-            <a href="<?php echo esc_url($edit_url); ?>"
-               target="_blank"
-               rel="noopener noreferrer"
-               class="unicorn-floating-btn-link"
-               title="Mit Unicorn Studio bearbeiten">
-                <svg class="unicorn-floating-btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span class="unicorn-floating-btn-text">Unicorn Studio</span>
-            </a>
-            <button class="unicorn-floating-btn-close" onclick="document.getElementById('unicorn-studio-floating-btn').style.display='none'" title="Ausblenden">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M18 6L6 18M6 6l12 12"/>
-                </svg>
-            </button>
-        </div>
-        <?php
-    }
-
-    /**
-     * Add item to WordPress admin bar
+     * Add item to WordPress admin bar (frontend)
+     * Shows a styled button for Unicorn Studio pages
      */
     public function add_admin_bar_item($admin_bar) {
         if (!$this->can_edit()) {
@@ -150,184 +83,75 @@ class Unicorn_Studio_Admin_Bar {
         }
 
         $edit_url = $this->get_edit_url();
-        $site_id = get_option('unicorn_studio_site_id');
 
-        // Main menu item
-        $admin_bar->add_menu([
-            'id'    => 'unicorn-studio',
-            'title' => '<span class="ab-icon dashicons dashicons-editor-code"></span> Unicorn Studio',
-            'href'  => $edit_url ?: sprintf('%s/dashboard', $this->app_url),
+        // Only show the edit button if we have a valid URL
+        if (!$edit_url) {
+            return;
+        }
+
+        // Add the main styled button (like Elementor)
+        $admin_bar->add_node([
+            'id'    => 'unicorn-studio-edit',
+            'title' => '<span class="ab-icon"></span><span class="ab-label">' . __('Mit Unicorn Studio bearbeiten', 'unicorn-studio') . '</span>',
+            'href'  => $edit_url,
             'meta'  => [
-                'title'  => 'Unicorn Studio',
-                'target' => '_blank',
-                'class'  => 'unicorn-studio-admin-bar',
+                'class' => 'unicorn-studio-admin-bar-button',
+                'title' => __('Diese Seite mit Unicorn Studio bearbeiten', 'unicorn-studio'),
             ],
-        ]);
-
-        // Sub-menu: Edit this page
-        if ($edit_url) {
-            $admin_bar->add_menu([
-                'parent' => 'unicorn-studio',
-                'id'     => 'unicorn-studio-edit',
-                'title'  => 'Diese Seite bearbeiten',
-                'href'   => $edit_url,
-                'meta'   => [
-                    'target' => '_blank',
-                ],
-            ]);
-        }
-
-        // Sub-menu: Dashboard
-        if ($site_id) {
-            $admin_bar->add_menu([
-                'parent' => 'unicorn-studio',
-                'id'     => 'unicorn-studio-dashboard',
-                'title'  => 'Site Dashboard',
-                'href'   => sprintf('%s/dashboard/sites/%s', $this->app_url, $site_id),
-                'meta'   => [
-                    'target' => '_blank',
-                ],
-            ]);
-
-            // Sub-menu: Pages
-            $admin_bar->add_menu([
-                'parent' => 'unicorn-studio',
-                'id'     => 'unicorn-studio-pages',
-                'title'  => 'Alle Seiten',
-                'href'   => sprintf('%s/dashboard/sites/%s', $this->app_url, $site_id),
-                'meta'   => [
-                    'target' => '_blank',
-                ],
-            ]);
-
-            // Sub-menu: Components
-            $admin_bar->add_menu([
-                'parent' => 'unicorn-studio',
-                'id'     => 'unicorn-studio-components',
-                'title'  => 'Global Components',
-                'href'   => sprintf('%s/dashboard/sites/%s/components', $this->app_url, $site_id),
-                'meta'   => [
-                    'target' => '_blank',
-                ],
-            ]);
-        }
-
-        // Sub-menu: Sync
-        $admin_bar->add_menu([
-            'parent' => 'unicorn-studio',
-            'id'     => 'unicorn-studio-sync',
-            'title'  => 'Sync Status',
-            'href'   => admin_url('admin.php?page=unicorn-studio-sync'),
         ]);
     }
 
     /**
-     * Enqueue floating button styles
+     * Enqueue admin bar styles
      */
     public function enqueue_styles() {
         if (!$this->can_edit()) {
             return;
         }
 
-        // Inline styles for the floating button
-        $css = '
-        .unicorn-floating-btn {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            z-index: 999999;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
+        // Add admin bar styles
+        wp_add_inline_style('admin-bar', $this->get_admin_bar_css());
+    }
 
-        .unicorn-floating-btn-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%);
-            color: white !important;
-            text-decoration: none !important;
-            border-radius: 50px;
-            font-size: 14px;
-            font-weight: 600;
-            box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);
-            transition: all 0.2s ease;
+    /**
+     * Output inline styles for admin bar
+     */
+    public function admin_bar_inline_styles() {
+        if (!$this->can_edit() || !is_admin_bar_showing()) {
+            return;
         }
+        ?>
+        <style>
+            <?php echo $this->get_admin_bar_css(); ?>
+        </style>
+        <?php
+    }
 
-        .unicorn-floating-btn-link:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
-            color: white !important;
-        }
-
-        .unicorn-floating-btn-icon {
-            width: 20px;
-            height: 20px;
-        }
-
-        .unicorn-floating-btn-text {
-            white-space: nowrap;
-        }
-
-        .unicorn-floating-btn-close {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-            padding: 0;
-            background: rgba(0, 0, 0, 0.6);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .unicorn-floating-btn:hover .unicorn-floating-btn-close {
-            opacity: 1;
-        }
-
-        .unicorn-floating-btn-close:hover {
-            background: rgba(0, 0, 0, 0.8);
-        }
-
-        .unicorn-floating-btn-close svg {
-            width: 14px;
-            height: 14px;
-        }
-
-        /* Mobile: Icon only */
-        @media (max-width: 600px) {
-            .unicorn-floating-btn-link {
-                padding: 14px;
-                border-radius: 50%;
+    /**
+     * Get admin bar CSS
+     */
+    private function get_admin_bar_css(): string {
+        return '
+            #wpadminbar .unicorn-studio-admin-bar-button > a {
+                background: linear-gradient(135deg, #9333ea 0%, #c084fc 100%) !important;
+                color: #ffffff !important;
             }
-            .unicorn-floating-btn-text {
-                display: none;
+            #wpadminbar .unicorn-studio-admin-bar-button > a:hover {
+                background: linear-gradient(135deg, #7e22ce 0%, #a855f7 100%) !important;
             }
-        }
-
-        /* Admin bar icon */
-        #wp-admin-bar-unicorn-studio .ab-icon {
-            margin-right: 4px;
-        }
-
-        #wp-admin-bar-unicorn-studio .ab-icon:before {
-            content: "\\f475";
-            top: 2px;
-        }
+            #wpadminbar .unicorn-studio-admin-bar-button .ab-icon::before {
+                content: "\\f116";
+                top: 3px;
+                font-family: dashicons;
+            }
+            #wpadminbar .unicorn-studio-admin-bar-button .ab-label {
+                margin-left: 4px;
+            }
+            @media screen and (max-width: 782px) {
+                #wpadminbar .unicorn-studio-admin-bar-button .ab-label {
+                    display: none;
+                }
+            }
         ';
-
-        wp_add_inline_style('admin-bar', $css);
-
-        // Also add to head for non-admin pages
-        if (!is_admin_bar_showing()) {
-            echo '<style>' . $css . '</style>';
-        }
     }
 }

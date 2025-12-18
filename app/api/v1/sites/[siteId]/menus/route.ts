@@ -50,12 +50,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Check if this is a WordPress sync request (needs full items)
     const includeItems = request.nextUrl.searchParams.get('includeItems') === 'true'
 
+    // Debug: Log the raw URL and query params
+    console.log('[Menus API] Full URL:', request.url)
+    console.log('[Menus API] Query param includeItems:', request.nextUrl.searchParams.get('includeItems'))
+
     let menus
     if (includeItems) {
       // For WordPress sync: include all menu items
+      console.log('[Menus API] Calling getMenusForWordPress...')
       menus = await getMenusForWordPress(siteId)
+      console.log('[Menus API] getMenusForWordPress returned:', menus.length, 'menus')
+      // Log items count for each menu
+      menus.forEach((m, i) => {
+        console.log(`[Menus API] Menu ${i}: "${m.name}" has ${m.items?.length || 0} items`)
+      })
     } else {
       // For dashboard/list view: just metadata
+      console.log('[Menus API] Calling getMenus (no items)...')
       menus = await getMenus(siteId)
     }
 

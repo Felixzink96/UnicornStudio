@@ -381,9 +381,20 @@ class Unicorn_Studio_Sync_Manager {
             error_log('[Unicorn Menu Sync] Using response directly, count: ' . count($menus));
         }
 
-        // Log each menu
+        // Log each menu with items details
         foreach ($menus as $index => $menu) {
-            error_log('[Unicorn Menu Sync] Menu ' . $index . ': ' . wp_json_encode($menu));
+            $items_count = isset($menu['items']) ? count($menu['items']) : 0;
+            $item_count_field = $menu['itemCount'] ?? $menu['item_count'] ?? 'N/A';
+            error_log('[Unicorn Menu Sync] Menu ' . $index . ': "' . ($menu['name'] ?? 'unknown') . '" - items array: ' . $items_count . ', itemCount field: ' . $item_count_field);
+
+            // Log items if present
+            if (isset($menu['items']) && is_array($menu['items'])) {
+                foreach ($menu['items'] as $item_index => $item) {
+                    error_log('[Unicorn Menu Sync]   Item ' . $item_index . ': ' . ($item['label'] ?? 'no label') . ' -> ' . ($item['pageSlug'] ?? $item['externalUrl'] ?? 'no url'));
+                }
+            } else {
+                error_log('[Unicorn Menu Sync]   WARNING: No items array in menu response!');
+            }
         }
 
         // Store menus in option

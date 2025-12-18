@@ -85,6 +85,7 @@ export interface PageWithGlobals {
   page_name: string;
   page_slug: string;
   page_html: string | null;
+  page_custom_css: string | null;
   page_settings: Record<string, unknown> | null;
   page_seo: Record<string, unknown> | null;
   hide_header: boolean;

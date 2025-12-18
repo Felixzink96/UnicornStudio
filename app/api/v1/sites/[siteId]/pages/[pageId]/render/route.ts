@@ -14,6 +14,8 @@ import {
 import type { PageWithGlobals, RenderedPage } from '@/types/global-components'
 import { injectMenusIntoHtml } from '@/lib/menus/render-menu'
 import type { MenuWithItems, MenuItem } from '@/types/menu'
+import { generateDesignTokensCSS, generateGoogleFontsLink } from '@/lib/css/design-tokens'
+import type { DesignVariables } from '@/types/cms'
 
 interface RouteParams {
   params: Promise<{ siteId: string; pageId: string }>
@@ -136,6 +138,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     })
 
+    // Fetch design variables for CSS tokens
+    const { data: designVarsData } = await supabase
+      .from('design_variables')
+      .select('*')
+      .eq('site_id', siteId)
+      .single()
+
+    const designVars = designVarsData as DesignVariables | null
+
     // Use RPC function to get page with globals
     const { data, error } = await supabase.rpc('get_page_with_globals', {
       p_page_id: pageId,
@@ -144,7 +155,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (error) {
       console.error('Get page with globals error:', error)
       // Fallback: try direct query
-      return await fallbackRender(supabase, siteId, pageId, format, menus)
+      return await fallbackRender(supabase, siteId, pageId, format, menus, designVars)
     }
 
     if (!data || data.length === 0) {
@@ -153,8 +164,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const pageData = data[0] as PageWithGlobals
 
-    // Build rendered page with menu injection
-    const rendered = buildRenderedPage(pageData, menus)
+    // Build rendered page with menu injection and design tokens
+    const rendered = buildRenderedPage(pageData, menus, designVars)
 
     if (format === 'html') {
       return new Response(rendered.html, {
@@ -176,17 +187,30 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  * Build the rendered page from page data with globals
  * Injects dynamic menus into header/footer placeholders
  */
-function buildRenderedPage(pageData: PageWithGlobals, menus: MenuWithItems[] = []): RenderedPage {
+function buildRenderedPage(
+  pageData: PageWithGlobals,
+  menus: MenuWithItems[] = [],
+  designVars: DesignVariables | null = null
+): RenderedPage {
   let css = ''
   let js = ''
   let html = ''
 
-  // Collect CSS
+  // Add design tokens CSS first (so they're available for components)
+  const designTokensCSS = generateDesignTokensCSS(designVars)
+  css += designTokensCSS + '\n'
+
+  // Collect CSS from header/footer
   if (!pageData.hide_header && pageData.header_css) {
     css += pageData.header_css + '\n'
   }
   if (!pageData.hide_footer && pageData.footer_css) {
     css += pageData.footer_css + '\n'
+  }
+
+  // Add page custom CSS (keyframes, custom classes extracted from AI-generated HTML)
+  if (pageData.page_custom_css) {
+    css += '\n/* Page Custom CSS */\n' + pageData.page_custom_css + '\n'
   }
 
   // Collect JS
@@ -222,8 +246,8 @@ function buildRenderedPage(pageData: PageWithGlobals, menus: MenuWithItems[] = [
     html += footerWithMenus + '\n'
   }
 
-  // Wrap with CSS and JS
-  const fullHtml = buildFullHtml(html, css, js, pageData)
+  // Wrap with CSS and JS (including design tokens)
+  const fullHtml = buildFullHtml(html, css, js, pageData, designVars)
 
   return {
     html: fullHtml,
@@ -251,9 +275,11 @@ function buildFullHtml(
   bodyHtml: string,
   css: string,
   js: string,
-  pageData: PageWithGlobals
+  pageData: PageWithGlobals,
+  designVars: DesignVariables | null = null
 ): string {
   const seo = pageData.page_seo as Record<string, string> | null
+  const googleFontsLink = generateGoogleFontsLink(designVars)
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -262,6 +288,7 @@ function buildFullHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${seo?.title || pageData.page_name}</title>
   ${seo?.description ? `<meta name="description" content="${seo.description}">` : ''}
+  ${googleFontsLink ? `<link href="${googleFontsLink}" rel="stylesheet">` : ''}
   <script src="https://cdn.tailwindcss.com"></script>
   ${css ? `<style>\n${css}\n</style>` : ''}
 </head>
@@ -280,7 +307,8 @@ async function fallbackRender(
   siteId: string,
   pageId: string,
   format: string,
-  menus: MenuWithItems[] = []
+  menus: MenuWithItems[] = [],
+  designVars: DesignVariables | null = null
 ) {
   // Get page
   const { data: page, error: pageError } = await supabase
@@ -352,14 +380,18 @@ async function fallbackRender(
     includeDropdowns: false,
   }) : ''
 
-  // Build page
-  const css = [headerCss, footerCss].filter(Boolean).join('\n')
+  // Build page with design tokens CSS + page custom CSS
+  const designTokensCSS = generateDesignTokensCSS(designVars)
+  // Type assertion for custom_css (may not exist in older schemas)
+  const pageCustomCss = (page as { custom_css?: string | null }).custom_css || ''
+  const css = [designTokensCSS, headerCss, footerCss, pageCustomCss].filter(Boolean).join('\n')
   const js = [headerJs, footerJs].filter(Boolean).join('\n')
   const bodyHtml = [headerWithMenus, page.html_content || '', footerWithMenus]
     .filter(Boolean)
     .join('\n')
 
   const seo = page.seo as Record<string, string> | null
+  const googleFontsLink = generateGoogleFontsLink(designVars)
   const fullHtml = `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -367,6 +399,7 @@ async function fallbackRender(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${seo?.title || page.name}</title>
   ${seo?.description ? `<meta name="description" content="${seo.description}">` : ''}
+  ${googleFontsLink ? `<link href="${googleFontsLink}" rel="stylesheet">` : ''}
   <script src="https://cdn.tailwindcss.com"></script>
   ${css ? `<style>\n${css}\n</style>` : ''}
 </head>

@@ -9,6 +9,7 @@ import { darkenHex } from '@/lib/design/style-extractor'
 import { ContextMenu } from '../context-menu/ContextMenu'
 import { SaveComponentDialog } from '../context-menu/SaveComponentDialog'
 import { ImagePicker } from '../assets/ImagePicker'
+import { FullPageWireframe } from './FullPageWireframe'
 
 // Helper: Convert hex to RGB string (space-separated for CSS)
 function hexToRgb(hex: string): string {
@@ -52,6 +53,7 @@ export function LivePreview() {
   const designVariables = useEditorStore((s) => s.designVariables)
   const siteId = useEditorStore((s) => s.siteId)
   const messages = useEditorStore((s) => s.messages)
+  const activeBuildSection = useEditorStore((s) => s.activeBuildSection)
 
   // Prüfen ob gerade gestreamt wird (für Animation-Pause und Scroll-Restore)
   const lastMessage = messages[messages.length - 1]
@@ -108,61 +110,12 @@ export function LivePreview() {
     return () => iframe.removeEventListener('load', handleLoad)
   }, [])
 
-  // Generate CSS variables from design tokens
+  // Generate CSS variables from design tokens - using central function
   const designTokensCss = useMemo(() => {
     if (!designVariables) return ''
-
-    const colors = designVariables.colors as Record<string, Record<string, string>> | undefined
-    const typography = designVariables.typography as { fontHeading?: string; fontBody?: string } | undefined
-
-    let css = ':root {\n'
-
-    // Brand colors
-    if (colors?.brand) {
-      if (colors.brand.primary) {
-        css += `  --color-brand-primary: ${colors.brand.primary};\n`
-        css += `  --color-brand-primary-rgb: ${hexToRgb(colors.brand.primary)};\n`
-        // Generate hover color (10% darker)
-        const hoverColor = darkenHex(colors.brand.primary, 10)
-        css += `  --color-brand-primaryHover: ${hoverColor};\n`
-        css += `  --color-brand-primaryHover-rgb: ${hexToRgb(hoverColor)};\n`
-      }
-      if (colors.brand.secondary) {
-        css += `  --color-brand-secondary: ${colors.brand.secondary};\n`
-        css += `  --color-brand-secondary-rgb: ${hexToRgb(colors.brand.secondary)};\n`
-      }
-      if (colors.brand.accent) {
-        css += `  --color-brand-accent: ${colors.brand.accent};\n`
-        css += `  --color-brand-accent-rgb: ${hexToRgb(colors.brand.accent)};\n`
-      }
-    }
-
-    // Neutral colors
-    if (colors?.neutral) {
-      const neutralMap: Record<string, string> = {
-        '50': 'background',
-        '100': 'muted',
-        '200': 'border',
-        '900': 'foreground'
-      }
-      Object.entries(neutralMap).forEach(([key, name]) => {
-        if (colors.neutral[key]) {
-          css += `  --color-neutral-${name}: ${colors.neutral[key]};\n`
-          css += `  --color-neutral-${name}-rgb: ${hexToRgb(colors.neutral[key])};\n`
-        }
-      })
-    }
-
-    // Fonts
-    if (typography?.fontHeading) {
-      css += `  --font-heading: '${typography.fontHeading}', sans-serif;\n`
-    }
-    if (typography?.fontBody) {
-      css += `  --font-body: '${typography.fontBody}', sans-serif;\n`
-    }
-
-    css += '}\n'
-    return css
+    // Import dynamically to avoid SSR issues
+    const { generateDesignTokensCSS } = require('@/lib/css/design-tokens')
+    return generateDesignTokensCSS(designVariables)
   }, [designVariables])
 
   // Combine page HTML with global header/footer and inject menus
@@ -1483,8 +1436,11 @@ export function LivePreview() {
   return (
     <div
       onClick={handleContainerClick}
-      className="h-full w-full bg-zinc-950 flex items-center justify-center overflow-auto"
+      className="h-full w-full bg-zinc-950 flex items-center justify-center overflow-auto relative"
     >
+      {/* Wireframe Build Animation während AI generiert */}
+      <FullPageWireframe isActive={isCurrentlyStreaming} />
+
       <div
         className={`h-full transition-all duration-300 ${isResponsive ? 'my-4 rounded-lg overflow-hidden shadow-2xl border border-zinc-700' : ''}`}
         style={{

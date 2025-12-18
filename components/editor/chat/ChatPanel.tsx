@@ -48,14 +48,15 @@ import {
   Link,
   MessageSquare,
   Plus,
+  ImageIcon,
 } from 'lucide-react'
 
 export function ChatPanel() {
   const [input, setInput] = useState('')
   const [selectedModel, setSelectedModel] = useState({
-    name: 'Gemini 3 Pro',
-    id: 'gemini-3-pro-preview',
-    description: 'Neuestes Model'
+    name: 'Gemini 3 Flash',
+    id: 'gemini-3-flash-preview',
+    description: 'Schnell & günstig'
   })
   const [promptBuilderOpen, setPromptBuilderOpen] = useState(false)
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false)
@@ -67,7 +68,6 @@ export function ChatPanel() {
   const [designDialogOpen, setDesignDialogOpen] = useState(false)
   const [suggestedTokens, setSuggestedTokens] = useState<SuggestedTokens | null>(null)
   const [detectedFonts, setDetectedFonts] = useState<DetectedFont[]>([])
-  const [hasCheckedDesignTokens, setHasCheckedDesignTokens] = useState(false)
 
   // Global Components Dialog State
   const [globalComponentsDialogOpen, setGlobalComponentsDialogOpen] = useState(false)
@@ -78,10 +78,13 @@ export function ChatPanel() {
   // Site Setup Modal State (NEU: Unified Setup)
   const [siteSetupModalOpen, setSiteSetupModalOpen] = useState(false)
   const [siteSetupPrompt, setSiteSetupPrompt] = useState('')
+  const [siteSetupImages, setSiteSetupImages] = useState<Array<{ base64: string; mimeType: string }>>([])
 
   // Thinking Mode State
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [currentThinking, setCurrentThinking] = useState('')
+  // Generation phase: 'idle' | 'thinking' | 'building'
+  const [generationPhase, setGenerationPhase] = useState<'idle' | 'thinking' | 'building'>('idle')
 
   // Streaming Progress State
   const [streamingStats, setStreamingStats] = useState<{
@@ -94,6 +97,10 @@ export function ChatPanel() {
   const [googleSearchEnabled, setGoogleSearchEnabled] = useState(false)
   const [codeExecutionEnabled, setCodeExecutionEnabled] = useState(false)
   const [detectedUrls, setDetectedUrls] = useState<string[]>([])
+
+  // Image Upload State
+  const [uploadedImages, setUploadedImages] = useState<Array<{ file: File; preview: string; base64: string }>>([])
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   // @-Reference System State (erweitert für alle Referenz-Typen)
   const [showReferenceDropdown, setShowReferenceDropdown] = useState(false)
@@ -139,11 +146,9 @@ export function ChatPanel() {
   const [retryCount, setRetryCount] = useState(0)
   const maxRetries = 1
 
-  // Wireframe Animation State
-  const [activeOperation, setActiveOperation] = useState<{
-    type: string
-    sectionId?: string
-  } | null>(null)
+  // Wireframe Animation State (from store for LivePreview access)
+  const activeBuildSection = useEditorStore((s) => s.activeBuildSection)
+  const setActiveBuildSection = useEditorStore((s) => s.setActiveBuildSection)
 
   // Reset isSending and animation when generation completes
   useEffect(() => {
@@ -152,9 +157,9 @@ export function ChatPanel() {
         setIsSending(false)
       }
       // Reset wireframe animation
-      setActiveOperation(null)
+      setActiveBuildSection(null)
     }
-  }, [isGenerating, isSending])
+  }, [isGenerating, isSending, setActiveBuildSection])
 
   // Cleanup abort controller on unmount
   useEffect(() => {
@@ -391,14 +396,16 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
 
   // Store enhanced prompt for API (not shown in chat)
   const enhancedPromptRef = useRef<string | null>(null)
+  // Store images for API (from setup flow)
+  const storedImagesRef = useRef<Array<{ base64: string; mimeType: string }> | null>(null)
 
   // Handle send with setup data (after setup modal)
-  const handleSendWithSetup = async (enhancedPrompt: string, originalPrompt: string) => {
-    // Mark that design tokens are now set
-    setHasCheckedDesignTokens(true)
+  const handleSendWithSetup = async (enhancedPrompt: string, originalPrompt: string, images?: Array<{ base64: string; mimeType: string }>) => {
     // Store enhanced prompt for API call
     enhancedPromptRef.current = enhancedPrompt
-    // Show original prompt in chat, but use enhanced prompt for API
+    // Store images for API call
+    storedImagesRef.current = images || null
+    // Show original prompt in chat, but use enhanced prompt for API (skipSetup = true)
     await handleSend(originalPrompt, true)
   }
 
@@ -419,34 +426,43 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
 
   const handleSend = async (promptOverride?: string, skipSetup?: boolean) => {
     const promptToSend = promptOverride || input.trim()
-    if (!promptToSend || isGenerating || isSending) return
+    const hasFiles = uploadedImages.length > 0
+
+    // Allow sending with just files (no text required)
+    if ((!promptToSend && !hasFiles) || isGenerating || isSending) return
 
     // Immediately set sending state to prevent double-clicks
     setIsSending(true)
 
-    // NEU: Prüfe ob Setup nötig ist (nur bei erstem Prompt ohne Custom Tokens)
+    // Prüfe ob Setup nötig ist (prüft ob Custom-Tokens existieren)
     // skipSetup = true wenn wir vom Setup Modal kommen
-    if (!skipSetup && !hasCheckedDesignTokens && siteId) {
+    if (!skipSetup && siteId) {
       const needsSetup = await checkIfNeedsSetup()
       if (needsSetup) {
-        setHasCheckedDesignTokens(true)
+        // Speichere Bilder für Setup-Analyse und späteren Generate-Request
+        const imagesForSetup = uploadedImages.map(img => ({
+          base64: img.base64,
+          mimeType: img.file.type,
+        }))
+
         setInput('')
+        setUploadedImages([]) // Clear UI
 
-        // Zeige Chat-Nachricht mit Setup-Button
-        addMessage({ role: 'user', content: promptToSend })
-        addMessage({
-          role: 'assistant',
-          content: `Ich habe deine Anfrage analysiert und Vorschläge für Seiten, Farben und Schriften vorbereitet.
+        // Zeige User-Nachricht (mit Hinweis auf Dateien)
+        const displayContent = hasFiles
+          ? `${promptToSend}\n\n[${uploadedImages.length} Datei(en) angehängt]`
+          : promptToSend
+        addMessage({ role: 'user', content: displayContent })
 
-<setup-button prompt="${encodeURIComponent(promptToSend)}">Website Setup öffnen</setup-button>`,
-        })
-
-        // Speichere Prompt für späteren Zugriff
+        // Speichere Prompt UND Bilder, öffne Setup Modal
         setSiteSetupPrompt(promptToSend)
+        setSiteSetupImages(imagesForSetup)
+        setSiteSetupModalOpen(true)
+        setIsSending(false)
 
         return // Stoppe hier - Generierung erfolgt nach Setup
       }
-      setHasCheckedDesignTokens(true)
+      // needsSetup = false → Custom-Tokens existieren bereits, weiter mit Generierung
     }
 
     // Store prompt for later use in component detection
@@ -513,6 +529,26 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
       }
       abortControllerRef.current = new AbortController()
 
+      // Prepare images for API (base64 with mimeType)
+      // Use storedImagesRef if available (from setup flow), otherwise use uploadedImages
+      let imagesToSend: Array<{ base64: string; mimeType: string }> | undefined
+
+      if (storedImagesRef.current && storedImagesRef.current.length > 0) {
+        // Images from setup flow
+        imagesToSend = storedImagesRef.current
+        storedImagesRef.current = null // Clear after use
+        console.log(`[AI] Using ${imagesToSend.length} stored image(s) from setup flow`)
+      } else if (uploadedImages.length > 0) {
+        // Images from direct upload
+        imagesToSend = uploadedImages.map(img => ({
+          base64: img.base64,
+          mimeType: img.file.type,
+        }))
+      }
+
+      // Clear uploaded images after preparing them
+      setUploadedImages([])
+
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -529,6 +565,8 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
           // Gemini Tools
           googleSearchEnabled,
           codeExecutionEnabled,
+          // Images for multimodal
+          images: imagesToSend,
         }),
         signal: abortControllerRef.current.signal,
       })
@@ -568,6 +606,10 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
               if (data.type === 'thinking') {
                 // Accumulate thinking content
                 setCurrentThinking(prev => prev + data.content)
+                // Set phase to thinking
+                if (generationPhase !== 'thinking') {
+                  setGenerationPhase('thinking')
+                }
               }
 
               // Handle Google Search results
@@ -597,11 +639,17 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                 }
                 console.log('[Function Call]', data.name, data.args)
 
-                // Activate wireframe build animation
-                setActiveOperation({
-                  type: data.name,
-                  sectionId: data.args?.section_id as string || undefined,
-                })
+                // Switch from thinking to building phase
+                setGenerationPhase('building')
+
+                // Activate section highlight in preview
+                const sectionId = data.args?.section_id as string || undefined
+                if (sectionId) {
+                  setActiveBuildSection({
+                    id: sectionId,
+                    operation: data.name,
+                  })
+                }
 
                 // Show the message to user during streaming
                 const message = data.args?.message as string || 'Verarbeite...'
@@ -783,6 +831,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                       }
                       setGenerating(false)
                       setCurrentThinking('')
+                      setGenerationPhase('idle')
                       return
                     }
 
@@ -816,6 +865,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                       }
                       setGenerating(false)
                       setCurrentThinking('')
+                      setGenerationPhase('idle')
                       return
                     }
 
@@ -834,6 +884,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                       }
                       setGenerating(false)
                       setCurrentThinking('')
+                      setGenerationPhase('idle')
                       return
                     }
 
@@ -870,6 +921,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                       }
                       setGenerating(false)
                       setCurrentThinking('')
+                      setGenerationPhase('idle')
                       return
                     }
 
@@ -1028,6 +1080,7 @@ Der Header und Footer werden automatisch erkannt und als wiederverwendbare Kompo
                       }
                       setGenerating(false)
                       setCurrentThinking('')
+                      setGenerationPhase('idle')
                       return
                     }
 
@@ -1296,6 +1349,7 @@ document.addEventListener('DOMContentLoaded', function() {
                       }
                       setGenerating(false)
                       setCurrentThinking('')
+                      setGenerationPhase('idle')
                       return
                     }
 
@@ -1353,14 +1407,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Global Components Detection (für neue Seiten)
                     if (functionCall.name === 'create_full_page') {
                       const extracted = extractGlobalComponents(finalHtml)
+                      console.log('[Global Components] Extraction result:', {
+                        hasHeader: !!extracted.header,
+                        headerConfidence: extracted.header?.confidence,
+                        hasFooter: !!extracted.footer,
+                        footerConfidence: extracted.footer?.confidence,
+                      })
+
                       const hasNewHeader = extracted.header && extracted.header.confidence >= 50
                       const hasNewFooter = extracted.footer && extracted.footer.confidence >= 50
 
                       if (hasNewHeader || hasNewFooter) {
+                        console.log('[Global Components] Opening dialog for:', {
+                          header: hasNewHeader,
+                          footer: hasNewFooter,
+                        })
                         setDetectedHeader(hasNewHeader ? extracted.header : null)
                         setDetectedFooter(hasNewFooter ? extracted.footer : null)
                         setPendingFinalHtml(finalHtml)
                         setGlobalComponentsDialogOpen(true)
+                      } else {
+                        console.log('[Global Components] No components detected with sufficient confidence')
                       }
                     }
 
@@ -1380,6 +1447,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                   setGenerating(false)
                   setCurrentThinking('')
+                  setGenerationPhase('idle')
                   return
                 }
 
@@ -1416,6 +1484,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                   setGenerating(false)
                   setCurrentThinking('')
+                  setGenerationPhase('idle')
                   return // Stoppe hier - Updates werden via Preview/Apply behandelt
                 }
 
@@ -1606,6 +1675,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     } finally {
       setGenerating(false)
+      setGenerationPhase('idle')
       // Clear abort controller reference
       abortControllerRef.current = null
       // Reset retry count on completion (success or final failure)
@@ -1679,6 +1749,49 @@ document.addEventListener('DOMContentLoaded', function() {
     ))
   }
 
+  // Image upload handlers
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const newImages = await Promise.all(
+      files.slice(0, 4).map(async (file) => { // Max 4 images
+        const preview = URL.createObjectURL(file)
+        const base64 = await fileToBase64(file)
+        return { file, preview, base64 }
+      })
+    )
+
+    setUploadedImages(prev => [...prev, ...newImages].slice(0, 4))
+    // Reset input so same file can be selected again
+    if (imageInputRef.current) {
+      imageInputRef.current.value = ''
+    }
+  }
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => {
+        const result = reader.result as string
+        // Remove data:image/xxx;base64, prefix
+        const base64 = result.split(',')[1]
+        resolve(base64)
+      }
+      reader.onerror = error => reject(error)
+    })
+  }
+
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => {
+      const newImages = [...prev]
+      URL.revokeObjectURL(newImages[index].preview)
+      newImages.splice(index, 1)
+      return newImages
+    })
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Handle reference dropdown (keyboard navigation handled in ReferenceDropdown)
     if (showReferenceDropdown) {
@@ -1703,10 +1816,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Models with thinking support flag
   const models = [
-    { name: 'Gemini 3 Pro', id: 'gemini-3-pro-preview', description: 'Neuestes Model', supportsThinking: true },
-    { name: 'Gemini 2.5 Flash', id: 'gemini-2.5-flash', description: 'Smart & Thinking', supportsThinking: true },
-    { name: 'Gemini 2.5 Pro', id: 'gemini-2.5-pro', description: 'Bestes Model', supportsThinking: true },
-    { name: 'Gemini 2.0 Flash', id: 'gemini-2.0-flash', description: 'Sehr schnell', supportsThinking: false },
+    { name: 'Gemini 3 Flash', id: 'gemini-3-flash-preview', description: 'Schnell & günstig', supportsThinking: true },
+    { name: 'Gemini 3 Pro', id: 'gemini-3-pro-preview', description: 'Bestes Model', supportsThinking: true },
   ]
 
   // Check if current model supports thinking
@@ -1739,9 +1850,9 @@ document.addEventListener('DOMContentLoaded', function() {
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden relative">
         {/* Wireframe Build Animation Overlay */}
         <WireframeBuildAnimation
-          isActive={activeOperation !== null}
-          operationType={activeOperation?.type}
-          sectionId={activeOperation?.sectionId}
+          isActive={activeBuildSection !== null}
+          operationType={activeBuildSection?.operation}
+          sectionId={activeBuildSection?.id}
         />
         <div className="p-4 space-y-6 min-w-0">
           {/* Empty State */}
@@ -1788,7 +1899,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 {/* Show Thinking BEFORE the streaming assistant response */}
                 {showThinkingBeforeThis && (
                   <div className="mb-4">
-                    <ThinkingDisplay content={currentThinking} isComplete={!!message.content} />
+                    <ThinkingDisplay content={currentThinking} isComplete={!!message.content} phase={generationPhase} />
                   </div>
                 )}
                 <ChatMessage
@@ -1833,6 +1944,52 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
           )}
 
+          {/* Uploaded Files Preview (Images & PDFs) */}
+          {uploadedImages.length > 0 && (
+            <div className="flex gap-2 px-3 py-2 border-b border-zinc-200 dark:border-zinc-700">
+              {uploadedImages.map((file, index) => (
+                <div key={index} className="relative group">
+                  {file.file.type === 'application/pdf' ? (
+                    <div className="h-16 w-16 flex flex-col items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-red-50 dark:bg-red-900/20">
+                      <FileText className="h-6 w-6 text-red-500" />
+                      <span className="text-[10px] text-red-500 mt-1">PDF</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={file.preview}
+                      alt={`Upload ${index + 1}`}
+                      className="h-16 w-16 object-cover rounded-lg border border-zinc-200 dark:border-zinc-700"
+                    />
+                  )}
+                  <button
+                    onClick={() => removeImage(index)}
+                    className="absolute -top-1.5 -right-1.5 p-0.5 bg-zinc-800 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {uploadedImages.length < 4 && (
+                <button
+                  onClick={() => imageInputRef.current?.click()}
+                  className="h-16 w-16 flex items-center justify-center border-2 border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-400 hover:border-zinc-400 hover:text-zinc-500 transition-colors cursor-pointer"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Hidden file input - supports images and PDFs */}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*,application/pdf"
+            multiple
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+
           {/* Textarea */}
           <div className="relative">
             <textarea
@@ -1840,7 +1997,7 @@ document.addEventListener('DOMContentLoaded', function() {
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Beschreibe Änderungen..."
+              placeholder="Beschreibe Änderungen oder lade ein Bild hoch..."
               rows={2}
               disabled={isGenerating}
               className="w-full px-3 py-3 text-sm bg-transparent border-0 resize-none focus:outline-none focus:ring-0 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-zinc-800 dark:text-zinc-200 disabled:opacity-50"
@@ -1935,12 +2092,20 @@ document.addEventListener('DOMContentLoaded', function() {
               >
                 <Code className="h-4 w-4" />
               </button>
+
+              <button
+                onClick={() => imageInputRef.current?.click()}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${uploadedImages.length > 0 ? 'text-blue-500 bg-blue-100 dark:bg-blue-900/40' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                title="Bild oder PDF hochladen"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Send Button */}
             <button
               onClick={() => handleSend()}
-              disabled={(!input.trim() && selectedReferences.length === 0) || isGenerating || isSending}
+              disabled={(!input.trim() && selectedReferences.length === 0 && uploadedImages.length === 0) || isGenerating || isSending}
               className="p-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:bg-zinc-300 dark:disabled:bg-zinc-600 disabled:text-zinc-500 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed"
             >
               {(isGenerating || isSending) ? (
@@ -2051,7 +2216,8 @@ document.addEventListener('DOMContentLoaded', function() {
         open={siteSetupModalOpen}
         onOpenChange={setSiteSetupModalOpen}
         initialPrompt={siteSetupPrompt}
-        onGenerate={async (data: SiteSetupData, originalPrompt: string) => {
+        initialImages={siteSetupImages}
+        onGenerate={async (data: SiteSetupData, originalPrompt: string, images) => {
           if (!siteId) return
 
           try {
@@ -2216,10 +2382,11 @@ Disallow: /wp-includes/`
             // Der Prompt enthält alle Setup-Infos inkl. Header/Footer Anforderungen
             const enhancedPrompt = buildEnhancedPromptWithHeaderFooter(originalPrompt, data)
             setSiteSetupModalOpen(false)
+            setSiteSetupImages([]) // Clear stored images
 
             // Starte Generierung - Original-Prompt wird im Chat angezeigt,
-            // Enhanced-Prompt wird intern an die API geschickt
-            await handleSendWithSetup(enhancedPrompt, originalPrompt)
+            // Enhanced-Prompt wird intern an die API geschickt, MIT Bildern
+            await handleSendWithSetup(enhancedPrompt, originalPrompt, images)
 
           } catch (error: any) {
             console.error('Error completing site setup:', error?.message || error)
@@ -2285,48 +2452,72 @@ function StreamingStatus({ stats }: { stats: { startTime: number; charCount: num
 /**
  * ThinkingDisplay - Shows AI reasoning process during generation
  */
-function ThinkingDisplay({ content, isComplete }: { content: string; isComplete?: boolean }) {
+function ThinkingDisplay({
+  content,
+  isComplete,
+  phase
+}: {
+  content: string
+  isComplete?: boolean
+  phase?: 'idle' | 'thinking' | 'building'
+}) {
   const [isExpanded, setIsExpanded] = useState(true)
 
-  // Auto-collapse when thinking is complete and response starts
+  // Auto-collapse when thinking is complete and building starts
   useEffect(() => {
-    if (isComplete) {
+    if (isComplete || phase === 'building') {
       setIsExpanded(false)
     }
-  }, [isComplete])
+  }, [isComplete, phase])
+
+  const isBuilding = phase === 'building'
+  const isDone = phase === 'idle' && isComplete
 
   return (
-    <div className={`border rounded-xl overflow-hidden transition-all ${isComplete
-      ? 'border-purple-200/50 bg-purple-50/30'
-      : 'border-purple-300 bg-purple-50/50 shadow-sm'
-      }`}>
-      {/* Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-2 bg-purple-100/50 hover:bg-purple-100 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Brain className={`h-4 w-4 text-purple-600 ${!isComplete ? 'animate-pulse' : ''}`} />
-          <span className="text-sm font-medium text-purple-700">
-            {isComplete ? 'AI hat nachgedacht' : 'AI denkt nach...'}
-          </span>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="h-4 w-4 text-purple-500" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-purple-500" />
-        )}
-      </button>
+    <div className="space-y-2">
+      {/* Thinking Section */}
+      <div className={`border rounded-xl overflow-hidden transition-all ${isDone || isBuilding
+        ? 'border-purple-200/50 bg-purple-50/30'
+        : 'border-purple-300 bg-purple-50/50 shadow-sm'
+        }`}>
+        {/* Header */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full flex items-center justify-between px-4 py-2 bg-purple-100/50 hover:bg-purple-100 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Brain className={`h-4 w-4 text-purple-600 ${phase === 'thinking' ? 'animate-pulse' : ''}`} />
+            <span className="text-sm font-medium text-purple-700">
+              {phase === 'thinking' ? 'AI denkt nach...' : 'AI hat nachgedacht ✓'}
+            </span>
+          </div>
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4 text-purple-500" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-purple-500" />
+          )}
+        </button>
 
-      {/* Content */}
-      {isExpanded && (
-        <div className="px-4 py-3 max-h-48 overflow-y-auto">
-          <p className="text-sm text-purple-900/80 whitespace-pre-wrap leading-relaxed">
-            {content}
-            {!isComplete && (
-              <span className="inline-block w-1.5 h-4 bg-purple-500 animate-pulse ml-0.5 align-middle" />
-            )}
-          </p>
+        {/* Content */}
+        {isExpanded && (
+          <div className="px-4 py-3 max-h-48 overflow-y-auto">
+            <p className="text-sm text-purple-900/80 whitespace-pre-wrap leading-relaxed">
+              {content}
+              {phase === 'thinking' && (
+                <span className="inline-block w-1.5 h-4 bg-purple-500 animate-pulse ml-0.5 align-middle" />
+              )}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Building Indicator - shows after thinking */}
+      {isBuilding && (
+        <div className="border border-blue-300 bg-blue-50/50 rounded-xl px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-blue-600 animate-pulse" />
+            <span className="text-sm font-medium text-blue-700">AI baut Website...</span>
+          </div>
         </div>
       )}
     </div>

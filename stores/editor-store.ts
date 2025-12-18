@@ -18,6 +18,7 @@ import type {
 import type { MenuWithItems, MenuItem } from '@/types/menu'
 import type { DesignVariables } from '@/types/cms'
 import { insertGlobalComponents, removeHeaderFooterFromHtml, sanitizeHtmlForGlobalComponents } from '@/lib/ai/html-operations'
+import { extractAndFilterCSS } from '@/lib/css/extract-css'
 
 const MAX_HISTORY = 50
 
@@ -251,6 +252,7 @@ const initialState: EditorStateWithMenus = {
   selectedElement: null,
   messages: [],
   isGenerating: false,
+  activeBuildSection: null as { id: string; operation: string } | null,
   history: [],
   historyIndex: -1,
   hasUnsavedChanges: false,
@@ -604,8 +606,42 @@ export const useEditorStore = create<EditorStateWithMenus & EditorActions>()(
       })
     },
 
-    applyGeneratedHtml: (html: string) => {
+    applyGeneratedHtml: async (html: string) => {
+      const state = get()
+
+      // Extract CSS from <style> tags and filter out design tokens
+      // Design tokens are managed globally, custom CSS (keyframes, classes) is saved per page
+      const { customCSS, cleanedHTML, filteredTokens } = extractAndFilterCSS(html)
+
+      if (filteredTokens.length > 0) {
+        console.log('[Apply] Filtered design tokens from CSS:', filteredTokens)
+      }
+      if (customCSS) {
+        console.log('[Apply] Extracted custom CSS, length:', customCSS.length)
+      }
+
+      // Update HTML in editor (keep original with inline styles for preview)
       get().updateHtml(html, true)
+
+      // Save custom_css to database if we have a pageId
+      if (state.pageId && customCSS) {
+        try {
+          const supabase = createClient()
+          // Type assertion needed because custom_css column may not be in generated types yet
+          const { error } = await supabase
+            .from('pages')
+            .update({ custom_css: customCSS } as Record<string, unknown>)
+            .eq('id', state.pageId)
+
+          if (error) {
+            console.error('[Apply] Failed to save custom CSS:', error)
+          } else {
+            console.log('[Apply] Custom CSS saved to database')
+          }
+        } catch (err) {
+          console.error('[Apply] Error saving custom CSS:', err)
+        }
+      }
     },
 
     // ============================================
@@ -748,6 +784,12 @@ export const useEditorStore = create<EditorStateWithMenus & EditorActions>()(
     setGenerating: (isGenerating: boolean) => {
       set((state) => {
         state.isGenerating = isGenerating
+      })
+    },
+
+    setActiveBuildSection: (section: { id: string; operation: string } | null) => {
+      set((state) => {
+        state.activeBuildSection = section
       })
     },
 
@@ -1243,6 +1285,7 @@ export const useEditorStore = create<EditorStateWithMenus & EditorActions>()(
 )
 
 // Default HTML for new pages (empty - AI will generate content)
+// Uses bg-background which references the CSS variable from design tokens
 function getDefaultHtml(): string {
   return `<!DOCTYPE html>
 <html lang="de">
@@ -1251,7 +1294,7 @@ function getDefaultHtml(): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-white">
+<body class="bg-background text-foreground">
 </body>
 </html>`
 }

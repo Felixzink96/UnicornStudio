@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! })
 
@@ -209,7 +209,11 @@ Erstelle Designs die:
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt } = await request.json()
+    const body = await request.json()
+    const { prompt, images } = body as {
+      prompt: string
+      images?: Array<{ base64: string; mimeType: string }>
+    }
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json(
@@ -218,9 +222,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Build content parts (images first, then text)
+    const contentParts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = []
+
+    // Add images/PDFs if present
+    if (images && images.length > 0) {
+      for (const img of images) {
+        contentParts.push({
+          inlineData: {
+            data: img.base64,
+            mimeType: img.mimeType,
+          }
+        })
+      }
+      console.log(`[Setup] Analyzing ${images.length} file(s) for setup suggestions`)
+    }
+
+    // Add text prompt
+    contentParts.push({
+      text: `${SYSTEM_PROMPT}\n\nGeneriere Setup-Vorschläge für folgende Website:\n\n${prompt}${images?.length ? '\n\nAnalysiere auch die hochgeladenen Bilder/PDFs und extrahiere Farben, Stil und Struktur daraus!' : ''}`
+    })
+
     const model = genAI.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: `${SYSTEM_PROMPT}\n\nGeneriere Setup-Vorschläge für folgende Website:\n\n${prompt}`,
+      model: 'gemini-3-flash-preview',
+      contents: contentParts,
+      config: {
+        // Enable thinking for better analysis
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.HIGH,
+        },
+      },
     })
 
     const response = await model

@@ -34,7 +34,7 @@ Benutzer-Anfrage: ${prompt}
 Gib das komplette HTML der Seite zurück mit dem modifizierten Element:`
 
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash-preview',
       contents: systemPrompt,
     })
 

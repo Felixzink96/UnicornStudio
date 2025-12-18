@@ -39,6 +39,7 @@ export async function getPageBySlug(siteId: string, slug: string) {
 }
 
 // Default HTML for new pages (empty - AI will generate content)
+// Uses bg-background which references the CSS variable from design tokens
 const DEFAULT_HTML = `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -46,7 +47,7 @@ const DEFAULT_HTML = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-white">
+<body class="bg-background text-foreground">
 </body>
 </html>`
 

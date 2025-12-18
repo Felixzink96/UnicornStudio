@@ -655,7 +655,19 @@ export function extractGlobalComponents(html: string): ExtractedGlobalComponents
 
   // Extract header from HTML
   if (header) {
-    const headerMatch = html.match(/<header[^>]*>[\s\S]*?<\/header>/i)
+    // Try <header> tag first
+    let headerMatch = html.match(/<header[^>]*>[\s\S]*?<\/header>/i)
+
+    // If no <header>, try <nav> with header indicators (fixed, sticky, top-0)
+    if (!headerMatch) {
+      headerMatch = html.match(/<nav[^>]*(?:class="[^"]*(?:fixed|sticky)[^"]*"|id="(?:header|nav|navigation)")[^>]*>[\s\S]*?<\/nav>/i)
+    }
+
+    // Try div with header ID
+    if (!headerMatch) {
+      headerMatch = html.match(/<div[^>]*id="(?:header|main-header|site-header)"[^>]*>[\s\S]*?<\/div>/i)
+    }
+
     if (headerMatch) {
       // Remove header from content HTML
       contentHtml = contentHtml.replace(headerMatch[0], '').trim()

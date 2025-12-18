@@ -345,7 +345,7 @@ export function ChatMessage({ message, onOpenSetup }: ChatMessageProps) {
         if (bodyMatch) {
           finalHtml = html.replace(
             /<body[^>]*>[\s\S]*<\/body>/,
-            `<body class="bg-white">\n${htmlToApply}\n</body>`
+            `<body class="bg-background text-foreground">\n${htmlToApply}\n</body>`
           )
         } else {
           finalHtml = htmlToApply

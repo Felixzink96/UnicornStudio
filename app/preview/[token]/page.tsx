@@ -462,7 +462,7 @@ export default function PreviewPage() {
 
     // CSS to hide editor artifacts and selection outlines
     const previewCss = `
-      /* Hide editor-specific styles */
+      /* Hide ALL editor-specific styles */
       [data-element-id],
       [data-section-id],
       [contenteditable] {
@@ -486,6 +486,61 @@ export default function PreviewPage() {
       .section-overlay {
         display: none !important;
       }
+      /* Hide all unicorn editor classes */
+      .unicorn-hover-outline,
+      .unicorn-selected,
+      .unicorn-editing,
+      .unicorn-badge,
+      .unicorn-spacing-top,
+      .unicorn-spacing-right,
+      .unicorn-spacing-bottom,
+      .unicorn-spacing-left,
+      .unicorn-layout-overlay {
+        outline: none !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .unicorn-badge,
+      .unicorn-spacing-top,
+      .unicorn-spacing-right,
+      .unicorn-spacing-bottom,
+      .unicorn-spacing-left,
+      .unicorn-layout-overlay {
+        display: none !important;
+      }
+      /* Remove any pointer-events blocking */
+      * {
+        pointer-events: auto !important;
+      }
+    `
+
+    // Script to clean up any editor artifacts that might have been saved
+    const cleanupScript = `
+      <script>
+        (function() {
+          // Remove editor-specific attributes
+          var editorAttrs = ['data-element-id', 'data-section-id', 'contenteditable', 'data-selected', 'data-hovered'];
+          editorAttrs.forEach(function(attr) {
+            document.querySelectorAll('[' + attr + ']').forEach(function(el) {
+              el.removeAttribute(attr);
+            });
+          });
+
+          // Remove editor-specific classes
+          var editorClasses = ['unicorn-hover-outline', 'unicorn-selected', 'unicorn-editing',
+            'editing-outline', 'selection-outline', 'hover-outline'];
+          editorClasses.forEach(function(cls) {
+            document.querySelectorAll('.' + cls).forEach(function(el) {
+              el.classList.remove(cls);
+            });
+          });
+
+          // Remove any badge elements that shouldn't exist
+          document.querySelectorAll('.unicorn-badge, .unicorn-spacing-top, .unicorn-spacing-right, .unicorn-spacing-bottom, .unicorn-spacing-left, .unicorn-layout-overlay').forEach(function(el) {
+            el.remove();
+          });
+        })();
+      </script>
     `
 
     // Script to handle link clicks - external links need confirmation
@@ -535,7 +590,7 @@ export default function PreviewPage() {
         .replace(/<body[^>]*>/, `$&\n${headerHtml}`)
         .replace(/<\/body>/, `${footerHtml}\n</body>`)
         .replace(/<\/head>/, `<style>${combinedCss}</style>\n</head>`)
-        .replace(/<\/body>/, `${linkHandlerScript}\n<script>${combinedJs}</script>\n</body>`)
+        .replace(/<\/body>/, `${cleanupScript}\n${linkHandlerScript}\n<script>${combinedJs}</script>\n</body>`)
     }
 
     // Otherwise wrap in full HTML
@@ -550,6 +605,7 @@ export default function PreviewPage() {
   ${headerHtml}
   ${pageContent}
   ${footerHtml}
+  ${cleanupScript}
   ${linkHandlerScript}
   <script>${combinedJs}</script>
 </body>

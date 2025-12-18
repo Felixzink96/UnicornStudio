@@ -200,30 +200,72 @@ export function detectComponentType(html: string): ComponentPosition {
 export function analyzeHtmlForComponents(html: string): DetectedComponent[] {
   const components: DetectedComponent[] = []
 
-  // Header Detection
-  const headerMatch = html.match(/<header[^>]*>[\s\S]*?<\/header>/i)
-  if (headerMatch) {
-    components.push({
-      type: 'header',
-      confidence: detectHeader(headerMatch[0]).confidence,
-      html: headerMatch[0],
-      suggestedName: 'Global Header',
-    })
+  // Helper: Find matching closing tag (handles nested tags)
+  const findClosingTag = (content: string, tagName: string, startIndex: number): number => {
+    let depth = 1
+    const openTag = new RegExp(`<${tagName}[^>]*>`, 'gi')
+    const closeTag = new RegExp(`</${tagName}>`, 'gi')
+
+    let searchPos = startIndex
+    while (depth > 0 && searchPos < content.length) {
+      openTag.lastIndex = searchPos
+      closeTag.lastIndex = searchPos
+
+      const nextOpen = openTag.exec(content)
+      const nextClose = closeTag.exec(content)
+
+      if (!nextClose) break
+
+      if (nextOpen && nextOpen.index < nextClose.index) {
+        depth++
+        searchPos = nextOpen.index + nextOpen[0].length
+      } else {
+        depth--
+        if (depth === 0) {
+          return nextClose.index + nextClose[0].length
+        }
+        searchPos = nextClose.index + nextClose[0].length
+      }
+    }
+    return -1
   }
 
-  // Footer Detection
-  const footerMatch = html.match(/<footer[^>]*>[\s\S]*?<\/footer>/i)
-  if (footerMatch) {
-    components.push({
-      type: 'footer',
-      confidence: detectFooter(footerMatch[0]).confidence,
-      html: footerMatch[0],
-      suggestedName: 'Global Footer',
-    })
+  // Header Detection - robust for nested elements
+  const headerOpenMatch = html.match(/<header[^>]*>/i)
+  if (headerOpenMatch) {
+    const startIndex = headerOpenMatch.index! + headerOpenMatch[0].length
+    const endIndex = findClosingTag(html, 'header', startIndex)
+    if (endIndex > 0) {
+      const headerHtml = html.substring(headerOpenMatch.index!, endIndex)
+      console.log('[Component Detection] Found header, length:', headerHtml.length)
+      components.push({
+        type: 'header',
+        confidence: detectHeader(headerHtml).confidence,
+        html: headerHtml,
+        suggestedName: 'Global Header',
+      })
+    }
+  }
+
+  // Footer Detection - robust for nested elements
+  const footerOpenMatch = html.match(/<footer[^>]*>/i)
+  if (footerOpenMatch) {
+    const startIndex = footerOpenMatch.index! + footerOpenMatch[0].length
+    const endIndex = findClosingTag(html, 'footer', startIndex)
+    if (endIndex > 0) {
+      const footerHtml = html.substring(footerOpenMatch.index!, endIndex)
+      console.log('[Component Detection] Found footer, length:', footerHtml.length)
+      components.push({
+        type: 'footer',
+        confidence: detectFooter(footerHtml).confidence,
+        html: footerHtml,
+        suggestedName: 'Global Footer',
+      })
+    }
   }
 
   // Nav Detection (falls kein header tag)
-  if (!headerMatch) {
+  if (!headerOpenMatch) {
     const navMatch = html.match(/<nav[^>]*>[\s\S]*?<\/nav>/i)
     if (navMatch) {
       const result = detectHeader(navMatch[0])

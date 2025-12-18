@@ -79,18 +79,10 @@ export async function getOrCreateCache(
   try {
     console.log(`[Cache] Creating new cache for model: ${model}`)
 
-    // Gemini 3 Pro requires specific model format for caching
-    // Use the versioned model name for caching
-    const cacheModel = model.includes('gemini-3')
-      ? 'models/gemini-2.0-flash-001' // Fallback for Gemini 3 - caching not yet available
-      : `models/${model}`
-
-    // Note: Gemini 3 Pro Preview might not support caching yet
-    // In that case, we return null and the system falls back to non-cached
-    if (model.includes('gemini-3')) {
-      console.log(`[Cache] Gemini 3 Pro Preview - using implicit caching (explicit not yet available)`)
-      return null
-    }
+    // All Gemini 3 models support explicit caching:
+    // - Gemini 3 Flash: min 2,048 tokens, 90% discount
+    // - Gemini 3 Pro: min 4,096 tokens, 90% discount
+    const cacheModel = `models/${model}`
 
     const cache = await genAI.caches.create({
       model: cacheModel,

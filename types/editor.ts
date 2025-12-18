@@ -172,6 +172,9 @@ export interface EditorState {
   globalFooter: GlobalComponentData | null
   detectedGlobalComponents: DetectedGlobalComponents | null
   showGlobalComponentsDialog: boolean
+
+  // Build Animation State
+  activeBuildSection: { id: string; operation: string } | null
 }
 
 // ============================================
@@ -186,7 +189,7 @@ export interface EditorActions {
   // HTML
   setHtml: (html: string) => void
   updateHtml: (html: string, addToHistory?: boolean) => void
-  applyGeneratedHtml: (html: string) => void
+  applyGeneratedHtml: (html: string) => Promise<void>
 
   // View
   setViewMode: (mode: ViewMode) => void
@@ -238,6 +241,9 @@ export interface EditorActions {
     footerName: string | null
   ) => Promise<void>
   getHtmlWithGlobalComponents: () => string
+
+  // Build Animation
+  setActiveBuildSection: (section: { id: string; operation: string } | null) => void
 }
 
 // ============================================

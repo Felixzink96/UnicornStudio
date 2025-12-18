@@ -2,7 +2,8 @@ import { GoogleGenAI } from '@google/genai'
 import { buildSystemPrompt, type DesignTokensForAI, type GlobalComponentsForAI, type SiteIdentityForAI } from '@/lib/ai/system-prompt'
 import { createClient } from '@/lib/supabase/server'
 import { darkenHex } from '@/lib/design/style-extractor'
-import { getOrCreateCache } from '@/lib/ai/cache-manager'
+// Note: Explicit caching disabled because it's incompatible with tools (Function Calling)
+// Implicit caching via systemInstruction is used instead
 import { htmlOperationTools } from '@/lib/ai/html-tools'
 
 // Configure Google AI with longer timeout to prevent ETIMEDOUT on long generations
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { prompt, existingHtml, context, selectedElement, model: modelId, referencedPages, references, thinkingEnabled, googleSearchEnabled, codeExecutionEnabled } = body as {
+    const { prompt, existingHtml, context, selectedElement, model: modelId, referencedPages, references, thinkingEnabled, googleSearchEnabled, codeExecutionEnabled, images } = body as {
       prompt: string
       existingHtml?: string
       context?: {
@@ -124,6 +125,8 @@ export async function POST(request: Request) {
       // Gemini Tools
       googleSearchEnabled?: boolean
       codeExecutionEnabled?: boolean
+      // Images for multimodal analysis
+      images?: Array<{ base64: string; mimeType: string }>
     }
 
     // Load design tokens from database if siteId is provided
@@ -466,7 +469,7 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
     }
 
     // Always use the model selected by user in chat
-    const selectedModel = modelId || 'gemini-2.0-flash'
+    const selectedModel = modelId || 'gemini-3-flash-preview'
 
     // Build Gemini Tools array based on request settings
     const tools: Array<Record<string, unknown>> = []
@@ -476,10 +479,12 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
 
     // ONLY add HTML operation tools if no other tools are enabled
     // Gemini doesn't support mixing function calling with other tools
+    let useFunctionCalling = false
     if (!hasOtherTools) {
       tools.push({
         functionDeclarations: htmlOperationTools
       })
+      useFunctionCalling = true
       console.log('[AI] HTML Operation Tools enabled (Function Calling)')
     } else {
       console.log('[AI] Function Calling disabled - using text-based output (other tools active)')
@@ -515,55 +520,77 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
     // Add tools if any are enabled
     if (tools.length > 0) {
       config.tools = tools
-    }
 
-    // Add thinking config if enabled
-    // WICHTIG: Gemini 3 verwendet 'thinkingLevel', ältere Modelle 'thinkingBudget'
-    if (thinkingEnabled) {
-      if (selectedModel.includes('gemini-3')) {
-        // Gemini 3: thinking_level statt thinking_budget
-        // Laut Google Docs: "You cannot use both thinking_level and thinking_budget"
-        config.thinkingConfig = {
-          includeThoughts: true,
-          thinkingLevel: 'high',
+      // Force function calling when HTML tools are active
+      // This ensures AI MUST call a function instead of returning free text
+      if (useFunctionCalling) {
+        config.toolConfig = {
+          functionCallingConfig: {
+            mode: 'ANY', // AI MUST call one of the available functions
+          }
         }
-      } else {
-        // Gemini 2.5 und älter: thinking_budget
-        config.thinkingConfig = {
-          includeThoughts: true,
-          thinkingBudget: 32768,  // Erhöht von 24K auf 32K für komplexe Layouts
-        }
+        console.log('[AI] Function Calling Mode: ANY (forced)')
       }
     }
 
-    // Try to use cached system prompt for cost savings (up to 75% cheaper)
-    // Only for models that support explicit caching (Gemini 2.5)
-    let cachedContentName: string | null = null
-    const supportsExplicitCaching = selectedModel.includes('gemini-2.5') || selectedModel.includes('gemini-2.0')
-
-    if (supportsExplicitCaching) {
-      cachedContentName = await getOrCreateCache(genAI, selectedModel, systemPrompt)
-    }
-
-    // Use systemInstruction for better implicit caching on Gemini 3
-    // This keeps the system prompt separate and cacheable
-    if (cachedContentName) {
-      // Use explicit cache (Gemini 2.5)
-      config.cachedContent = cachedContentName
-      console.log(`[AI] Using cached system prompt: ${cachedContentName}`)
+    // Always enable thinking on high for best results
+    // WICHTIG: Gemini 3 verwendet 'thinkingLevel', ältere Modelle 'thinkingBudget'
+    if (selectedModel.includes('gemini-3')) {
+      // Gemini 3: thinking_level statt thinking_budget
+      config.thinkingConfig = {
+        includeThoughts: thinkingEnabled, // Nur anzeigen wenn User es will
+        thinkingLevel: 'high' as const, // Immer high für beste Qualität
+      }
     } else {
-      // Use systemInstruction for implicit caching (Gemini 3 Pro)
-      // This is the recommended way for Gemini 3 - system prompt is cached automatically
-      config.systemInstruction = systemPrompt
-      console.log(`[AI] Using systemInstruction for implicit caching`)
+      // Gemini 2.5 und älter: thinking_budget
+      config.thinkingConfig = {
+        includeThoughts: thinkingEnabled,
+        thinkingBudget: 32768,
+      }
     }
+
+    // Media resolution for image/video analysis - high for good quality/cost balance
+    // Valid values: MEDIA_RESOLUTION_LOW, MEDIA_RESOLUTION_MEDIUM, MEDIA_RESOLUTION_HIGH
+    config.mediaResolution = 'MEDIA_RESOLUTION_HIGH'
+
+    // Use systemInstruction for system prompt
+    // Note: Explicit caching (cachedContent) kann nicht mit tools kombiniert werden
+    // Da wir htmlOperationTools standardmäßig verwenden, nutzen wir implicit caching via systemInstruction
+    // Gemini cached systemInstruction automatisch bei wiederholten Anfragen
+    config.systemInstruction = systemPrompt
+
+    // Log prompt version for cache debugging
+    const versionMatch = systemPrompt.match(/PROMPT_V:\s*([^\s->]+)/)
+    const promptVersion = versionMatch ? versionMatch[1] : 'unknown'
+    console.log(`[AI] System Prompt Version: ${promptVersion}`)
+    console.log(`[AI] CACHING: ENABLED`)
+    console.log(`[AI] System Prompt Length: ${systemPrompt.length} chars`)
+
+    // Build user message parts (text + optional images)
+    const userParts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = []
+
+    // Add images first if present
+    if (images && images.length > 0) {
+      for (const img of images) {
+        userParts.push({
+          inlineData: {
+            data: img.base64,
+            mimeType: img.mimeType,
+          }
+        })
+      }
+      console.log(`[AI] Including ${images.length} image(s) in request`)
+    }
+
+    // Add text prompt
+    userParts.push({ text: userMessage })
 
     // Generate with streaming using new SDK
     const response = await genAI.models.generateContentStream({
       model: selectedModel,
       contents: [
         // Only user message - system prompt is now in config
-        { role: 'user', parts: [{ text: userMessage }] }
+        { role: 'user', parts: userParts }
       ],
       config: Object.keys(config).length > 0 ? config : undefined,
     })

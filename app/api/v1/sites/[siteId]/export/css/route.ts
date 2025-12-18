@@ -12,6 +12,8 @@ import {
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { getStoredFonts, generateExportFontFaceCSS } from '@/lib/fonts/font-storage'
+import { generateDesignTokensCSS } from '@/lib/css/design-tokens'
+import type { DesignVariables } from '@/types/cms'
 
 interface RouteParams {
   params: Promise<{ siteId: string }>
@@ -84,17 +86,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // 5. Collect all HTML content for Tailwind class extraction
     let allHtml = ''
 
-    // Pages - include both html_content and content JSON
+    // Pages - include html_content, content JSON, and custom_css
     const { data: pagesWithHtml } = await supabase
       .from('pages')
-      .select('html_content, content')
+      .select('html_content, content, custom_css')
       .eq('site_id', siteId)
 
-    pagesWithHtml?.forEach((page) => {
+    // Collect custom CSS from all pages (keyframes, custom classes, etc.)
+    let pagesCustomCSS = ''
+    // Type assertion needed because custom_css column may not exist in older schemas
+    const pages = pagesWithHtml as Array<{
+      html_content: string | null
+      content: unknown
+      custom_css?: string | null
+    }> | null
+    pages?.forEach((page) => {
       if (page.html_content) {
         allHtml += page.html_content
       }
       allHtml += JSON.stringify(page.content || {})
+      // Collect custom CSS extracted from each page
+      if (page.custom_css) {
+        pagesCustomCSS += page.custom_css + '\n\n'
+      }
     })
 
     // 6. CMS Components
@@ -170,10 +184,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // 8. Extract all CSS classes from HTML
     const extractedClasses = extractAllClasses(allHtml)
 
-    // 9. Generate CSS Variables from design tokens
-    const designVars = designVarsRes.data
-    const siteSettings = siteRes.data?.settings as Record<string, unknown> | null
-    const cssVariables = generateCSSVariables(designVars, siteSettings)
+    // 9. Generate CSS Variables from design tokens (using central function)
+    const designVars = designVarsRes.data as DesignVariables | null
+    const cssVariables = generateDesignTokensCSS(designVars)
 
     // 9.5. Get stored fonts and generate @font-face CSS
     let fontFaceCSS = ''
@@ -250,6 +263,13 @@ ${keyframesCSS}
    CUSTOM UTILITIES (animations, background-images, etc.)
    ---------------------------------------------------------------- */
 ${customUtilities}
+
+/* ----------------------------------------------------------------
+   PAGE CUSTOM CSS (extracted from AI-generated pages)
+   Includes: @keyframes, custom utility classes, page-specific styles
+   Design tokens are NOT duplicated here (managed via CSS Variables above)
+   ---------------------------------------------------------------- */
+${pagesCustomCSS}
 `.trim()
 
     // 9. Return CSS with proper headers
@@ -473,134 +493,6 @@ function extractAllClasses(html: string): Set<string> {
   }
 
   return classes
-}
-
-/**
- * Generate CSS Variables and Token Classes from design tokens
- */
-function generateCSSVariables(
-  designVars: Record<string, unknown> | null,
-  siteSettings: Record<string, unknown> | null
-): string {
-  let css = ':root {\n'
-
-  const defaults = {
-    colors: {
-      brand: { primary: '#3b82f6', secondary: '#64748b', accent: '#f59e0b' },
-      semantic: { success: '#22c55e', warning: '#f59e0b', error: '#ef4444', info: '#3b82f6' },
-      neutral: { '50': '#fafafa', '100': '#f4f4f5', '200': '#e4e4e7', '900': '#18181b' },
-    },
-    typography: { fontHeading: 'Inter', fontBody: 'Inter', fontMono: 'JetBrains Mono' },
-  }
-
-  // Colors
-  const colors = (designVars?.colors as Record<string, Record<string, string>>) || defaults.colors
-
-  if (colors.brand) {
-    Object.entries(colors.brand).forEach(([key, value]) => {
-      css += `  --color-${key}: ${value};\n`
-    })
-  }
-
-  if (colors.semantic) {
-    Object.entries(colors.semantic).forEach(([key, value]) => {
-      css += `  --color-${key}: ${value};\n`
-    })
-  }
-
-  if (colors.neutral) {
-    Object.entries(colors.neutral).forEach(([key, value]) => {
-      css += `  --color-neutral-${key}: ${value};\n`
-    })
-  }
-
-  // Site settings colors
-  if (siteSettings?.colors) {
-    const settingsColors = siteSettings.colors as Record<string, string>
-    Object.entries(settingsColors).forEach(([key, value]) => {
-      css += `  --site-${key}: ${value};\n`
-    })
-  }
-
-  // Typography
-  const typography = (designVars?.typography as Record<string, unknown>) || defaults.typography
-  css += `\n  /* Typography */\n`
-  css += `  --font-heading: '${typography.fontHeading || 'Inter'}', system-ui, sans-serif;\n`
-  css += `  --font-body: '${typography.fontBody || 'Inter'}', system-ui, sans-serif;\n`
-  css += `  --font-mono: '${typography.fontMono || 'JetBrains Mono'}', monospace;\n`
-
-  // Design Token Variables (for use in classes)
-  css += `\n  /* Design Token Variables */\n`
-
-  // Primary colors with hover variant
-  const primaryColor = colors.brand?.primary || defaults.colors.brand.primary
-  const primaryHover = darkenHexColor(primaryColor, 10)
-  css += `  --color-primary: ${primaryColor};\n`
-  css += `  --color-primary-hover: ${primaryHover};\n`
-
-  // Other token colors
-  css += `  --color-secondary: ${colors.brand?.secondary || defaults.colors.brand.secondary};\n`
-  css += `  --color-accent: ${colors.brand?.accent || defaults.colors.brand.accent};\n`
-  css += `  --color-background: ${colors.neutral?.['50'] || defaults.colors.neutral['50']};\n`
-  css += `  --color-foreground: ${colors.neutral?.['900'] || defaults.colors.neutral['900']};\n`
-  css += `  --color-muted: ${colors.neutral?.['100'] || defaults.colors.neutral['100']};\n`
-  css += `  --color-border: ${colors.neutral?.['200'] || defaults.colors.neutral['200']};\n`
-
-  css += '}\n\n'
-
-  // Generate Design Token Utility Classes
-  css += `/* Design Token Utility Classes */\n`
-  css += `/* These classes use CSS variables and update automatically when tokens change */\n\n`
-
-  // Background colors
-  css += `.bg-primary { background-color: var(--color-primary); }\n`
-  css += `.bg-primary-hover { background-color: var(--color-primary-hover); }\n`
-  css += `.hover\\:bg-primary-hover:hover { background-color: var(--color-primary-hover); }\n`
-  css += `.bg-secondary { background-color: var(--color-secondary); }\n`
-  css += `.bg-accent { background-color: var(--color-accent); }\n`
-  css += `.bg-background { background-color: var(--color-background); }\n`
-  css += `.bg-muted { background-color: var(--color-muted); }\n\n`
-
-  // Text colors
-  css += `.text-primary { color: var(--color-primary); }\n`
-  css += `.text-secondary { color: var(--color-secondary); }\n`
-  css += `.text-accent { color: var(--color-accent); }\n`
-  css += `.text-foreground { color: var(--color-foreground); }\n`
-  css += `.text-muted-foreground { color: color-mix(in srgb, var(--color-foreground) 60%, transparent); }\n\n`
-
-  // Border colors
-  css += `.border-primary { border-color: var(--color-primary); }\n`
-  css += `.border-secondary { border-color: var(--color-secondary); }\n`
-  css += `.border-border { border-color: var(--color-border); }\n\n`
-
-  // Font families
-  css += `.font-heading { font-family: var(--font-heading); }\n`
-  css += `.font-body { font-family: var(--font-body); }\n`
-  css += `.font-mono { font-family: var(--font-mono); }\n\n`
-
-  // Ring colors for focus states
-  css += `.ring-primary { --tw-ring-color: var(--color-primary); }\n`
-  css += `.focus\\:ring-primary:focus { --tw-ring-color: var(--color-primary); }\n`
-
-  return css
-}
-
-/**
- * Darken a hex color by a percentage
- */
-function darkenHexColor(hex: string, percent: number): string {
-  // Remove # if present
-  hex = hex.replace('#', '')
-
-  // Parse hex values
-  const num = parseInt(hex, 16)
-  const amt = Math.round(2.55 * percent)
-
-  const R = Math.max(0, (num >> 16) - amt)
-  const G = Math.max(0, ((num >> 8) & 0x00FF) - amt)
-  const B = Math.max(0, (num & 0x0000FF) - amt)
-
-  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)
 }
 
 /**

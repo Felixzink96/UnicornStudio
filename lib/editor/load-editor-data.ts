@@ -125,8 +125,9 @@ export async function loadEditorData(siteId: string, pageId: string): Promise<Ed
       .select('*')
       .eq('site_id', siteId)
       .single(),
-    // Menus with items
-    supabase
+    // Menus with items (table not in generated types yet)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
       .from('menus')
       .select(`
         id,

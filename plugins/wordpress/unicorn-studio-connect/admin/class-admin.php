@@ -21,6 +21,11 @@ class Unicorn_Studio_Admin {
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_scripts']);
+
+        // Add "Edit with Unicorn Studio" functionality
+        add_action('add_meta_boxes', [$this, 'add_editor_meta_box']);
+        add_filter('page_row_actions', [$this, 'add_row_action'], 10, 2);
+        add_filter('post_row_actions', [$this, 'add_row_action'], 10, 2);
     }
 
     /**
@@ -136,5 +141,145 @@ class Unicorn_Studio_Admin {
      */
     public function render_design_page() {
         include UNICORN_STUDIO_PLUGIN_DIR . 'admin/views/design.php';
+    }
+
+    /**
+     * Add meta box for Unicorn Studio editor link
+     */
+    public function add_editor_meta_box() {
+        add_meta_box(
+            'unicorn_studio_editor',
+            __('Unicorn Studio', 'unicorn-studio'),
+            [$this, 'render_editor_meta_box'],
+            'page',
+            'side',
+            'high'
+        );
+    }
+
+    /**
+     * Render the editor meta box
+     *
+     * @param WP_Post $post Current post object
+     */
+    public function render_editor_meta_box($post) {
+        $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
+        $site_id = get_option('unicorn_studio_site_id');
+        $api_url = get_option('unicorn_studio_api_url', 'http://localhost:3000/api/v1');
+
+        // Get base URL from API URL (remove /api/v1)
+        $base_url = preg_replace('/\/api\/v1\/?$/', '', $api_url);
+
+        if ($unicorn_id && $site_id) {
+            // Build editor URL with return parameter
+            $return_url = admin_url('post.php?post=' . $post->ID . '&action=edit');
+            $editor_url = $base_url . '/editor/' . $site_id . '/' . $unicorn_id . '?returnUrl=' . urlencode($return_url);
+
+            $last_sync = get_post_meta($post->ID, '_unicorn_studio_sync', true);
+            ?>
+            <div class="unicorn-studio-meta-box">
+                <p style="margin-bottom: 12px;">
+                    <a href="<?php echo esc_url($editor_url); ?>"
+                       class="button button-primary button-large"
+                       style="width: 100%; text-align: center; display: block;"
+                       target="_blank">
+                        <span class="dashicons dashicons-edit" style="margin-top: 4px;"></span>
+                        <?php esc_html_e('Mit Unicorn Studio bearbeiten', 'unicorn-studio'); ?>
+                    </a>
+                </p>
+
+                <?php if ($last_sync) : ?>
+                    <p class="description" style="margin: 0;">
+                        <small>
+                            <?php esc_html_e('Letzte Synchronisierung:', 'unicorn-studio'); ?>
+                            <br>
+                            <?php echo esc_html($last_sync); ?>
+                        </small>
+                    </p>
+                <?php endif; ?>
+            </div>
+            <?php
+        } else {
+            ?>
+            <p class="description">
+                <?php esc_html_e('Diese Seite ist nicht mit Unicorn Studio verknüpft.', 'unicorn-studio'); ?>
+            </p>
+            <p>
+                <a href="<?php echo esc_url(admin_url('admin.php?page=unicorn-studio-sync')); ?>" class="button">
+                    <?php esc_html_e('Seiten synchronisieren', 'unicorn-studio'); ?>
+                </a>
+            </p>
+            <?php
+        }
+    }
+
+    /**
+     * Add "Edit with Unicorn Studio" to page/post row actions
+     *
+     * @param array   $actions Existing actions
+     * @param WP_Post $post    Post object
+     * @return array Modified actions
+     */
+    public function add_row_action($actions, $post) {
+        // Only for pages
+        if ($post->post_type !== 'page') {
+            return $actions;
+        }
+
+        $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
+        $site_id = get_option('unicorn_studio_site_id');
+        $api_url = get_option('unicorn_studio_api_url', 'http://localhost:3000/api/v1');
+
+        if (!$unicorn_id || !$site_id) {
+            return $actions;
+        }
+
+        // Get base URL from API URL
+        $base_url = preg_replace('/\/api\/v1\/?$/', '', $api_url);
+
+        // Build editor URL with return parameter
+        $return_url = admin_url('edit.php?post_type=page');
+        $editor_url = $base_url . '/editor/' . $site_id . '/' . $unicorn_id . '?returnUrl=' . urlencode($return_url);
+
+        // Add the action after "Edit"
+        $new_actions = [];
+        foreach ($actions as $key => $action) {
+            $new_actions[$key] = $action;
+            if ($key === 'edit') {
+                $new_actions['unicorn_edit'] = sprintf(
+                    '<a href="%s" target="_blank" style="color: #9333ea;">%s</a>',
+                    esc_url($editor_url),
+                    esc_html__('Unicorn Studio', 'unicorn-studio')
+                );
+            }
+        }
+
+        return $new_actions;
+    }
+
+    /**
+     * Get the Unicorn Studio editor URL for a page
+     *
+     * @param int    $post_id   WordPress post ID
+     * @param string $return_url URL to return to after editing
+     * @return string|false Editor URL or false if not a Unicorn page
+     */
+    public static function get_editor_url($post_id, $return_url = '') {
+        $unicorn_id = get_post_meta($post_id, '_unicorn_studio_id', true);
+        $site_id = get_option('unicorn_studio_site_id');
+        $api_url = get_option('unicorn_studio_api_url', 'http://localhost:3000/api/v1');
+
+        if (!$unicorn_id || !$site_id) {
+            return false;
+        }
+
+        $base_url = preg_replace('/\/api\/v1\/?$/', '', $api_url);
+        $editor_url = $base_url . '/editor/' . $site_id . '/' . $unicorn_id;
+
+        if ($return_url) {
+            $editor_url .= '?returnUrl=' . urlencode($return_url);
+        }
+
+        return $editor_url;
     }
 }

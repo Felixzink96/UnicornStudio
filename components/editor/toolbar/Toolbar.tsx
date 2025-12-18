@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useEditorStore } from '@/stores/editor-store'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -64,6 +65,9 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ siteId }: ToolbarProps) {
+  const searchParams = useSearchParams()
+  const returnUrl = searchParams.get('returnUrl')
+
   const viewMode = useEditorStore((s) => s.viewMode)
   const breakpoint = useEditorStore((s) => s.breakpoint)
   const pages = useEditorStore((s) => s.pages)
@@ -85,6 +89,10 @@ export function Toolbar({ siteId }: ToolbarProps) {
 
   // WordPress integration
   const wordpress = useWordPress(siteId)
+
+  // Back URL - use returnUrl if from WordPress, otherwise default to dashboard
+  const backUrl = returnUrl || `/dashboard/sites/${siteId}`
+  const isExternalReturn = returnUrl && !returnUrl.startsWith('/')
 
   // Global Components State
   const [showComponentLibrary, setShowComponentLibrary] = useState(false)
@@ -108,11 +116,21 @@ export function Toolbar({ siteId }: ToolbarProps) {
         {/* Left Section - Logo & Page Name */}
         <div className="w-[420px] min-w-[420px] flex items-center gap-2 px-3 border-r border-zinc-200 dark:border-zinc-800">
           {/* Back Button - minimal */}
-          <Link href={`/dashboard/sites/${siteId}`}>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
+          {isExternalReturn ? (
+            // External URL (e.g., WordPress admin) - use anchor tag
+            <a href={backUrl}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" title="Zurück zu WordPress">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </a>
+          ) : (
+            // Internal URL - use Next.js Link
+            <Link href={backUrl}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
 
           {/* Page Selector - Figma style with dropdown */}
           <DropdownMenu>

@@ -59,9 +59,10 @@ export function LivePreview() {
   const lastMessage = messages[messages.length - 1]
   const isCurrentlyStreaming = lastMessage?.isStreaming || false
 
-  // Wireframe nur bei komplett neuer Website zeigen, nicht bei Änderungen
+  // Wireframe nur bei komplett neuer Website zeigen, NICHT wenn bereits Header/Footer existieren
   const hasExistingContent = html.includes('<section') || html.includes('<main') || html.includes('<header')
-  const showWireframe = isCurrentlyStreaming && !hasExistingContent
+  const hasGlobalComponents = !!globalHeader || !!globalFooter
+  const showWireframe = isCurrentlyStreaming && !hasExistingContent && !hasGlobalComponents
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -1442,7 +1443,7 @@ export function LivePreview() {
       onClick={handleContainerClick}
       className="h-full w-full bg-zinc-950 flex items-center justify-center overflow-auto relative"
     >
-      {/* Wireframe Build Animation nur bei neuer Website, nicht bei Änderungen */}
+      {/* Wireframe Build Animation nur bei neuer Website ohne Header/Footer */}
       <FullPageWireframe isActive={showWireframe} />
 
       <div

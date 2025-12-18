@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Editor } from '@/components/editor/Editor'
+import { loadEditorData, type EditorInitialData } from '@/lib/editor/load-editor-data'
 import crypto from 'crypto'
 
 interface EditorPageProps {
@@ -88,9 +89,10 @@ export default async function EditorPage({ params, searchParams }: EditorPagePro
     console.log('[WP Auth] Validating token for site:', siteId, 'page:', pageId)
     const isValid = await validateWpToken(wpToken, siteId, pageId)
     if (isValid) {
-      // WordPress auth is valid - render editor without Supabase user check
-      console.log('[WP Auth] Token valid - rendering editor')
-      return <Editor pageId={pageId} siteId={siteId} isEmbedded={embedded === 'true'} />
+      // WordPress auth is valid - load data server-side and render editor
+      console.log('[WP Auth] Token valid - loading data and rendering editor')
+      const initialData = await loadEditorData(siteId, pageId)
+      return <Editor pageId={pageId} siteId={siteId} isEmbedded={embedded === 'true'} initialData={initialData} />
     }
     // Invalid token - show error page for embedded mode
     console.log('[WP Auth] Token invalid')

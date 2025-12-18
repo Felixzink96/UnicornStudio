@@ -572,6 +572,176 @@ export const useEditorStore = create<EditorStateWithMenus & EditorActions>()(
       }
     },
 
+    // Initialize with pre-loaded data (for WordPress iframe embedding)
+    initializeWithData: (siteId: string, pageId: string, data: unknown) => {
+      // Type the incoming data
+      const initialData = data as {
+        site: {
+          id: string
+          name: string
+          settings: Record<string, unknown> | null
+          global_header_id: string | null
+          global_footer_id: string | null
+        } | null
+        page: {
+          id: string
+          name: string
+          slug: string | null
+          html_content: string | null
+          is_home: boolean | null
+        } | null
+        pages: Array<{
+          id: string
+          name: string
+          slug: string | null
+          html_content: string | null
+          is_home: boolean | null
+        }>
+        chatHistory: Array<{
+          id: string
+          role: string
+          content: string
+          generated_html: string | null
+          model: string | null
+          tokens_used: number | null
+          created_at: string | null
+        }>
+        designVariables: Record<string, unknown> | null
+        menus: Array<{
+          id: string
+          name: string
+          slug: string
+          position: string | null
+          settings: Record<string, unknown> | null
+          menu_items: Array<{
+            id: string
+            menu_id: string
+            parent_id: string | null
+            link_type: string
+            page_id: string | null
+            external_url: string | null
+            anchor: string | null
+            content_type_slug: string | null
+            label: string
+            icon: string | null
+            description: string | null
+            target: string
+            position: number
+            pages: { slug: string; name: string } | null
+          }>
+        }>
+        globalHeader: { id: string; html: string | null; css: string | null; js: string | null } | null
+        globalFooter: { id: string; html: string | null; css: string | null; js: string | null } | null
+      }
+
+      const { site, page, pages, chatHistory, designVariables, menus, globalHeader, globalFooter } = initialData
+
+      // Apply design tokens
+      if (designVariables && typeof window !== 'undefined') {
+        applyDesignTokensToDocument(designVariables as DesignVariables)
+      }
+
+      const htmlContent = (page?.html_content as string) || getDefaultHtml()
+
+      set((state) => {
+        state.siteId = siteId
+        state.designVariables = (designVariables as unknown as DesignVariables) || null
+        state.pageId = pageId
+        state.html = htmlContent
+        state.originalHtml = htmlContent
+        state.history = [htmlContent]
+        state.historyIndex = 0
+        state.siteContext = site ? {
+          siteId: site.id,
+          siteName: site.name,
+          siteType: (site.settings as Record<string, unknown>)?.type as string,
+          industry: (site.settings as Record<string, unknown>)?.industry as string,
+          colors: (site.settings as Record<string, unknown>)?.colors as SiteContext['colors'],
+          fonts: (site.settings as Record<string, unknown>)?.fonts as SiteContext['fonts'],
+          style: (site.settings as Record<string, unknown>)?.style as string,
+        } : null
+        state.currentPage = page ? {
+          id: page.id,
+          name: page.name,
+          slug: page.slug || '',
+          htmlContent: htmlContent,
+          isHome: page.is_home || false,
+        } : null
+        state.pages = (pages || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug || '',
+          htmlContent: (p.html_content as string) || '',
+          isHome: p.is_home || false,
+        }))
+        state.messages = (chatHistory || []).map((m) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          generatedHtml: m.generated_html || undefined,
+          model: m.model || undefined,
+          tokensUsed: m.tokens_used || undefined,
+          isApplied: false,
+          timestamp: new Date(m.created_at || Date.now()),
+        }))
+        // Process menus
+        state.menus = (menus || []).map((menu) => {
+          const items: MenuItem[] = (menu.menu_items || []).map((item) => ({
+            id: item.id,
+            menuId: item.menu_id,
+            parentId: item.parent_id,
+            linkType: item.link_type as MenuItem['linkType'],
+            pageId: item.page_id || undefined,
+            externalUrl: item.external_url || undefined,
+            anchor: item.anchor || undefined,
+            contentTypeSlug: item.content_type_slug || undefined,
+            label: item.label,
+            icon: item.icon || undefined,
+            description: item.description || undefined,
+            target: (item.target || '_self') as '_self' | '_blank',
+            position: item.position,
+            createdAt: '',
+            updatedAt: '',
+            pageSlug: item.pages?.slug,
+            pageName: item.pages?.name,
+          }))
+          return {
+            id: menu.id,
+            siteId,
+            name: menu.name,
+            slug: menu.slug,
+            description: undefined,
+            position: menu.position as MenuWithItems['position'],
+            settings: (menu.settings || {}) as MenuWithItems['settings'],
+            createdAt: '',
+            updatedAt: '',
+            items,
+          }
+        })
+        // Global components
+        if (globalHeader) {
+          state.globalHeader = {
+            id: globalHeader.id,
+            name: 'Header',
+            html: globalHeader.html || '',
+            css: globalHeader.css || undefined,
+            js: globalHeader.js || undefined,
+          }
+        }
+        if (globalFooter) {
+          state.globalFooter = {
+            id: globalFooter.id,
+            name: 'Footer',
+            html: globalFooter.html || '',
+            css: globalFooter.css || undefined,
+            js: globalFooter.js || undefined,
+          }
+        }
+      })
+
+      console.log('[Editor] Initialized with pre-loaded data for WordPress embedding')
+    },
+
     reset: () => {
       set(initialState)
     },

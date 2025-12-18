@@ -184,6 +184,7 @@ export interface EditorState {
 export interface EditorActions {
   // Init
   initialize: (siteId: string, pageId: string) => Promise<void>
+  initializeWithData: (siteId: string, pageId: string, data: unknown) => void
   reset: () => void
 
   // HTML

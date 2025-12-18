@@ -8,18 +8,21 @@ import { LivePreview } from './preview/LivePreview'
 import { CodeEditor } from './code-view/CodeEditor'
 import { ElementFloatingBar } from './element-panel/ElementFloatingBar'
 import { LayersPanel } from './layers/LayersPanel'
+import type { EditorInitialData } from '@/lib/editor/load-editor-data'
 
 interface EditorProps {
   siteId: string
   pageId: string
   isEmbedded?: boolean
+  initialData?: EditorInitialData
 }
 
-export function Editor({ siteId, pageId, isEmbedded = false }: EditorProps) {
+export function Editor({ siteId, pageId, isEmbedded = false, initialData }: EditorProps) {
   const viewMode = useEditorStore((s) => s.viewMode)
   const selectedElement = useEditorStore((s) => s.selectedElement)
   const showLayersPanel = useEditorStore((s) => s.showLayersPanel)
   const initialize = useEditorStore((s) => s.initialize)
+  const initializeWithData = useEditorStore((s) => s.initializeWithData)
   const reset = useEditorStore((s) => s.reset)
   const save = useEditorStore((s) => s.save)
   const undo = useEditorStore((s) => s.undo)
@@ -28,12 +31,18 @@ export function Editor({ siteId, pageId, isEmbedded = false }: EditorProps) {
 
   // Initialize editor on mount
   useEffect(() => {
-    initialize(siteId, pageId)
+    if (initialData) {
+      // Use pre-loaded data for embedded/WordPress mode
+      initializeWithData(siteId, pageId, initialData)
+    } else {
+      // Normal mode - fetch data client-side
+      initialize(siteId, pageId)
+    }
 
     return () => {
       reset()
     }
-  }, [siteId, pageId, initialize, reset])
+  }, [siteId, pageId, initialize, initializeWithData, reset, initialData])
 
   // Keyboard shortcuts
   useEffect(() => {

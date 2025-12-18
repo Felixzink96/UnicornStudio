@@ -111,7 +111,12 @@ export default function MenuEditorPage() {
       if (pagesError) {
         console.error('Failed to load pages:', pagesError)
       } else {
-        setPages(pagesData || [])
+        // Transform null to undefined for is_home
+        const transformedPages = (pagesData || []).map(p => ({
+          ...p,
+          is_home: p.is_home ?? undefined
+        }))
+        setPages(transformedPages)
       }
     } catch (error) {
       console.error('Failed to load data:', error)

@@ -468,8 +468,61 @@ class Unicorn_Studio_Global_Components {
 
         return preg_replace_callback($pattern, function($matches) {
             $menu_slug = $matches[1];
+            $derived_position = preg_replace('/-menu$/', '', $menu_slug); // 'header-menu' -> 'header'
 
-            // Map common slug patterns to WordPress menu locations
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("[Unicorn Menu] Looking for menu: slug={$menu_slug}, position={$derived_position}");
+            }
+
+            // FIRST: Try to use synced Unicorn Studio menus (preferred)
+            $unicorn_menus = get_option('unicorn_studio_menus', []);
+            $unicorn_menu = null;
+
+            if (!empty($unicorn_menus) && is_array($unicorn_menus)) {
+                foreach ($unicorn_menus as $menu) {
+                    // Match by slug or position
+                    if (
+                        ($menu['slug'] ?? '') === $menu_slug ||
+                        ($menu['position'] ?? '') === $menu_slug ||
+                        ($menu['position'] ?? '') === $derived_position
+                    ) {
+                        $unicorn_menu = $menu;
+                        break;
+                    }
+                }
+            }
+
+            // If we found a Unicorn menu with items, use it directly
+            if ($unicorn_menu && !empty($unicorn_menu['items'])) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log("[Unicorn Menu] Found Unicorn menu: " . ($unicorn_menu['name'] ?? 'unknown') . " with " . count($unicorn_menu['items']) . " items");
+                }
+
+                $output = '';
+                foreach ($unicorn_menu['items'] as $item) {
+                    // Build URL based on link type
+                    $url = '/';
+                    $link_type = $item['linkType'] ?? 'page';
+
+                    if ($link_type === 'page') {
+                        $page_slug = $item['pageSlug'] ?? '';
+                        $url = $page_slug ? '/' . ltrim($page_slug, '/') : '/';
+                    } elseif ($link_type === 'external') {
+                        $url = $item['externalUrl'] ?? '#';
+                    } elseif ($link_type === 'anchor') {
+                        $url = '#' . ($item['anchor'] ?? '');
+                    }
+
+                    $label = $item['label'] ?? '';
+                    $target = ($item['target'] ?? '_self') === '_blank' ? ' target="_blank" rel="noopener noreferrer"' : '';
+
+                    $output .= '<a href="' . esc_url($url) . '"' . $target . '>' . esc_html($label) . '</a>' . "\n";
+                }
+
+                return $output;
+            }
+
+            // FALLBACK: Try WordPress native menus
             $location_map = [
                 'header-menu' => 'unicorn-header',
                 'header'      => 'unicorn-header',
@@ -479,8 +532,6 @@ class Unicorn_Studio_Global_Components {
                 'mobile'      => 'unicorn-mobile',
             ];
 
-            // Derive base position from slug (e.g., 'header-menu' -> 'header')
-            $derived_position = preg_replace('/-menu$/', '', $menu_slug);
             if (!isset($location_map[$derived_position])) {
                 $location_map[$derived_position] = 'unicorn-' . $derived_position;
             }
@@ -507,24 +558,22 @@ class Unicorn_Studio_Global_Components {
             }
 
             if (!$menu) {
-                // Return empty string if no menu found (placeholder removed)
                 if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log("[Unicorn Menu] Menu not found for slug: {$menu_slug}");
+                    error_log("[Unicorn Menu] No menu found for slug: {$menu_slug} (no Unicorn menu, no WP menu)");
                 }
                 return '';
             }
 
-            // Get menu items
+            // Get menu items from WordPress
             $menu_items = wp_get_nav_menu_items($menu->term_id);
 
             if (empty($menu_items)) {
                 return '';
             }
 
-            // Render menu items as simple links (matching the AI-generated structure)
+            // Render menu items as simple links
             $output = '';
             foreach ($menu_items as $item) {
-                // Skip child items (we'll handle them with parent)
                 if ($item->menu_item_parent != 0) {
                     continue;
                 }
@@ -534,7 +583,6 @@ class Unicorn_Studio_Global_Components {
                 $target = $item->target ? ' target="' . esc_attr($item->target) . '"' : '';
                 $classes = !empty($item->classes) ? ' class="' . esc_attr(implode(' ', array_filter($item->classes))) . '"' : '';
 
-                // Simple link output - inherits styling from parent container
                 $output .= '<a href="' . esc_url($url) . '"' . $target . $classes . '>' . esc_html($label) . '</a>' . "\n";
             }
 

@@ -68,6 +68,16 @@ class Unicorn_Studio_Admin {
             'unicorn-studio-design',
             [$this, 'render_design_page']
         );
+
+        // Hidden page for iframe editor (no menu item)
+        add_submenu_page(
+            null, // No parent = hidden from menu
+            __('Editor', 'unicorn-studio'),
+            __('Editor', 'unicorn-studio'),
+            'edit_pages',
+            'unicorn-studio-editor',
+            [$this, 'render_editor_iframe']
+        );
     }
 
     /**
@@ -144,6 +154,15 @@ class Unicorn_Studio_Admin {
     }
 
     /**
+     * Render fullscreen editor iframe (Elementor-style)
+     */
+    public function render_editor_iframe() {
+        // This outputs a full HTML page, not within WP admin
+        include UNICORN_STUDIO_PLUGIN_DIR . 'admin/views/editor-iframe.php';
+        exit; // Stop WordPress from rendering admin footer
+    }
+
+    /**
      * Add meta box for Unicorn Studio editor link
      */
     public function add_editor_meta_box() {
@@ -165,15 +184,10 @@ class Unicorn_Studio_Admin {
     public function render_editor_meta_box($post) {
         $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
         $site_id = get_option('unicorn_studio_site_id');
-        $api_url = get_option('unicorn_studio_api_url', 'http://localhost:3000/api/v1');
-
-        // Get base URL from API URL (remove /api/v1)
-        $base_url = preg_replace('/\/api\/v1\/?$/', '', $api_url);
 
         if ($unicorn_id && $site_id) {
-            // Build editor URL with return parameter
-            $return_url = admin_url('post.php?post=' . $post->ID . '&action=edit');
-            $editor_url = $base_url . '/editor/' . $site_id . '/' . $unicorn_id . '?returnUrl=' . urlencode($return_url);
+            // Build iframe editor URL (internal WordPress page)
+            $editor_url = admin_url('admin.php?page=unicorn-studio-editor&post_id=' . $post->ID);
 
             $last_sync = get_post_meta($post->ID, '_unicorn_studio_sync', true);
             ?>
@@ -181,8 +195,7 @@ class Unicorn_Studio_Admin {
                 <p style="margin-bottom: 12px;">
                     <a href="<?php echo esc_url($editor_url); ?>"
                        class="button button-primary button-large"
-                       style="width: 100%; text-align: center; display: block;"
-                       target="_blank">
+                       style="width: 100%; text-align: center; display: block;">
                         <span class="dashicons dashicons-edit" style="margin-top: 4px;"></span>
                         <?php esc_html_e('Mit Unicorn Studio bearbeiten', 'unicorn-studio'); ?>
                     </a>
@@ -228,18 +241,13 @@ class Unicorn_Studio_Admin {
 
         $unicorn_id = get_post_meta($post->ID, '_unicorn_studio_id', true);
         $site_id = get_option('unicorn_studio_site_id');
-        $api_url = get_option('unicorn_studio_api_url', 'http://localhost:3000/api/v1');
 
         if (!$unicorn_id || !$site_id) {
             return $actions;
         }
 
-        // Get base URL from API URL
-        $base_url = preg_replace('/\/api\/v1\/?$/', '', $api_url);
-
-        // Build editor URL with return parameter
-        $return_url = admin_url('edit.php?post_type=page');
-        $editor_url = $base_url . '/editor/' . $site_id . '/' . $unicorn_id . '?returnUrl=' . urlencode($return_url);
+        // Build iframe editor URL (internal WordPress page)
+        $editor_url = admin_url('admin.php?page=unicorn-studio-editor&post_id=' . $post->ID);
 
         // Add the action after "Edit"
         $new_actions = [];
@@ -247,7 +255,7 @@ class Unicorn_Studio_Admin {
             $new_actions[$key] = $action;
             if ($key === 'edit') {
                 $new_actions['unicorn_edit'] = sprintf(
-                    '<a href="%s" target="_blank" style="color: #9333ea;">%s</a>',
+                    '<a href="%s" style="color: #9333ea; font-weight: 500;">%s</a>',
                     esc_url($editor_url),
                     esc_html__('Unicorn Studio', 'unicorn-studio')
                 );
@@ -258,28 +266,19 @@ class Unicorn_Studio_Admin {
     }
 
     /**
-     * Get the Unicorn Studio editor URL for a page
+     * Get the Unicorn Studio iframe editor URL for a page
      *
-     * @param int    $post_id   WordPress post ID
-     * @param string $return_url URL to return to after editing
+     * @param int $post_id WordPress post ID
      * @return string|false Editor URL or false if not a Unicorn page
      */
-    public static function get_editor_url($post_id, $return_url = '') {
+    public static function get_editor_url($post_id) {
         $unicorn_id = get_post_meta($post_id, '_unicorn_studio_id', true);
         $site_id = get_option('unicorn_studio_site_id');
-        $api_url = get_option('unicorn_studio_api_url', 'http://localhost:3000/api/v1');
 
         if (!$unicorn_id || !$site_id) {
             return false;
         }
 
-        $base_url = preg_replace('/\/api\/v1\/?$/', '', $api_url);
-        $editor_url = $base_url . '/editor/' . $site_id . '/' . $unicorn_id;
-
-        if ($return_url) {
-            $editor_url .= '?returnUrl=' . urlencode($return_url);
-        }
-
-        return $editor_url;
+        return admin_url('admin.php?page=unicorn-studio-editor&post_id=' . $post_id);
     }
 }

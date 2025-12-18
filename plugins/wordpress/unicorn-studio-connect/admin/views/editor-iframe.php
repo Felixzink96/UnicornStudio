@@ -49,6 +49,16 @@ if ($wp_token) {
 }
 $editor_url .= '?' . http_build_query($editor_params);
 
+// Debug info (remove in production)
+$debug_info = [
+    'base_url' => $base_url,
+    'site_id' => $site_id,
+    'unicorn_id' => $unicorn_id,
+    'has_api_key' => !empty($api_key),
+    'api_key_length' => strlen($api_key),
+    'editor_url' => $editor_url,
+];
+
 // Get page title
 $page_title = get_the_title($post_id);
 ?>
@@ -242,6 +252,18 @@ $page_title = get_the_title($post_id);
         <div class="unicorn-loader-text">Editor wird geladen...</div>
         <div class="unicorn-loader-bar">
             <div class="unicorn-loader-progress"></div>
+        </div>
+        <!-- Debug Info (remove in production) -->
+        <div style="margin-top: 30px; font-size: 11px; color: #666; text-align: left; max-width: 500px;">
+            <strong>Debug Info:</strong><br>
+            Base URL: <?php echo esc_html($debug_info['base_url']); ?><br>
+            Site ID: <?php echo esc_html($debug_info['site_id']); ?><br>
+            Page ID: <?php echo esc_html($debug_info['unicorn_id']); ?><br>
+            API Key vorhanden: <?php echo $debug_info['has_api_key'] ? 'Ja (' . $debug_info['api_key_length'] . ' Zeichen)' : 'Nein'; ?><br>
+            <details style="margin-top: 10px;">
+                <summary style="cursor: pointer;">URL anzeigen</summary>
+                <code style="word-break: break-all; display: block; margin-top: 5px; padding: 5px; background: rgba(255,255,255,0.1); border-radius: 4px;"><?php echo esc_html($debug_info['editor_url']); ?></code>
+            </details>
         </div>
     </div>
 

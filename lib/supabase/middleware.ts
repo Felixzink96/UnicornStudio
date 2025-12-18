@@ -23,6 +23,7 @@ export async function updateSession(request: NextRequest) {
   // WORDPRESS TOKEN: Allow editor requests with wpToken to pass through
   // The token will be validated in the page component
   if (pathname.startsWith('/editor') && searchParams.has('wpToken')) {
+    console.log('[Middleware] WordPress token detected - bypassing auth for:', pathname)
     return NextResponse.next({ request })
   }
 

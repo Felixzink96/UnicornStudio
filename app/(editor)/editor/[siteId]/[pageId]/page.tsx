@@ -81,15 +81,35 @@ export default async function EditorPage({ params, searchParams }: EditorPagePro
   const { siteId, pageId } = await params
   const { wpToken, embedded, returnUrl } = await searchParams
 
+  console.log('[Editor] Request params:', { siteId, pageId, hasWpToken: !!wpToken, embedded })
+
   // Check for WordPress token authentication
   if (wpToken) {
+    console.log('[WP Auth] Validating token for site:', siteId, 'page:', pageId)
     const isValid = await validateWpToken(wpToken, siteId, pageId)
     if (isValid) {
       // WordPress auth is valid - render editor without Supabase user check
+      console.log('[WP Auth] Token valid - rendering editor')
       return <Editor pageId={pageId} siteId={siteId} isEmbedded={embedded === 'true'} />
     }
-    // Invalid token - redirect to login
-    console.log('[WP Auth] Invalid token, redirecting to login')
+    // Invalid token - show error page for embedded mode
+    console.log('[WP Auth] Token invalid')
+    if (embedded === 'true') {
+      return (
+        <div className="h-screen flex items-center justify-center bg-zinc-950">
+          <div className="text-center p-8 bg-zinc-900 rounded-lg border border-zinc-800 max-w-md">
+            <div className="text-red-500 text-5xl mb-4">⚠️</div>
+            <h1 className="text-xl font-bold text-white mb-2">Authentifizierung fehlgeschlagen</h1>
+            <p className="text-zinc-400 mb-4">
+              Der WordPress-Token konnte nicht validiert werden. Bitte überprüfen Sie die API-Key Einstellungen in WordPress.
+            </p>
+            <p className="text-zinc-500 text-sm">
+              Fehlercode: WP_TOKEN_INVALID
+            </p>
+          </div>
+        </div>
+      )
+    }
   }
 
   // Standard Supabase authentication

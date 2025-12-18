@@ -24,7 +24,14 @@ export async function updateSession(request: NextRequest) {
   // The token will be validated in the page component
   if (pathname.startsWith('/editor') && searchParams.has('wpToken')) {
     console.log('[Middleware] WordPress token detected - bypassing auth for:', pathname)
-    return NextResponse.next({ request })
+    const response = NextResponse.next({ request })
+    response.headers.set('X-WP-Token-Bypass', 'true')
+    return response
+  }
+
+  // Debug: Add header to show wpToken was checked but not found
+  if (pathname.startsWith('/editor')) {
+    console.log('[Middleware] Editor path but no wpToken. SearchParams:', Array.from(searchParams.keys()))
   }
 
   let supabaseResponse = NextResponse.next({

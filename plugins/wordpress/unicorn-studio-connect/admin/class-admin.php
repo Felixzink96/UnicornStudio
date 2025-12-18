@@ -26,6 +26,9 @@ class Unicorn_Studio_Admin {
         add_action('add_meta_boxes', [$this, 'add_editor_meta_box']);
         add_filter('page_row_actions', [$this, 'add_row_action'], 10, 2);
         add_filter('post_row_actions', [$this, 'add_row_action'], 10, 2);
+
+        // Intercept editor page early to prevent WP admin wrapper
+        add_action('admin_init', [$this, 'maybe_render_fullscreen_editor']);
     }
 
     /**
@@ -154,12 +157,29 @@ class Unicorn_Studio_Admin {
     }
 
     /**
+     * Check if we should render fullscreen editor (called early in admin_init)
+     */
+    public function maybe_render_fullscreen_editor() {
+        // Check if this is the editor page request
+        if (!isset($_GET['page']) || $_GET['page'] !== 'unicorn-studio-editor') {
+            return;
+        }
+
+        if (!isset($_GET['post_id']) || !current_user_can('edit_pages')) {
+            return;
+        }
+
+        // Render fullscreen editor and exit early (before WP admin renders)
+        $this->render_editor_iframe();
+    }
+
+    /**
      * Render fullscreen editor iframe (Elementor-style)
      */
     public function render_editor_iframe() {
         // This outputs a full HTML page, not within WP admin
         include UNICORN_STUDIO_PLUGIN_DIR . 'admin/views/editor-iframe.php';
-        exit; // Stop WordPress from rendering admin footer
+        exit; // Stop WordPress from rendering anything else
     }
 
     /**

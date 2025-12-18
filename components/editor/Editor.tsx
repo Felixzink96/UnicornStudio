@@ -12,9 +12,10 @@ import { LayersPanel } from './layers/LayersPanel'
 interface EditorProps {
   siteId: string
   pageId: string
+  isEmbedded?: boolean
 }
 
-export function Editor({ siteId, pageId }: EditorProps) {
+export function Editor({ siteId, pageId, isEmbedded = false }: EditorProps) {
   const viewMode = useEditorStore((s) => s.viewMode)
   const selectedElement = useEditorStore((s) => s.selectedElement)
   const showLayersPanel = useEditorStore((s) => s.showLayersPanel)

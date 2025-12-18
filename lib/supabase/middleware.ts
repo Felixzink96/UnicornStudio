@@ -9,6 +9,7 @@ const AUTH_PATHS = ['/login', '/signup']
 
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  const searchParams = request.nextUrl.searchParams
 
   // Check if this route needs auth checking at all
   const isProtectedPath = PROTECTED_PATHS.some(path => pathname.startsWith(path))
@@ -16,6 +17,12 @@ export async function updateSession(request: NextRequest) {
 
   // FAST PATH: If route doesn't need auth, skip the expensive getUser() call
   if (!isProtectedPath && !isAuthPath) {
+    return NextResponse.next({ request })
+  }
+
+  // WORDPRESS TOKEN: Allow editor requests with wpToken to pass through
+  // The token will be validated in the page component
+  if (pathname.startsWith('/editor') && searchParams.has('wpToken')) {
     return NextResponse.next({ request })
   }
 

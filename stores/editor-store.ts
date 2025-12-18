@@ -638,7 +638,7 @@ export const useEditorStore = create<EditorStateWithMenus & EditorActions>()(
 
       // Apply design tokens
       if (designVariables && typeof window !== 'undefined') {
-        applyDesignTokensToDocument(designVariables as DesignVariables)
+        applyDesignTokensToDocument(designVariables as unknown as DesignVariables)
       }
 
       const htmlContent = (page?.html_content as string) || getDefaultHtml()

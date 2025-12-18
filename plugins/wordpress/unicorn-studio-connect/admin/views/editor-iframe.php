@@ -301,17 +301,32 @@ $page_title = get_the_title($post_id);
         const iframe = document.getElementById('editor-frame');
         const loader = document.getElementById('loader');
 
-        // Hide loader when iframe loads
-        iframe.addEventListener('load', function() {
-            setTimeout(function() {
-                loader.classList.add('hidden');
-            }, 300);
-        });
-
-        // Fallback: Hide loader after 15 seconds
-        setTimeout(function() {
+        // DEBUG MODE: Don't auto-hide loader - let user see debug info
+        // Add manual close button
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Loader schließen & Editor zeigen';
+        closeBtn.style.cssText = 'margin-top: 20px; padding: 10px 20px; background: #9333ea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        closeBtn.onclick = function() {
             loader.classList.add('hidden');
-        }, 15000);
+        };
+        loader.appendChild(closeBtn);
+
+        // Track iframe URL changes
+        iframe.addEventListener('load', function() {
+            try {
+                const iframeUrl = iframe.contentWindow.location.href;
+                console.log('[Unicorn Debug] Iframe loaded URL:', iframeUrl);
+
+                // Add URL info to debug display
+                const urlInfo = document.createElement('div');
+                urlInfo.style.cssText = 'margin-top: 15px; padding: 10px; background: rgba(255,100,100,0.2); border-radius: 4px; font-size: 11px; color: #ff6666;';
+                urlInfo.innerHTML = '<strong>Iframe wurde umgeleitet zu:</strong><br><code style="word-break: break-all;">' + iframeUrl + '</code>';
+                loader.querySelector('div[style*="Debug Info"]').appendChild(urlInfo);
+            } catch(e) {
+                // Cross-origin - can't access iframe URL
+                console.log('[Unicorn Debug] Iframe loaded (cross-origin, URL nicht lesbar)');
+            }
+        });
 
         // Listen for close message from editor
         window.addEventListener('message', function(event) {

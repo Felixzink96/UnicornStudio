@@ -487,7 +487,8 @@ class Unicorn_Studio_API_Client {
      * @return array|WP_Error
      */
     public function get_menus() {
-        return $this->request('/menus');
+        // Include items for WordPress sync (needed to create native WP menus)
+        return $this->request('/menus?includeItems=true');
     }
 
     /**

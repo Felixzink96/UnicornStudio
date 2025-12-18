@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getMenus, createMenu } from '@/lib/supabase/queries/menus'
+import { getMenus, getMenusForWordPress, createMenu } from '@/lib/supabase/queries/menus'
 import {
   authenticateAPIRequest,
   validateSiteAccess,
@@ -47,12 +47,22 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return forbiddenResponse(access.error)
     }
 
-    const menus = await getMenus(siteId)
+    // Check if this is a WordPress sync request (needs full items)
+    const includeItems = request.nextUrl.searchParams.get('includeItems') === 'true'
+
+    let menus
+    if (includeItems) {
+      // For WordPress sync: include all menu items
+      menus = await getMenusForWordPress(siteId)
+    } else {
+      // For dashboard/list view: just metadata
+      menus = await getMenus(siteId)
+    }
 
     // Debug logging
     console.log('[Menus API] Site ID:', siteId)
+    console.log('[Menus API] Include items:', includeItems)
     console.log('[Menus API] Menus count:', menus.length)
-    console.log('[Menus API] Menus data:', JSON.stringify(menus, null, 2))
 
     // Return menus directly - successResponse wraps in { success: true, data: ... }
     return successResponse(menus)

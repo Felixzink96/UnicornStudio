@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { createClient } from '@/lib/supabase/client'
 import type { MenuItem, MenuWithItems, CreateMenuItemRequest } from '@/types/menu'
 
 interface Page {
@@ -59,19 +60,58 @@ export default function MenuEditorPage() {
 
   async function loadData() {
     try {
-      const [menuRes, pagesRes] = await Promise.all([
-        fetch(`/api/v1/sites/${siteId}/menus/${menuId}`),
-        fetch(`/api/v1/sites/${siteId}/pages`),
-      ])
+      const supabase = createClient()
 
-      if (menuRes.ok) {
-        const menuData = await menuRes.json()
-        setMenu(menuData)
+      // Load menu with items using RPC
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: menuData, error: menuError } = await (supabase as any).rpc('get_menu_with_items', {
+        p_menu_id: menuId,
+      })
+
+      if (menuError) {
+        console.error('Failed to load menu:', menuError)
+      } else if (menuData) {
+        // Transform the RPC result to match MenuWithItems type
+        const transformedMenu: MenuWithItems = {
+          id: menuData.id,
+          siteId: menuData.site_id,
+          name: menuData.name,
+          slug: menuData.slug,
+          description: menuData.description,
+          position: menuData.position || 'custom',
+          settings: menuData.settings,
+          createdAt: menuData.created_at,
+          updatedAt: menuData.updated_at,
+          items: (menuData.items || []).map((item: Record<string, unknown>) => ({
+            id: item.id,
+            menuId: item.menu_id,
+            parentId: item.parent_id,
+            label: item.label,
+            linkType: item.link_type || 'page',
+            pageId: item.page_id,
+            pageSlug: item.page_slug,
+            externalUrl: item.external_url,
+            anchor: item.anchor,
+            target: item.target || '_self',
+            icon: item.icon,
+            position: item.position,
+            description: item.description,
+          })),
+        }
+        setMenu(transformedMenu)
       }
 
-      if (pagesRes.ok) {
-        const pagesData = await pagesRes.json()
-        setPages(pagesData)
+      // Load pages
+      const { data: pagesData, error: pagesError } = await supabase
+        .from('pages')
+        .select('id, name, slug, is_home')
+        .eq('site_id', siteId)
+        .order('name')
+
+      if (pagesError) {
+        console.error('Failed to load pages:', pagesError)
+      } else {
+        setPages(pagesData || [])
       }
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -83,34 +123,28 @@ export default function MenuEditorPage() {
   async function addItem() {
     if (!newItemLabel.trim()) return
 
-    const item: CreateMenuItemRequest = {
-      menuId: menuId,
-      label: newItemLabel,
-      linkType: newItemType,
-      position: menu?.items?.length || 0,
-    }
-
-    if (newItemType === 'page' && newItemPageId) {
-      item.pageId = newItemPageId
-    } else if (newItemType === 'external' && newItemUrl) {
-      item.externalUrl = newItemUrl
-      item.target = '_blank'
-    } else if (newItemType === 'anchor' && newItemAnchor) {
-      item.anchor = newItemAnchor
-    }
-
     try {
-      const response = await fetch(`/api/v1/sites/${siteId}/menus/${menuId}/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(item),
-      })
+      const supabase = createClient()
 
-      if (response.ok) {
-        await loadData()
-        resetNewItemForm()
-        setShowAddItem(false)
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from('menu_items')
+        .insert({
+          menu_id: menuId,
+          label: newItemLabel,
+          link_type: newItemType,
+          position: menu?.items?.length || 0,
+          page_id: newItemType === 'page' ? newItemPageId || null : null,
+          external_url: newItemType === 'external' ? newItemUrl || null : null,
+          anchor: newItemType === 'anchor' ? newItemAnchor || null : null,
+          target: newItemType === 'external' ? '_blank' : '_self',
+        })
+
+      if (error) throw error
+
+      await loadData()
+      resetNewItemForm()
+      setShowAddItem(false)
     } catch (error) {
       console.error('Failed to add item:', error)
     }
@@ -118,16 +152,19 @@ export default function MenuEditorPage() {
 
   async function deleteItem(itemId: string) {
     try {
-      const response = await fetch(
-        `/api/v1/sites/${siteId}/menus/${menuId}/items?itemId=${itemId}`,
-        { method: 'DELETE' }
-      )
+      const supabase = createClient()
 
-      if (response.ok) {
-        setMenu((prev) =>
-          prev ? { ...prev, items: prev.items?.filter((i) => i.id !== itemId) } : null
-        )
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from('menu_items')
+        .delete()
+        .eq('id', itemId)
+
+      if (error) throw error
+
+      setMenu((prev) =>
+        prev ? { ...prev, items: prev.items?.filter((i) => i.id !== itemId) } : null
+      )
     } catch (error) {
       console.error('Failed to delete item:', error)
     }
@@ -135,26 +172,25 @@ export default function MenuEditorPage() {
 
   async function updateItem(item: MenuItem) {
     try {
-      const response = await fetch(
-        `/api/v1/sites/${siteId}/menus/${menuId}/items?itemId=${item.id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            label: item.label,
-            linkType: item.linkType,
-            pageId: item.pageId,
-            externalUrl: item.externalUrl,
-            anchor: item.anchor,
-            target: item.target,
-          }),
-        }
-      )
+      const supabase = createClient()
 
-      if (response.ok) {
-        await loadData()
-        setEditingItem(null)
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from('menu_items')
+        .update({
+          label: item.label,
+          link_type: item.linkType,
+          page_id: item.pageId || null,
+          external_url: item.externalUrl || null,
+          anchor: item.anchor || null,
+          target: item.target || '_self',
+        })
+        .eq('id', item.id)
+
+      if (error) throw error
+
+      await loadData()
+      setEditingItem(null)
     } catch (error) {
       console.error('Failed to update item:', error)
     }
@@ -162,11 +198,18 @@ export default function MenuEditorPage() {
 
   async function reorderItems(orderedIds: string[]) {
     try {
-      await fetch(`/api/v1/sites/${siteId}/menus/${menuId}/items`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderedIds }),
-      })
+      const supabase = createClient()
+
+      // Update positions for all items
+      const updates = orderedIds.map((id, index) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from('menu_items')
+          .update({ position: index })
+          .eq('id', id)
+      )
+
+      await Promise.all(updates)
     } catch (error) {
       console.error('Failed to reorder items:', error)
     }

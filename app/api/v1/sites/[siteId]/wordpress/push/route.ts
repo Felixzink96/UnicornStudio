@@ -42,6 +42,9 @@ interface PushResult {
     entries?: { count: number; success: boolean; error?: string }
     pages?: { count: number; success: boolean; error?: string }
     taxonomies?: { count: number; success: boolean; error?: string }
+    templates?: { count: number; success: boolean; error?: string }
+    fields?: { count: number; success: boolean; error?: string }
+    cms_components?: { count: number; success: boolean; error?: string }
     css?: { success: boolean; error?: string }
     global_components?: {
       count: number
@@ -219,6 +222,113 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const msg = err instanceof Error ? err.message : 'Taxonomies sync failed'
       result.errors.push(msg)
       result.results.taxonomies = { count: 0, success: false, error: msg }
+    }
+
+    // 7.5. Push Templates (Archive/Single)
+    try {
+      const { data: templates } = await supabase
+        .from('templates')
+        .select('*')
+        .eq('site_id', siteId)
+        .in('type', ['archive', 'single'])
+
+      if (templates && templates.length > 0) {
+        for (const template of templates) {
+          await sendWebhook(webhookUrl, headers, {
+            event: 'template.updated',
+            site_id: siteId,
+            data: {
+              id: template.id,
+              name: template.name,
+              type: template.type,
+              html: template.html,
+              conditions: template.conditions,
+              is_default: template.is_default,
+              priority: template.priority,
+            },
+          })
+        }
+        result.results.templates = { count: templates.length, success: true }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Templates sync failed'
+      result.errors.push(msg)
+      result.results.templates = { count: 0, success: false, error: msg }
+    }
+
+    // 7.6. Push Custom Fields (ACF-style fields)
+    try {
+      const { data: fields } = await supabase
+        .from('fields')
+        .select('*, content_type:content_types(slug)')
+        .eq('site_id', siteId)
+        .order('position', { ascending: true })
+
+      if (fields && fields.length > 0) {
+        // Group fields by content type
+        const fieldsByContentType = fields.reduce((acc, field) => {
+          const ctSlug = (field.content_type as { slug: string } | null)?.slug || 'unknown'
+          if (!acc[ctSlug]) acc[ctSlug] = []
+          acc[ctSlug].push({
+            name: field.name,
+            label: field.label,
+            type: field.type,
+            required: field.required,
+            settings: field.settings,
+            sub_fields: field.sub_fields,
+            position: field.position,
+          })
+          return acc
+        }, {} as Record<string, unknown[]>)
+
+        await sendWebhook(webhookUrl, headers, {
+          event: 'fields.sync',
+          site_id: siteId,
+          data: {
+            fields_by_content_type: fieldsByContentType,
+            total_count: fields.length,
+          },
+        })
+        result.results.fields = { count: fields.length, success: true }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Fields sync failed'
+      result.errors.push(msg)
+      result.results.fields = { count: 0, success: false, error: msg }
+    }
+
+    // 7.7. Push CMS Components (with JavaScript)
+    try {
+      const { data: cmsComponents } = await supabase
+        .from('cms_components')
+        .select('id, name, slug, html, css, js, js_init, is_required')
+        .eq('site_id', siteId)
+        .not('js', 'is', null)
+
+      if (cmsComponents && cmsComponents.length > 0) {
+        // Send all components with JS in a single sync event
+        await sendWebhook(webhookUrl, headers, {
+          event: 'cms_components.sync',
+          site_id: siteId,
+          data: {
+            components: cmsComponents.map(c => ({
+              id: c.id,
+              name: c.name,
+              slug: c.slug,
+              js: c.js,
+              js_init: c.js_init || 'domready',
+            })),
+            total_count: cmsComponents.length,
+          },
+        })
+        result.results.cms_components = { count: cmsComponents.length, success: true }
+      } else {
+        result.results.cms_components = { count: 0, success: true }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'CMS Components sync failed'
+      result.errors.push(msg)
+      result.results.cms_components = { count: 0, success: false, error: msg }
     }
 
     // 8. Push CSS/Design Variables

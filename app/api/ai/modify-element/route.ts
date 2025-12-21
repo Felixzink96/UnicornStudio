@@ -36,6 +36,11 @@ Gib das komplette HTML der Seite zurück mit dem modifizierten Element:`
     const result = await genAI.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: systemPrompt,
+      config: {
+        thinkingConfig: {
+          thinkingBudget: 4096,
+        },
+      },
     })
 
     let text = result.text || ''

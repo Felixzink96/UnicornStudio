@@ -111,14 +111,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     })
 
-    // 6. CMS Components
-    const { data: components } = await supabase
+    // 6. CMS Components (including custom CSS)
+    const { data: cmsComponents } = await supabase
       .from('cms_components')
-      .select('html, variants')
+      .select('html, css, variants')
       .eq('site_id', siteId)
 
-    components?.forEach((comp) => {
+    let cmsComponentsCSS = ''
+    cmsComponents?.forEach((comp) => {
       allHtml += comp.html || ''
+      // Collect component CSS
+      if (comp.css) {
+        cmsComponentsCSS += `/* Component CSS */\n${comp.css}\n\n`
+      }
       if (comp.variants && Array.isArray(comp.variants)) {
         (comp.variants as Array<{ html?: string }>).forEach((v) => {
           allHtml += v.html || ''
@@ -263,6 +268,11 @@ ${keyframesCSS}
    CUSTOM UTILITIES (animations, background-images, etc.)
    ---------------------------------------------------------------- */
 ${customUtilities}
+
+/* ----------------------------------------------------------------
+   CMS COMPONENTS CSS (custom component styles)
+   ---------------------------------------------------------------- */
+${cmsComponentsCSS}
 
 /* ----------------------------------------------------------------
    PAGE CUSTOM CSS (extracted from AI-generated pages)

@@ -343,6 +343,38 @@ export function generateCSS(variables: DesignVariables): string {
     }
   }
 
+  // Motion/Animation variables
+  if (variables.motion) {
+    css += `  --motion-style: ${variables.motion.style};\n`
+    if (variables.motion.duration) {
+      css += `  --motion-duration-fast: ${variables.motion.duration.fast};\n`
+      css += `  --motion-duration-normal: ${variables.motion.duration.normal};\n`
+      css += `  --motion-duration-slow: ${variables.motion.duration.slow};\n`
+    }
+    if (variables.motion.easing) {
+      css += `  --motion-easing: ${variables.motion.easing};\n`
+    }
+    if (variables.motion.hoverScale) {
+      css += `  --motion-hover-scale: ${variables.motion.hoverScale};\n`
+    }
+    if (variables.motion.revealDistance) {
+      css += `  --motion-reveal-distance: ${variables.motion.revealDistance};\n`
+    }
+  }
+
+  // Layout variables
+  if (variables.layout) {
+    css += `  --layout-style: ${variables.layout.style};\n`
+    css += `  --layout-max-width: ${variables.layout.maxWidth};\n`
+    css += `  --layout-section-spacing: ${variables.layout.sectionSpacing};\n`
+    css += `  --layout-hero-style: ${variables.layout.heroStyle};\n`
+  }
+
+  // Archetype
+  if (variables.archetype) {
+    css += `  --design-archetype: ${variables.archetype};\n`
+  }
+
   css += '}\n'
 
   return css

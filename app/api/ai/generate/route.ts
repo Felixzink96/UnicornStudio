@@ -260,8 +260,6 @@ export async function POST(request: Request) {
       siteType: context?.siteType,
       industry: context?.industry,
       style: context?.style,
-      colors: context?.colors,
-      fonts: context?.fonts,
       designTokens,
       globalComponents,
       siteIdentity,

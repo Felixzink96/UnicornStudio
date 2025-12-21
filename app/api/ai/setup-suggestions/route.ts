@@ -3,9 +3,19 @@ import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! })
 
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export type DesignArchetype = 'architect' | 'innovator' | 'brutalist' | 'organic'
+
 export interface SetupSuggestion {
   siteName: string
   siteType: string
+
+  // NEW: Design Archetype
+  archetype: DesignArchetype
+
   pages: {
     name: string
     slug: string
@@ -14,6 +24,7 @@ export interface SetupSuggestion {
     inHeader: boolean
     inFooter: boolean
   }[]
+
   colors: {
     primary: string
     primaryHover: string
@@ -24,11 +35,46 @@ export interface SetupSuggestion {
     muted: string
     border: string
   }
+
   fonts: {
     heading: string
     body: string
-    mono?: string // Optional: nur wenn Code-Elemente relevant sind
+    mono?: string
   }
+
+  // NEW: Border Radius based on archetype
+  radii: {
+    style: 'sharp' | 'soft' | 'rounded' | 'pill'
+    default: string
+    lg: string
+    xl: string
+    button: string
+    card: string
+    input: string
+  }
+
+  // NEW: Motion/Animation preferences
+  motion: {
+    style: 'elegant' | 'snappy' | 'bold' | 'playful'
+    duration: {
+      fast: string
+      normal: string
+      slow: string
+    }
+    easing: string
+    hoverScale: number
+    revealDistance: string
+  }
+
+  // NEW: Layout preferences
+  layout: {
+    style: 'symmetric' | 'asymmetric' | 'editorial' | 'organic'
+    maxWidth: string
+    sectionSpacing: string
+    useOverlaps: boolean
+    heroStyle: 'centered' | 'split' | 'fullwidth' | 'editorial'
+  }
+
   gradient?: {
     enabled: boolean
     from: string
@@ -36,176 +82,249 @@ export interface SetupSuggestion {
     via?: string
     direction: 'to-r' | 'to-br' | 'to-b' | 'to-bl' | 'to-l' | 'to-tl' | 'to-t' | 'to-tr'
   }
-  customColors?: Record<string, string> // Zusätzliche Markenfarben wenn nötig
+
+  customColors?: Record<string, string>
+
   headerSettings: {
     style: 'simple' | 'centered' | 'split'
     sticky: boolean
     showCta: boolean
     ctaText?: string
-    ctaPage?: string // slug der Zielseite
+    ctaPage?: string
+  }
+
+  // NEW: Visual effects
+  effects: {
+    useNoise: boolean
+    useBlur: boolean
+    useGradientBlobs: boolean
+    useScanLines: boolean
+    borderStyle: 'none' | 'subtle' | 'prominent' | 'thick'
   }
 }
 
-const SYSTEM_PROMPT = `Du bist ein Premium Website-Design-Experte mit hohem Anspruch an Ästhetik und UX.
-Basierend auf dem User-Prompt generierst du perfekt abgestimmte Setup-Vorschläge für eine neue Website.
+// ============================================================================
+// SYSTEM PROMPT
+// ============================================================================
+
+const SYSTEM_PROMPT = `Du bist ein ELITE Website-Design-Architekt von einer Top-Agentur.
+Du erschaffst Designs die bei Awwwards, FWA und CSSDA gewinnen könnten.
 
 WICHTIG: Antworte NUR mit einem validen JSON-Objekt, keine Erklärungen oder Markdown.
 
+═══════════════════════════════════════════════════════════════════════════
+SCHRITT 1: WÄHLE DEN DESIGN-ARCHETYP
+═══════════════════════════════════════════════════════════════════════════
+
+Analysiere Branche und Stil. Wähle EINEN Archetyp und bleibe 100% konsistent:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ARCHITECT (Seriös: Recht, Finanzen, Immobilien, B2B Enterprise, Beratung)  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • Formen: Eckig (rounded-none, rounded-sm). Harte Kanten, clean lines     │
+│ • Layout: Asymmetrische Grids, feine Linien (border-[0.5px]), viel Weiß   │
+│ • Motion: Langsam (700-1000ms), elegant, keine Bounces                     │
+│ • Fonts: Serif Headlines + Sans Body (z.B. Cormorant + Inter)             │
+│ • Farben: Gedämpft, Kontraste durch Typo statt Farbe                      │
+│ • Effekte: Subtile Borders, minimales Noise, keine Glows                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ INNOVATOR (Modern: SaaS, Tech, Startup, AI, Software, Digital Products)    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • Formen: Freundlich rund (rounded-2xl, rounded-3xl)                       │
+│ • Layout: Glassmorphism, weiche Schatten, schwebende Cards                 │
+│ • Motion: Smooth schnell (200-400ms), micro-interactions                   │
+│ • Fonts: Geometric Sans (Inter, Plus Jakarta Sans, Space Grotesk)          │
+│ • Farben: Primärfarbe + viel Weiß/Grau + Akzent-Pops, Gradients OK        │
+│ • Effekte: Blur, Gradient Blobs, subtiles Noise, Glow auf CTAs            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ BRUTALIST (Bold: Kunst, Mode, Krypto, Events, Agenturen, Kreative)         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • Formen: Extrem (rounded-none ODER rounded-full Pills, kein Mittelweg)   │
+│ • Layout: Gigantische Typo (text-8xl+), dicke Borders, Marquee-Text        │
+│ • Motion: Hart und schnell (100-200ms), "in your face", Glitch möglich     │
+│ • Fonts: Monospace, Display Fonts (Bebas Neue, Anton, Space Mono)          │
+│ • Farben: High Contrast, Neon möglich, oft Schwarz-Weiß-Basis              │
+│ • Effekte: Scan-Lines, Glitch, starke Borders, kein Blur                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ORGANIC (Soft: Food, Wellness, Kinder, Bio, Lifestyle, Gesundheit)         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • Formen: Sehr weich (rounded-[40px], rounded-full), Blobs, Waves          │
+│ • Layout: Überlappende Bilder, natürliche Anordnung, asymmetrisch-soft     │
+│ • Motion: Bouncy (ease-out), elastisch, verspielt (400-600ms)              │
+│ • Fonts: Rounded Sans (Nunito, Quicksand), Handschrift-Akzente möglich     │
+│ • Farben: Warm, erdig, Pastelltöne, natürliche Palette                     │
+│ • Effekte: Soft Shadows, Gradient Blobs, KEIN hartes Noise                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+⚠️ NIEMALS Archetypen mischen! "Brutalist + Organic" = Design-Chaos.
+
+═══════════════════════════════════════════════════════════════════════════
+SCHRITT 2: GENERIERE ALLE DESIGN-VARIABLEN
+═══════════════════════════════════════════════════════════════════════════
+
 Das JSON muss folgende Struktur haben:
+
 {
-  "siteName": "Name der Website",
-  "siteType": "restaurant|portfolio|agency|shop|blog|business|landing|saas|event|medical|education|nonprofit",
+  "siteName": "Website Name",
+  "siteType": "restaurant|portfolio|agency|shop|blog|business|landing|saas|event|medical|education|nonprofit|law|finance|creative|wellness",
+
+  "archetype": "architect|innovator|brutalist|organic",
+
   "pages": [
     {
       "name": "Seitenname",
-      "slug": "seiten-slug",
+      "slug": "slug",
       "selected": true,
       "isLegalPage": false,
       "inHeader": true,
       "inFooter": true
     }
   ],
+
   "colors": {
-    "primary": "#hex",
-    "primaryHover": "#hex (ca. 10-15% dunkler als primary)",
-    "secondary": "#hex",
-    "accent": "#hex",
-    "background": "#hex",
-    "foreground": "#hex",
-    "muted": "#hex",
-    "border": "#hex"
+    "primary": "#hex - Hauptfarbe passend zum Archetyp",
+    "primaryHover": "#hex - 10-15% dunkler",
+    "secondary": "#hex - ANDERE Farbe als primary",
+    "accent": "#hex - ANDERE Farbe als primary UND secondary",
+    "background": "#hex - Hintergrund (dunkel für Brutalist/Tech, hell für Organic)",
+    "foreground": "#hex - Textfarbe",
+    "muted": "#hex - Subtiler Hintergrund",
+    "border": "#hex - Linienfarbe"
   },
+
   "fonts": {
-    "heading": "Google Font Name",
-    "body": "Google Font Name",
-    "mono": "Google Font Name (optional, nur wenn relevant)"
+    "heading": "Google Font - passend zum Archetyp",
+    "body": "Google Font - gut lesbar",
+    "mono": "Optional - nur wenn Code relevant"
   },
+
+  "radii": {
+    "style": "sharp|soft|rounded|pill",
+    "default": "0|0.375rem|0.75rem|1rem",
+    "lg": "0|0.5rem|1rem|1.5rem",
+    "xl": "0|0.75rem|1.5rem|2rem",
+    "button": "0|0.5rem|1rem|9999px",
+    "card": "0|0.75rem|1.5rem|2rem",
+    "input": "0|0.375rem|0.75rem|1rem"
+  },
+
+  "motion": {
+    "style": "elegant|snappy|bold|playful",
+    "duration": {
+      "fast": "150ms|200ms|100ms|200ms",
+      "normal": "300ms|300ms|150ms|400ms",
+      "slow": "700ms|500ms|200ms|600ms"
+    },
+    "easing": "cubic-bezier(...) passend zum Stil",
+    "hoverScale": 1.02|1.05|1.1|1.08,
+    "revealDistance": "60px|40px|80px|50px"
+  },
+
+  "layout": {
+    "style": "symmetric|asymmetric|editorial|organic",
+    "maxWidth": "1280px|1440px|1600px|1200px",
+    "sectionSpacing": "4rem|5rem|6rem|4rem",
+    "useOverlaps": false|true|true|true,
+    "heroStyle": "centered|split|fullwidth|editorial"
+  },
+
   "gradient": {
     "enabled": true/false,
     "from": "#hex",
     "to": "#hex",
-    "via": "#hex (optional, für 3-Farb-Gradient)",
-    "direction": "to-r|to-br|to-b|to-bl|to-l|to-tl|to-t|to-tr"
+    "via": "#hex optional",
+    "direction": "to-br"
   },
+
   "customColors": {
-    "goldAccent": "#hex",
-    "brandRed": "#hex"
+    "optionalExtraColor": "#hex"
   },
+
   "headerSettings": {
     "style": "simple|centered|split",
     "sticky": true/false,
     "showCta": true/false,
     "ctaText": "Button Text",
     "ctaPage": "kontakt"
+  },
+
+  "effects": {
+    "useNoise": false|true|false|false,
+    "useBlur": false|true|false|true,
+    "useGradientBlobs": false|true|false|true,
+    "useScanLines": false|false|true|false,
+    "borderStyle": "subtle|none|thick|none"
   }
 }
 
-=== DESIGN-PRINZIPIEN ===
+═══════════════════════════════════════════════════════════════════════════
+ARCHETYP-SPEZIFISCHE DEFAULTS
+═══════════════════════════════════════════════════════════════════════════
 
-1. FARBEN - DU BIST EIN FARBDESIGN-MEISTER!
+ARCHITECT:
+- radii.style: "sharp"
+- radii.default: "0" oder "0.125rem"
+- motion.style: "elegant"
+- motion.easing: "cubic-bezier(0.4, 0, 0.2, 1)"
+- layout.style: "asymmetric" oder "editorial"
+- effects.borderStyle: "subtle" (feine Linien)
+- Fonts: Serif + Sans Kombination
+- Colors: Gedämpft, wenig Sättigung
 
-   Du bist ein Experte für Farbtheorie, Markenidentität und visuelle Psychologie.
-   Erstelle eine EINZIGARTIGE, PREMIUM Farbpalette die perfekt zur Marke passt!
+INNOVATOR:
+- radii.style: "rounded"
+- radii.default: "0.75rem"
+- motion.style: "snappy"
+- motion.easing: "cubic-bezier(0.16, 1, 0.3, 1)"
+- layout.style: "symmetric"
+- effects.useBlur: true
+- effects.useGradientBlobs: true
+- Fonts: Modern Geometric Sans
+- Colors: Lebendig aber professionell, Gradients erlaubt
 
-   DEIN AUFTRAG:
-   - Analysiere die Marke, Emotion und Zielgruppe
-   - Erstelle eine harmonische, aber einzigartige Palette
-   - Denke wie ein Art Director einer Top-Agentur
-   - Sei mutig und kreativ - keine langweiligen Standard-Farben!
+BRUTALIST:
+- radii.style: "sharp" oder "pill" (keine Mischung!)
+- radii.default: "0" oder "9999px"
+- motion.style: "bold"
+- motion.easing: "cubic-bezier(0.85, 0, 0.15, 1)"
+- layout.style: "editorial"
+- effects.useScanLines: true
+- effects.borderStyle: "thick" (3-4px Borders)
+- Fonts: Monospace oder Bold Display
+- Colors: High Contrast, oft dark mode
 
-   DIE 8 FARBEN (alle Pflicht, alle als #hex):
-   - primary: Hauptfarbe für Buttons, Links, CTAs
-   - primaryHover: 10-15% dunkler als primary
-   - secondary: ANDERE Farbe als primary
-   - accent: ANDERE Farbe als primary UND secondary - für besondere Highlights
-   - background: Seitenhintergrund
-   - foreground: Textfarbe
-   - muted: Subtiler Hintergrund für Cards
-   - border: Linienfarbe
+ORGANIC:
+- radii.style: "soft"
+- radii.default: "1rem" bis "2rem"
+- motion.style: "playful"
+- motion.easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" (bouncy)
+- layout.style: "organic"
+- layout.useOverlaps: true
+- effects.useGradientBlobs: true (soft)
+- Fonts: Rounded, friendly
+- Colors: Warm, natural, pastel-ish
 
-   ⚠️ WICHTIG:
-   - Jede Farbe MUSS einzigartig sein!
-   - primary, secondary und accent = 3 VERSCHIEDENE Farben!
-   - Sei kreativ und wähle Farben passend zur Marke/Branche!
+═══════════════════════════════════════════════════════════════════════════
+WICHTIGE REGELN
+═══════════════════════════════════════════════════════════════════════════
 
-   FARBHARMONIE-TECHNIKEN (wähle was passt):
-   - Komplementär: Gegenüberliegende Farben im Farbkreis
-   - Analog: Benachbarte Farben für Harmonie
-   - Triadisch: Drei gleichmäßig verteilte Farben
-   - Split-Komplementär: Eine Farbe + zwei Nachbarn der Komplementärfarbe
-   - Monochrom: Verschiedene Töne einer Farbe
-
-   WICHTIG:
-   - Keine generischen Blau/Grau Paletten wenn nicht zur Marke passend!
-   - Kontraste müssen für Accessibility funktionieren (WCAG AA mindestens)
-
-2. SCHRIFTARTEN - DU BIST EIN TYPOGRAFIE-MEISTER!
-
-   Du hast Zugriff auf ALLE 1500+ Google Fonts. Wähle die PERFEKTE Kombination für das Projekt!
-
-   DEIN AUFTRAG:
-   - Analysiere die Marke, Branche und Zielgruppe
-   - Wähle eine einzigartige, passende Font-Kombination
-   - Denke wie ein Premium-Typograf mit jahrelanger Erfahrung
-   - Sei kreativ, aber immer professionell
-
-   WICHTIG:
-   - heading: Display-Font für Headlines, Hero-Texte, große Überschriften
-   - body: Gut lesbare Font für Fließtext, Absätze, kleine Texte
-   - mono: NUR wenn Code/Tech-Daten relevant sind (sonst weglassen!)
-   - Verwende EXAKTE Google Fonts Namen (korrekte Schreibweise!)
-   - Die Fonts müssen harmonieren aber auch Kontrast bieten
-   - Wähle PREMIUM Fonts, keine Standard-Langweiler wie Arial oder Times
-
-3. GRADIENT - OPTIONAL ABER KRAFTVOLL:
-
-   Entscheide selbst ob ein Gradient zum Design passt!
-   - enabled: true wenn es das Design aufwertet, false wenn nicht
-   - from/to: Wähle Farben die zur Palette passen oder kontrastieren
-   - via: Optional für 3-Farb-Verläufe (nutze sparsam!)
-   - direction: Wähle die Richtung die am besten wirkt
-     * "to-r" = horizontal (→)
-     * "to-br" = diagonal (↘)
-     * "to-b" = vertikal (↓)
-     * "to-tr" = diagonal hoch (↗)
-
-4. CUSTOM COLORS - MARKENSPEZIFISCH:
-
-   Füge zusätzliche Farben hinzu wenn die Marke sie braucht!
-   - Nur wenn wirklich relevant (nicht erzwingen)
-   - Keys beschreibend: goldAccent, brandRed, neonGreen, etc.
-   - Für spezielle Brand-Farben die nicht in die 8 Hauptfarben passen
-
-5. HEADER-EINSTELLUNGEN:
-
-   - style: Wähle passend zur Marke
-     * "simple": Logo links, Menu rechts
-     * "centered": Logo zentriert, Menu darunter
-     * "split": Logo mitte, Menu links+rechts
-   - sticky: Meistens true, außer bei speziellen Designs
-   - showCta: true wenn es eine klare Handlungsaufforderung gibt
-   - ctaText: Kurz und handlungsorientiert
-   - ctaPage: slug der Zielseite
-
-6. SEITEN - INTELLIGENT AUSWÄHLEN:
-
-   Wähle 4-8 Seiten die WIRKLICH Sinn machen für das Projekt!
-   - Home (slug: "") IMMER dabei
-   - Impressum + Datenschutz PFLICHT (isLegalPage: true)
-   - WICHTIG: isLegalPage: true NUR für "impressum" und "datenschutz"!
-     ALLE anderen Seiten MÜSSEN isLegalPage: false haben!
-   - Analysiere was die Website braucht, keine Standard-Templates!
-
-=== QUALITÄTSANSPRUCH ===
-
-Erstelle Designs die:
-- Einzigartig und individuell wirken (keine generischen Templates)
-- Professionell und modern aussehen
-- Die Markenidentität perfekt transportieren
-- Konsistente Farbharmonie haben
-- Typografie die Hierarchie und Lesbarkeit optimiert
-- CTA-Strategien die Conversions fördern
+1. ARCHETYP FIRST: Entscheide zuerst den Archetyp, dann leite ALLES davon ab
+2. KONSISTENZ: Alle Werte müssen zum gewählten Archetyp passen
+3. KEINE MISCHUNG: Ein Architekt-Design hat KEINE runden Buttons
+4. FARBEN EINZIGARTIG: primary ≠ secondary ≠ accent
+5. FONTS HARMONISCH: Heading + Body müssen zusammen funktionieren
+6. isLegalPage: NUR true für "impressum" und "datenschutz"!
 `
+
+// ============================================================================
+// API HANDLER
+// ============================================================================
 
 export async function POST(request: NextRequest) {
   try {
@@ -222,10 +341,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build content parts (images first, then text)
+    // Build content parts
     const contentParts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = []
 
-    // Add images/PDFs if present
+    // Add images if present
     if (images && images.length > 0) {
       for (const img of images) {
         contentParts.push({
@@ -238,31 +357,26 @@ export async function POST(request: NextRequest) {
       console.log(`[Setup] Analyzing ${images.length} file(s) for setup suggestions`)
     }
 
-    // Add text prompt
+    // Add prompt
     contentParts.push({
-      text: `${SYSTEM_PROMPT}\n\nGeneriere Setup-Vorschläge für folgende Website:\n\n${prompt}${images?.length ? '\n\nAnalysiere auch die hochgeladenen Bilder/PDFs und extrahiere Farben, Stil und Struktur daraus!' : ''}`
+      text: `${SYSTEM_PROMPT}\n\n═══════════════════════════════════════════════════════════════════════════\nANFRAGE\n═══════════════════════════════════════════════════════════════════════════\n\n${prompt}${images?.length ? '\n\nAnalysiere auch die hochgeladenen Bilder/PDFs und extrahiere Farben, Stil und Markenidentität!' : ''}`
     })
 
-    const model = genAI.models.generateContent({
+    const response = await genAI.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: contentParts,
       config: {
-        // Enable thinking for better analysis
         thinkingConfig: {
           thinkingLevel: ThinkingLevel.HIGH,
         },
       },
     })
 
-    const response = await model
-
-    // Extract text from response
     const responseText = response.text || ''
 
-    // Parse JSON from response
+    // Parse JSON
     let suggestions: SetupSuggestion
     try {
-      // Try to extract JSON from response (might be wrapped in markdown)
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
       if (!jsonMatch) {
         throw new Error('No JSON found in response')
@@ -276,19 +390,172 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate and ensure required fields
+    // Validate archetype
+    if (!suggestions.archetype || !['architect', 'innovator', 'brutalist', 'organic'].includes(suggestions.archetype)) {
+      suggestions.archetype = 'innovator' // Default fallback
+    }
+
+    // Ensure radii exists with defaults based on archetype
+    if (!suggestions.radii) {
+      const radiiDefaults: Record<DesignArchetype, SetupSuggestion['radii']> = {
+        architect: {
+          style: 'sharp',
+          default: '0',
+          lg: '0',
+          xl: '0.125rem',
+          button: '0',
+          card: '0',
+          input: '0',
+        },
+        innovator: {
+          style: 'rounded',
+          default: '0.75rem',
+          lg: '1rem',
+          xl: '1.5rem',
+          button: '0.75rem',
+          card: '1rem',
+          input: '0.5rem',
+        },
+        brutalist: {
+          style: 'sharp',
+          default: '0',
+          lg: '0',
+          xl: '0',
+          button: '0',
+          card: '0',
+          input: '0',
+        },
+        organic: {
+          style: 'soft',
+          default: '1rem',
+          lg: '1.5rem',
+          xl: '2rem',
+          button: '9999px',
+          card: '1.5rem',
+          input: '1rem',
+        },
+      }
+      suggestions.radii = radiiDefaults[suggestions.archetype]
+    }
+
+    // Ensure motion exists with defaults
+    if (!suggestions.motion) {
+      const motionDefaults: Record<DesignArchetype, SetupSuggestion['motion']> = {
+        architect: {
+          style: 'elegant',
+          duration: { fast: '150ms', normal: '250ms', slow: '400ms' },
+          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+          hoverScale: 1.02,
+          revealDistance: '40px',
+        },
+        innovator: {
+          style: 'snappy',
+          duration: { fast: '150ms', normal: '300ms', slow: '500ms' },
+          easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+          hoverScale: 1.05,
+          revealDistance: '40px',
+        },
+        brutalist: {
+          style: 'bold',
+          duration: { fast: '100ms', normal: '150ms', slow: '250ms' },
+          easing: 'cubic-bezier(0.85, 0, 0.15, 1)',
+          hoverScale: 1.1,
+          revealDistance: '80px',
+        },
+        organic: {
+          style: 'playful',
+          duration: { fast: '200ms', normal: '400ms', slow: '600ms' },
+          easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+          hoverScale: 1.08,
+          revealDistance: '50px',
+        },
+      }
+      suggestions.motion = motionDefaults[suggestions.archetype]
+    }
+
+    // Ensure layout exists with defaults
+    if (!suggestions.layout) {
+      const layoutDefaults: Record<DesignArchetype, SetupSuggestion['layout']> = {
+        architect: {
+          style: 'asymmetric',
+          maxWidth: '1280px',
+          sectionSpacing: '5rem',
+          useOverlaps: false,
+          heroStyle: 'split',
+        },
+        innovator: {
+          style: 'symmetric',
+          maxWidth: '1440px',
+          sectionSpacing: '5rem',
+          useOverlaps: true,
+          heroStyle: 'centered',
+        },
+        brutalist: {
+          style: 'editorial',
+          maxWidth: '1600px',
+          sectionSpacing: '6rem',
+          useOverlaps: true,
+          heroStyle: 'fullwidth',
+        },
+        organic: {
+          style: 'organic',
+          maxWidth: '1200px',
+          sectionSpacing: '4rem',
+          useOverlaps: true,
+          heroStyle: 'editorial',
+        },
+      }
+      suggestions.layout = layoutDefaults[suggestions.archetype]
+    }
+
+    // Ensure effects exists with defaults
+    if (!suggestions.effects) {
+      const effectsDefaults: Record<DesignArchetype, SetupSuggestion['effects']> = {
+        architect: {
+          useNoise: false,
+          useBlur: false,
+          useGradientBlobs: false,
+          useScanLines: false,
+          borderStyle: 'subtle',
+        },
+        innovator: {
+          useNoise: true,
+          useBlur: true,
+          useGradientBlobs: true,
+          useScanLines: false,
+          borderStyle: 'none',
+        },
+        brutalist: {
+          useNoise: true,
+          useBlur: false,
+          useGradientBlobs: false,
+          useScanLines: true,
+          borderStyle: 'thick',
+        },
+        organic: {
+          useNoise: false,
+          useBlur: true,
+          useGradientBlobs: true,
+          useScanLines: false,
+          borderStyle: 'none',
+        },
+      }
+      suggestions.effects = effectsDefaults[suggestions.archetype]
+    }
+
+    // Validate pages
     if (!suggestions.pages || !Array.isArray(suggestions.pages)) {
       suggestions.pages = []
     }
 
-    // WICHTIG: isLegalPage NUR für Impressum und Datenschutz!
-    // Die KI setzt das manchmal falsch für andere Seiten
+    // Fix isLegalPage AND ensure all pages are selected by default
     suggestions.pages = suggestions.pages.map(page => ({
       ...page,
+      selected: true, // IMMER true - User kann manuell deselektieren
       isLegalPage: page.slug === 'impressum' || page.slug === 'datenschutz',
     }))
 
-    // Ensure Home page exists
+    // Ensure Home page
     if (!suggestions.pages.some(p => p.slug === '')) {
       suggestions.pages.unshift({
         name: 'Home',
@@ -300,7 +567,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Ensure legal pages exist
+    // Ensure legal pages
     if (!suggestions.pages.some(p => p.slug === 'impressum')) {
       suggestions.pages.push({
         name: 'Impressum',
@@ -322,6 +589,8 @@ export async function POST(request: NextRequest) {
         inFooter: true,
       })
     }
+
+    console.log(`[Setup] Generated suggestions with archetype: ${suggestions.archetype}`)
 
     return NextResponse.json(suggestions)
   } catch (error) {

@@ -323,15 +323,22 @@ export type Database = {
       }
       cms_components: {
         Row: {
+          ai_prompt: string | null
           category: string | null
+          content_type_ids: string[] | null
           created_at: string | null
+          css: string | null
           default_variant: string | null
           description: string | null
           html: string
           id: string
+          is_required: boolean | null
+          js: string | null
+          js_init: string | null
           name: string
           props: Json | null
           site_id: string
+          slug: string | null
           tags: string[] | null
           thumbnail_url: string | null
           type: string
@@ -340,15 +347,22 @@ export type Database = {
           variants: Json | null
         }
         Insert: {
+          ai_prompt?: string | null
           category?: string | null
+          content_type_ids?: string[] | null
           created_at?: string | null
+          css?: string | null
           default_variant?: string | null
           description?: string | null
           html: string
           id?: string
+          is_required?: boolean | null
+          js?: string | null
+          js_init?: string | null
           name: string
           props?: Json | null
           site_id: string
+          slug?: string | null
           tags?: string[] | null
           thumbnail_url?: string | null
           type: string
@@ -357,15 +371,22 @@ export type Database = {
           variants?: Json | null
         }
         Update: {
+          ai_prompt?: string | null
           category?: string | null
+          content_type_ids?: string[] | null
           created_at?: string | null
+          css?: string | null
           default_variant?: string | null
           description?: string | null
           html?: string
           id?: string
+          is_required?: boolean | null
+          js?: string | null
+          js_init?: string | null
           name?: string
           props?: Json | null
           site_id?: string
+          slug?: string | null
           tags?: string[] | null
           thumbnail_url?: string | null
           type?: string

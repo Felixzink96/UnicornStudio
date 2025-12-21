@@ -53,6 +53,10 @@ export interface SelectedElement {
     height: number
   }
   dataPath?: string
+  // Background Image Support
+  backgroundImage?: string      // URL des background-image (falls vorhanden)
+  hasBackgroundImage?: boolean  // true wenn Element background-image hat
+  ariaLabel?: string            // ARIA-Label für Accessibility
 }
 
 export interface ElementUpdate {

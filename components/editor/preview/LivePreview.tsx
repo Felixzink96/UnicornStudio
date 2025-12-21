@@ -696,6 +696,27 @@ export function LivePreview() {
 
             var rect = selectedElement.getBoundingClientRect();
             var cs = window.getComputedStyle(selectedElement);
+
+            // Background Image Detection
+            var bgImage = cs.backgroundImage;
+            var hasBackgroundImage = bgImage && bgImage !== 'none';
+            var backgroundImageUrl = null;
+
+            if (hasBackgroundImage) {
+              // CSS: background-image: url("...")
+              var urlMatch = bgImage.match(/url\\(["']?([^"')]+)["']?\\)/);
+              if (urlMatch) {
+                backgroundImageUrl = urlMatch[1];
+              }
+              // Tailwind arbitrary background URL class
+              if (!backgroundImageUrl && selectedElement.className) {
+                var twMatch = selectedElement.className.match(/bg-\\[url\\(['"]?([^'\"\\]]+)/);
+                if (twMatch) {
+                  backgroundImageUrl = twMatch[1];
+                }
+              }
+            }
+
             window.parent.postMessage({
               type: 'element-selected',
               element: {
@@ -707,6 +728,10 @@ export function LivePreview() {
                 innerHTML: selectedElement.innerHTML,
                 outerHTML: selectedElement.outerHTML,
                 rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+                // Background Image Support
+                backgroundImage: backgroundImageUrl,
+                hasBackgroundImage: hasBackgroundImage,
+                ariaLabel: selectedElement.getAttribute('aria-label') || '',
                 spacing: {
                   marginTop: parseInt(cs.marginTop)||0, marginRight: parseInt(cs.marginRight)||0,
                   marginBottom: parseInt(cs.marginBottom)||0, marginLeft: parseInt(cs.marginLeft)||0,

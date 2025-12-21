@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.31.0
+ * Version:           1.32.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.31.0');
+define('UNICORN_STUDIO_VERSION', '1.32.0');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -84,6 +84,7 @@ final class Unicorn_Studio {
     public $menus;
     public $forms;
     public $media_sync;
+    public $scripts;
 
     /**
      * Get single instance
@@ -146,6 +147,8 @@ final class Unicorn_Studio {
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-seo-manager.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-form-handler.php';
         require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-media-sync.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-cms-components.php';
+        require_once UNICORN_STUDIO_PLUGIN_DIR . 'includes/class-script-manager.php';
 
         // Initialize components
         $this->api = new Unicorn_Studio_API_Client();
@@ -172,6 +175,7 @@ final class Unicorn_Studio {
         $this->menus = Unicorn_Studio_Menus::get_instance();
         $this->forms = new Unicorn_Studio_Form_Handler();
         $this->media_sync = new Unicorn_Studio_Media_Sync();
+        $this->scripts = new Unicorn_Studio_Script_Manager();
 
         // Admin bar / floating button (frontend only)
         if (!is_admin()) {
@@ -209,6 +213,9 @@ final class Unicorn_Studio {
         // Output local fonts (GDPR-compliant)
         add_action('wp_head', [$this->fonts, 'output_font_preloads'], 5);
         add_action('wp_enqueue_scripts', [$this->fonts, 'enqueue_fonts'], 25);
+
+        // Enqueue CMS component JavaScript (from Unicorn Studio components)
+        add_action('wp_enqueue_scripts', ['Unicorn_Studio_CMS_Components', 'enqueue_scripts'], 30);
 
         // Add body classes
         add_filter('body_class', [$this, 'add_page_body_classes']);
@@ -515,6 +522,9 @@ register_activation_hook(__FILE__, function() {
         'sync_fonts' => true,
         'field_backend' => 'acf',
         'cpt_prefix' => 'us_',
+        'enable_gsap' => true,
+        'enable_alpine' => true,
+        'load_scripts_globally' => false,
     ]);
 
     // Create CSS and fonts directories

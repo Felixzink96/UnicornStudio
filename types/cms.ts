@@ -136,6 +136,7 @@ export interface FieldSettings {
   min?: number
   max?: number
   step?: number
+  unit?: string
 
   // Media settings
   allowedTypes?: string[]
@@ -415,6 +416,8 @@ export interface TermWithChildren extends Term {
 
 export type CMSComponentType = 'element' | 'block' | 'section' | 'layout'
 
+export type JSInitStrategy = 'immediate' | 'domready' | 'scroll' | 'interaction'
+
 export interface ComponentProp {
   name: string
   label: string
@@ -445,6 +448,15 @@ export interface CMSComponent {
 
   // Code
   html: string
+  css: string | null
+  js: string | null
+  js_init: JSInitStrategy
+
+  // AI Integration
+  slug: string | null
+  is_required: boolean
+  content_type_ids: string[]
+  ai_prompt: string | null
 
   // Variants
   variants: ComponentVariant[] | null
@@ -472,6 +484,13 @@ export interface CMSComponentInsert {
   category?: string | null
   tags?: string[] | null
   html: string
+  css?: string | null
+  js?: string | null
+  js_init?: JSInitStrategy
+  slug?: string | null
+  is_required?: boolean
+  content_type_ids?: string[]
+  ai_prompt?: string | null
   variants?: ComponentVariant[]
   default_variant?: string
   props?: ComponentProp[]
@@ -532,9 +551,15 @@ export interface TemplateUpdate extends Partial<Omit<TemplateInsert, 'site_id'>>
 // DESIGN VARIABLES
 // ============================================
 
+// Design Archetype for consistent visual language
+export type DesignArchetype = 'architect' | 'innovator' | 'brutalist' | 'organic'
+
 export interface DesignVariables {
   id: string
   site_id: string
+
+  // Design Archetype (determines overall visual style)
+  archetype?: DesignArchetype
 
   colors: {
     brand: {
@@ -606,9 +631,11 @@ export interface DesignVariables {
       '2xl': string
       [key: string]: string
     }
+    sectionSpacing?: string
   }
 
   borders: {
+    style?: 'sharp' | 'soft' | 'rounded' | 'pill'
     radius: {
       none: string
       sm: string
@@ -617,7 +644,10 @@ export interface DesignVariables {
       xl: string
       '2xl': string
       full: string
-      [key: string]: string
+      button?: string
+      card?: string
+      input?: string
+      [key: string]: string | undefined
     }
     widths: {
       thin: string
@@ -634,6 +664,37 @@ export interface DesignVariables {
     xl: string
     '2xl': string
     [key: string]: string
+  }
+
+  // Motion/Animation preferences (based on archetype)
+  motion?: {
+    style: 'elegant' | 'snappy' | 'bold' | 'playful'
+    duration: {
+      fast: string
+      normal: string
+      slow: string
+    }
+    easing: string
+    hoverScale: number
+    revealDistance: string
+  }
+
+  // Layout preferences (based on archetype)
+  layout?: {
+    style: 'symmetric' | 'asymmetric' | 'editorial' | 'organic'
+    maxWidth: string
+    sectionSpacing: string
+    useOverlaps: boolean
+    heroStyle: 'centered' | 'split' | 'fullwidth' | 'editorial'
+  }
+
+  // Visual Effects (based on archetype)
+  effects?: {
+    useNoise: boolean
+    useBlur: boolean
+    useGradientBlobs: boolean
+    useScanLines: boolean
+    borderStyle: 'none' | 'subtle' | 'prominent' | 'thick'
   }
 
   // Gradients
@@ -658,12 +719,16 @@ export interface DesignVariables {
 }
 
 export interface DesignVariablesUpdate {
-  site_id: string
+  site_id?: string
+  archetype?: DesignArchetype
   colors?: Partial<DesignVariables['colors']>
   typography?: Partial<DesignVariables['typography']>
   spacing?: Partial<DesignVariables['spacing']>
   borders?: Partial<DesignVariables['borders']>
   shadows?: Partial<DesignVariables['shadows']>
+  motion?: DesignVariables['motion']
+  layout?: DesignVariables['layout']
+  effects?: DesignVariables['effects']
   gradients?: DesignVariables['gradients']
   customColors?: DesignVariables['customColors']
 }

@@ -278,7 +278,7 @@ const initialState: EditorStateWithMenus = {
  * Apply design tokens to document as CSS custom properties
  * This enables the token-based utility classes to work in the editor
  */
-function applyDesignTokensToDocument(designVars: Record<string, unknown>) {
+function applyDesignTokensToDocument(designVars: DesignVariables | Record<string, unknown>) {
   if (typeof window === 'undefined') return
 
   const root = document.documentElement

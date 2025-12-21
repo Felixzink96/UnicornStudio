@@ -334,17 +334,92 @@ export function ChatPanel() {
         ? 'Zentriertes Layout (Logo und Navigation mittig übereinander)'
         : 'Mega Menu Layout (mit Dropdown-Panels für Unterseiten)'
 
+    // Archetyp-spezifische Beschreibungen
+    const archetypeDescriptions: Record<string, string> = {
+      architect: `ARCHITECT-STIL (Seriös, Premium):
+- Formen: ECKIG! Nutze rounded-none oder rounded-sm. Keine runden Elemente!
+- Layout: Asymmetrische Grids, feine Linien (border-[0.5px]), viel Weißraum
+- Typo: GROSS und elegant. Serif für Headlines, Sans für Body
+- Motion: LANGSAM (700-1000ms), elegant, KEINE bouncy Effekte
+- Borders: Feine, dezente Linien statt Schatten
+- Gesamteindruck: Wie eine Premium-Anwaltskanzlei oder Luxus-Bank`,
+
+      innovator: `INNOVATOR-STIL (Modern, Tech):
+- Formen: RUND! Nutze rounded-2xl, rounded-3xl. Weiche, freundliche Ecken
+- Layout: Glassmorphism, weiche Schatten, schwebende Cards
+- Typo: Modern Geometric Sans (wie Inter, Space Grotesk)
+- Motion: SCHNELL (200-400ms), snappy, micro-interactions
+- Effekte: Blur-Backgrounds, Gradient Blobs, subtiles Noise, Glow auf CTAs
+- Gesamteindruck: Wie ein modernes SaaS-Produkt oder Tech-Startup`,
+
+      brutalist: `BRUTALIST-STIL (Bold, Künstlerisch):
+- Formen: EXTREM! Entweder komplett eckig (rounded-none) ODER komplett rund (rounded-full). Kein Mittelweg!
+- Layout: RIESIGE Typografie (text-8xl+), dicke Borders (border-4), Marquee-Text
+- Typo: Monospace oder Bold Display Fonts (Bebas Neue, Anton)
+- Motion: HART und schnell (100-200ms), "in your face"
+- Effekte: Scan-Lines, starke Kontraste, KEINE weichen Blurs
+- Gesamteindruck: Wie eine Kunst-Galerie oder Mode-Agentur`,
+
+      organic: `ORGANIC-STIL (Soft, Natürlich):
+- Formen: SEHR WEICH! Nutze rounded-[40px], rounded-full, Blob-Shapes
+- Layout: Überlappende Bilder, natürliche Anordnung, asymmetrisch aber soft
+- Typo: Rounded Sans (Nunito, Quicksand), evtl. Handschrift-Akzente
+- Motion: BOUNCY (ease-out mit Überschwung), elastisch, verspielt
+- Effekte: Soft Shadows, Gradient Blobs, natürliche Farben
+- Gesamteindruck: Wie ein Wellness-Spa oder Bio-Food-Brand`,
+    }
+
+    const archetypeDesc = archetypeDescriptions[setupData.archetype] || archetypeDescriptions.innovator
+
     return `${originalPrompt}
 
---- WEBSITE SETUP (vom User konfiguriert) ---
+═══════════════════════════════════════════════════════════════════════════
+WEBSITE SETUP (vom User konfiguriert)
+═══════════════════════════════════════════════════════════════════════════
+
 Website-Name: ${setupData.siteName}
 Website-Typ: ${setupData.siteType}
+Design-Archetyp: ${setupData.archetype.toUpperCase()}
 
 SEITEN die verlinkt werden müssen:
 ${selectedPages.map(p => `- "${p.name}" -> href="/${p.slug}"`).join('\n')}
 
-=== HEADER ANFORDERUNGEN ===
-Erstelle einen hochwertigen, modernen Header mit folgenden Vorgaben:
+═══════════════════════════════════════════════════════════════════════════
+DESIGN-ARCHETYP: ${setupData.archetype.toUpperCase()}
+═══════════════════════════════════════════════════════════════════════════
+
+${archetypeDesc}
+
+BORDER-RADIUS (für diesen Archetyp):
+- Default: ${setupData.radii.default}
+- Buttons: ${setupData.radii.button}
+- Cards: ${setupData.radii.card}
+- Inputs: ${setupData.radii.input}
+
+MOTION (für diesen Archetyp):
+- Stil: ${setupData.motion.style}
+- Geschwindigkeit: fast=${setupData.motion.duration.fast}, normal=${setupData.motion.duration.slow}
+- Easing: ${setupData.motion.easing}
+- Hover-Scale: ${setupData.motion.hoverScale}
+
+LAYOUT (für diesen Archetyp):
+- Stil: ${setupData.layout.style}
+- Max-Width: ${setupData.layout.maxWidth}
+- Section-Spacing: ${setupData.layout.sectionSpacing}
+- Hero-Stil: ${setupData.layout.heroStyle}
+${setupData.layout.useOverlaps ? '- Overlapping Elemente erlaubt' : '- Keine Overlaps'}
+
+EFFEKTE (für diesen Archetyp):
+${setupData.effects.useNoise ? '- Noise-Textur im Hintergrund' : ''}
+${setupData.effects.useBlur ? '- Blur/Glassmorphism erlaubt' : ''}
+${setupData.effects.useGradientBlobs ? '- Gradient Blobs als Dekoration' : ''}
+${setupData.effects.useScanLines ? '- Scan-Lines für Retro/Tech-Look' : ''}
+${setupData.effects.borderStyle !== 'none' ? `- Border-Stil: ${setupData.effects.borderStyle}` : ''}
+
+═══════════════════════════════════════════════════════════════════════════
+HEADER ANFORDERUNGEN
+═══════════════════════════════════════════════════════════════════════════
+
 - Stil: ${headerStyleDesc}
 - Navigation-Links: ${headerMenuItems}
 - Links müssen zu den echten Seiten verlinken (siehe oben)
@@ -352,19 +427,25 @@ ${setupData.headerSettings.showCta ? `- CTA-Button: "${setupData.headerSettings.
 ${setupData.headerSettings.sticky ? '- Header soll sticky sein (fixed beim Scrollen)' : '- Header ist nicht sticky'}
 - Mobile: Burger-Menu für kleine Bildschirme
 
-=== FOOTER ANFORDERUNGEN ===
-Erstelle einen passenden Footer mit:
+═══════════════════════════════════════════════════════════════════════════
+FOOTER ANFORDERUNGEN
+═══════════════════════════════════════════════════════════════════════════
+
 - Links zu: ${footerMenuItems}
 - Links müssen zu den echten Seiten verlinken
 ${setupData.footerSettings.showCopyright ? `- Copyright-Text: "${setupData.footerSettings.copyrightText}"` : ''}
 
-=== DESIGN-SYSTEM ===
+═══════════════════════════════════════════════════════════════════════════
+FARBEN (CSS-Variablen)
+═══════════════════════════════════════════════════════════════════════════
 
-GRUNDFARBEN (CSS-Variablen - für Buttons, Text, Backgrounds):
+BRAND:
 - bg-[var(--color-brand-primary)] (${setupData.tokens.colors.primary})
-- hover:bg-[var(--color-brand-primaryHover)] (${setupData.tokens.colors.primaryHover})
+- hover:bg-[var(--color-brand-primary-hover)] (${setupData.tokens.colors.primaryHover})
 - bg-[var(--color-brand-secondary)] (${setupData.tokens.colors.secondary})
 - bg-[var(--color-brand-accent)] (${setupData.tokens.colors.accent})
+
+NEUTRAL:
 - bg-[var(--color-neutral-background)] (${setupData.tokens.colors.background})
 - text-[var(--color-neutral-foreground)] (${setupData.tokens.colors.foreground})
 - bg-[var(--color-neutral-muted)] (${setupData.tokens.colors.muted})
@@ -373,24 +454,20 @@ ${Object.keys(setupData.customColors).length > 0 ? `
 CUSTOM:
 ${Object.entries(setupData.customColors).map(([key, value]) => `- bg-[var(--color-custom-${key})] (${value})`).join('\n')}` : ''}
 
-KREATIVE FREIHEIT (für besondere Design-Elemente):
-- Eigene Gradients für Hero-Bereiche, Dekorationen
-- Kreative Schatten und Glows
-- Spezielle Hover-Effekte und Animationen
-- Dekorative Blobs, Patterns, Overlays
-
 SCHRIFTEN:
 - style="font-family: var(--font-heading)" (${setupData.tokens.fonts.heading})
 - style="font-family: var(--font-body)" (${setupData.tokens.fonts.body})
 ${setupData.tokens.fonts.mono ? `- style="font-family: var(--font-mono)" (${setupData.tokens.fonts.mono})` : ''}
 
-=== ICONS ===
-⚠️ KEINE EMOJIS! Verwende IMMER inline SVG Icons.
+═══════════════════════════════════════════════════════════════════════════
+WICHTIGE REGELN
+═══════════════════════════════════════════════════════════════════════════
 
-Erstelle ein EINZIGARTIGES Premium-Design: Grundfarben konsistent, aber kreative Extras für WOW-Effekt!
-
-WICHTIG: Generiere die KOMPLETTE Seite mit Header, Main Content und Footer.
-Der Header und Footer werden automatisch erkannt und als wiederverwendbare Komponenten gespeichert.`
+1. HALTE DICH STRIKT AN DEN ${setupData.archetype.toUpperCase()}-ARCHETYP!
+2. KEINE EMOJIS! Verwende IMMER inline SVG Icons.
+3. Nutze GSAP-kompatible Animationen: data-reveal="up|down|left|right", data-parallax="0.5"
+4. Generiere die KOMPLETTE Seite mit Header, Main Content und Footer.
+5. Der Header und Footer werden automatisch erkannt und als wiederverwendbare Komponenten gespeichert.`
   }
 
   // Store enhanced prompt for API (not shown in chat)
@@ -2219,8 +2296,11 @@ document.addEventListener('DOMContentLoaded', function() {
           if (!siteId) return
 
           try {
-            // 1. Design-Tokens speichern
+            // 1. Design-Tokens speichern (inkl. Archetyp-Daten)
             const designUpdate: Parameters<typeof updateDesignVariables>[1] = {
+              // Design Archetype
+              archetype: data.archetype,
+
               colors: {
                 brand: {
                   primary: data.tokens.colors.primary,
@@ -2256,29 +2336,53 @@ document.addEventListener('DOMContentLoaded', function() {
                   '2xl': '4rem',
                   '3xl': '6rem',
                   section: data.tokens.spacing.section,
-                  container: data.tokens.spacing.container,
+                  container: data.layout.maxWidth,
                   'card-gap': data.tokens.spacing.cardGap,
                 },
                 containerWidths: {
                   sm: '640px',
                   md: '768px',
                   lg: '1024px',
-                  xl: data.tokens.spacing.container,
+                  xl: data.layout.maxWidth,
                   '2xl': '1536px',
                 },
+                sectionSpacing: data.layout.sectionSpacing,
               },
+              // Border Radius based on Archetype
               borders: {
+                style: data.radii.style,
                 radius: {
                   none: '0',
                   sm: '0.125rem',
-                  md: data.tokens.radii.default,
-                  lg: data.tokens.radii.lg,
-                  xl: '1rem',
+                  md: data.radii.default,
+                  lg: data.radii.lg,
+                  xl: data.radii.xl,
                   '2xl': '1.5rem',
                   full: '9999px',
-                  default: data.tokens.radii.default,
+                  default: data.radii.default,
+                  button: data.radii.button,
+                  card: data.radii.card,
+                  input: data.radii.input,
                 },
               },
+              // Motion/Animation based on Archetype
+              motion: {
+                style: data.motion.style,
+                duration: data.motion.duration,
+                easing: data.motion.easing,
+                hoverScale: data.motion.hoverScale,
+                revealDistance: data.motion.revealDistance,
+              },
+              // Layout based on Archetype
+              layout: {
+                style: data.layout.style,
+                maxWidth: data.layout.maxWidth,
+                sectionSpacing: data.layout.sectionSpacing,
+                useOverlaps: data.layout.useOverlaps,
+                heroStyle: data.layout.heroStyle,
+              },
+              // Visual Effects based on Archetype
+              effects: data.effects,
             }
 
             // Add gradient if enabled

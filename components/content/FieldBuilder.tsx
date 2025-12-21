@@ -41,9 +41,11 @@ import {
 } from 'lucide-react'
 import { FieldTypeSelector } from './FieldTypeSelector'
 import { FieldForm } from './FieldForm'
+import { FieldBuilderChat } from './FieldBuilderChat'
 import { FIELD_TYPES } from '@/lib/content/field-types'
 import {
   createField,
+  createFields,
   updateField,
   deleteField,
   duplicateField,
@@ -54,6 +56,7 @@ import type { Field, FieldType, FieldInsert, ContentType, Taxonomy } from '@/typ
 interface FieldBuilderProps {
   siteId: string
   contentTypeId: string
+  contentTypeName?: string
   initialFields: Field[]
   taxonomies: Taxonomy[]
   allContentTypes: ContentType[]
@@ -62,6 +65,7 @@ interface FieldBuilderProps {
 export function FieldBuilder({
   siteId,
   contentTypeId,
+  contentTypeName,
   initialFields,
   taxonomies,
   allContentTypes,
@@ -191,6 +195,17 @@ export function FieldBuilder({
       }
       return next
     })
+  }
+
+  // Handle AI-generated fields
+  const handleAIGeneratedFields = async (fieldInserts: FieldInsert[]) => {
+    try {
+      const newFields = await createFields(fieldInserts)
+      setFields((prev) => [...prev, ...newFields])
+    } catch (error) {
+      console.error('Error creating AI-generated fields:', error)
+      throw error
+    }
   }
 
   return (
@@ -354,15 +369,26 @@ export function FieldBuilder({
         </div>
       )}
 
-      {/* Add Field Button */}
-      <Button
-        onClick={() => setIsAddingField(true)}
-        variant="outline"
-        className="w-full border-dashed border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
-      >
-        <Plus className="h-4 w-4 mr-2" />
-        Feld hinzufügen
-      </Button>
+      {/* Add Field Buttons */}
+      <div className="flex gap-3">
+        <Button
+          onClick={() => setIsAddingField(true)}
+          variant="outline"
+          className="flex-1 border-dashed border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Feld hinzufügen
+        </Button>
+
+        {/* AI Field Generation */}
+        <FieldBuilderChat
+          siteId={siteId}
+          contentTypeId={contentTypeId}
+          contentTypeName={contentTypeName}
+          existingFields={fields}
+          onFieldsGenerated={handleAIGeneratedFields}
+        />
+      </div>
 
       {/* Field Type Selector Dialog */}
       <Dialog open={isAddingField && !selectedFieldType} onOpenChange={setIsAddingField}>

@@ -38,6 +38,7 @@ export async function loadAllReferences(options: ResolverOptions): Promise<Refer
     pagesResult,
     menusResult,
     componentsResult,
+    cmsComponentsResult,
     entriesResult,
     tokensResult,
   ] = await Promise.all([
@@ -58,7 +59,7 @@ export async function loadAllReferences(options: ResolverOptions): Promise<Refer
           .order('name')
       : Promise.resolve({ data: null }),
 
-    // Components (Header/Footer)
+    // Components (Header/Footer) - Legacy
     (!includeCategories || includeCategories.includes('component'))
       ? supabase
           .from('components')
@@ -66,6 +67,16 @@ export async function loadAllReferences(options: ResolverOptions): Promise<Refer
           .eq('site_id', siteId)
           .in('position', ['header', 'footer'])
           .order('position')
+      : Promise.resolve({ data: null }),
+
+    // CMS Components (TOC, Reading Progress, etc.)
+    (!includeCategories || includeCategories.includes('component'))
+      ? supabase
+          .from('cms_components')
+          .select('id, name, slug, type, html, css, js, description')
+          .eq('site_id', siteId)
+          .not('slug', 'is', null)
+          .order('name')
       : Promise.resolve({ data: null }),
 
     // Entries
@@ -129,23 +140,45 @@ export async function loadAllReferences(options: ResolverOptions): Promise<Refer
     })
   }
 
-  // Components verarbeiten
-  if (componentsResult.data && componentsResult.data.length > 0) {
-    const componentRefs: ComponentReference[] = componentsResult.data.map((comp) => ({
-      id: comp.id,
-      name: comp.name,
-      displayName: comp.name,
-      category: 'component' as const,
-      icon: 'component',
-      position: comp.position as 'header' | 'footer' | 'content',
-      html: comp.html || undefined,
-    }))
+  // Components verarbeiten (Header/Footer + CMS Components)
+  const allComponentRefs: ComponentReference[] = []
 
+  // Legacy Header/Footer
+  if (componentsResult.data && componentsResult.data.length > 0) {
+    componentsResult.data.forEach((comp) => {
+      allComponentRefs.push({
+        id: comp.id,
+        name: comp.name,
+        displayName: `${comp.position === 'header' ? '🔝' : '🔻'} ${comp.name}`,
+        category: 'component' as const,
+        icon: 'component',
+        position: comp.position as 'header' | 'footer' | 'content',
+        html: comp.html || undefined,
+      })
+    })
+  }
+
+  // CMS Components (TOC, Reading Progress, etc.)
+  if (cmsComponentsResult.data && cmsComponentsResult.data.length > 0) {
+    cmsComponentsResult.data.forEach((comp) => {
+      allComponentRefs.push({
+        id: `cms_${comp.id}`, // Prefix to distinguish from legacy
+        name: comp.name,
+        displayName: `🧩 ${comp.name}`,
+        category: 'component' as const,
+        icon: 'puzzle',
+        position: 'content' as const,
+        html: comp.html || undefined,
+      })
+    })
+  }
+
+  if (allComponentRefs.length > 0) {
     groups.push({
       category: 'component',
       label: 'Components',
       icon: 'component',
-      items: componentRefs,
+      items: allComponentRefs,
     })
   }
 
@@ -482,26 +515,55 @@ export async function resolveReferencesForAI(
     )
   }
 
-  // Components (mit ID, CSS, JS)
+  // Components (mit ID, CSS, JS) - Legacy + CMS
   if (byCategory.component) {
-    promises.push(
-      supabase
-        .from('components')
-        .select('id, name, position, html, css, js')
-        .in('id', byCategory.component)
-        .then(({ data }) => {
-          if (data) {
-            result.components = data.map((c) => ({
-              id: c.id,
-              name: c.name,
-              position: c.position || 'content',
-              html: c.html || '',
-              css: c.css || undefined,
-              js: c.js || undefined,
-            }))
-          }
-        })
-    )
+    // Split IDs into legacy and CMS
+    const legacyIds = byCategory.component.filter(id => !id.startsWith('cms_'))
+    const cmsIds = byCategory.component.filter(id => id.startsWith('cms_')).map(id => id.replace('cms_', ''))
+
+    // Legacy components
+    if (legacyIds.length > 0) {
+      promises.push(
+        supabase
+          .from('components')
+          .select('id, name, position, html, css, js')
+          .in('id', legacyIds)
+          .then(({ data }) => {
+            if (data) {
+              result.components = (result.components || []).concat(data.map((c) => ({
+                id: c.id,
+                name: c.name,
+                position: c.position || 'content',
+                html: c.html || '',
+                css: c.css || undefined,
+                js: c.js || undefined,
+              })))
+            }
+          })
+      )
+    }
+
+    // CMS Components
+    if (cmsIds.length > 0) {
+      promises.push(
+        supabase
+          .from('cms_components')
+          .select('id, name, slug, html, css, js')
+          .in('id', cmsIds)
+          .then(({ data }) => {
+            if (data) {
+              result.components = (result.components || []).concat(data.map((c) => ({
+                id: `cms_${c.id}`,
+                name: c.name,
+                position: 'content',
+                html: c.html || '',
+                css: c.css || undefined,
+                js: c.js || undefined,
+              })))
+            }
+          })
+      )
+    }
   }
 
   // Sections (aus aktuellem HTML)

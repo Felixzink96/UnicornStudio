@@ -1,8 +1,6 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { ArrowLeft, Puzzle } from 'lucide-react'
-import { ComponentEditor } from '@/components/components-library/ComponentEditor'
+import { ComponentEditorAI } from '@/components/components-library/ComponentEditorAI'
 import type { CMSComponent } from '@/types/cms'
 
 interface EditComponentPageProps {
@@ -36,32 +34,29 @@ export default async function EditComponentPage({ params }: EditComponentPagePro
     notFound()
   }
 
+  // Get design variables for preview
+  const { data: designVars } = await supabase
+    .from('design_variables')
+    .select('*')
+    .eq('site_id', siteId)
+    .single()
+
   const component = componentData as CMSComponent
 
+  // Cast design variables to expected format
+  const designTokens = designVars ? {
+    colors: designVars.colors as { brand?: Record<string, string>; neutral?: Record<string, string> } | undefined,
+    typography: designVars.typography as { fontHeading?: string; fontBody?: string; fontMono?: string } | undefined,
+  } : undefined
+
+  // Full-screen overlay editor (like template editor)
   return (
-    <div className="p-8">
-      {/* Back Link */}
-      <Link
-        href={`/dashboard/sites/${siteId}/components`}
-        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Zurück zur Component Library
-      </Link>
-
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-          <Puzzle className="h-8 w-8 text-purple-500" />
-          {component.name}
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Component bearbeiten
-        </p>
-      </div>
-
-      {/* Component Editor */}
-      <ComponentEditor siteId={siteId} component={component} />
+    <div className="fixed inset-0 z-50">
+      <ComponentEditorAI
+        siteId={siteId}
+        component={component}
+        designVariables={designTokens}
+      />
     </div>
   )
 }

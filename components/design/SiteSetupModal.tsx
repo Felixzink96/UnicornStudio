@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { generateSlug, type PageSuggestion } from '@/lib/ai/page-suggestions'
 import type { SuggestedTokens } from '@/lib/design/style-extractor'
-import type { SetupSuggestion } from '@/app/api/ai/setup-suggestions/route'
+import type { SetupSuggestion, DesignArchetype } from '@/app/api/ai/setup-suggestions/route'
 
 // ============================================================================
 // TYPES
@@ -60,6 +60,38 @@ export interface SiteSetupData {
   tokens: SuggestedTokens
   gradient: GradientSettings
   customColors: Record<string, string>
+  // NEW: Design Archetype System
+  archetype: DesignArchetype
+  radii: {
+    style: 'sharp' | 'soft' | 'rounded' | 'pill'
+    default: string
+    lg: string
+    xl: string
+    button: string
+    card: string
+    input: string
+  }
+  motion: {
+    style: 'elegant' | 'snappy' | 'bold' | 'playful'
+    duration: { fast: string; normal: string; slow: string }
+    easing: string
+    hoverScale: number
+    revealDistance: string
+  }
+  layout: {
+    style: 'symmetric' | 'asymmetric' | 'editorial' | 'organic'
+    maxWidth: string
+    sectionSpacing: string
+    useOverlaps: boolean
+    heroStyle: 'centered' | 'split' | 'fullwidth' | 'editorial'
+  }
+  effects: {
+    useNoise: boolean
+    useBlur: boolean
+    useGradientBlobs: boolean
+    useScanLines: boolean
+    borderStyle: 'none' | 'subtle' | 'prominent' | 'thick'
+  }
   headerSettings: {
     style: 'simple' | 'centered' | 'mega'
     menuItems: { name: string; slug: string }[]
@@ -109,6 +141,42 @@ const DEFAULT_GRADIENT: GradientSettings = {
   from: '#3b82f6',
   to: '#8b5cf6',
   direction: 'to-br',
+}
+
+const DEFAULT_ARCHETYPE: DesignArchetype = 'innovator'
+
+const DEFAULT_RADII: SiteSetupData['radii'] = {
+  style: 'rounded',
+  default: '0.75rem',
+  lg: '1rem',
+  xl: '1.5rem',
+  button: '0.75rem',
+  card: '1rem',
+  input: '0.5rem',
+}
+
+const DEFAULT_MOTION: SiteSetupData['motion'] = {
+  style: 'snappy',
+  duration: { fast: '150ms', normal: '300ms', slow: '500ms' },
+  easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+  hoverScale: 1.05,
+  revealDistance: '40px',
+}
+
+const DEFAULT_LAYOUT: SiteSetupData['layout'] = {
+  style: 'symmetric',
+  maxWidth: '1440px',
+  sectionSpacing: '5rem',
+  useOverlaps: true,
+  heroStyle: 'centered',
+}
+
+const DEFAULT_EFFECTS: SiteSetupData['effects'] = {
+  useNoise: true,
+  useBlur: true,
+  useGradientBlobs: true,
+  useScanLines: false,
+  borderStyle: 'none',
 }
 
 const POPULAR_FONTS = [
@@ -188,6 +256,56 @@ export function SiteSetupModal({
   const [gradient, setGradient] = React.useState<GradientSettings>(DEFAULT_GRADIENT)
   const [customColors, setCustomColors] = React.useState<Record<string, string>>({})
 
+  // NEW: Archetype-based design settings
+  const [archetype, setArchetype] = React.useState<DesignArchetype>(DEFAULT_ARCHETYPE)
+  const [radii, setRadii] = React.useState<SiteSetupData['radii']>(DEFAULT_RADII)
+  const [motion, setMotion] = React.useState<SiteSetupData['motion']>(DEFAULT_MOTION)
+  const [layout, setLayout] = React.useState<SiteSetupData['layout']>(DEFAULT_LAYOUT)
+  const [effects, setEffects] = React.useState<SiteSetupData['effects']>(DEFAULT_EFFECTS)
+
+  // Archetyp-spezifische Defaults
+  const ARCHETYPE_DEFAULTS: Record<DesignArchetype, {
+    radii: SiteSetupData['radii']
+    motion: SiteSetupData['motion']
+    layout: SiteSetupData['layout']
+    effects: SiteSetupData['effects']
+  }> = {
+    architect: {
+      radii: { style: 'sharp', default: '0', lg: '0', xl: '0.125rem', button: '0', card: '0', input: '0' },
+      motion: { style: 'elegant', duration: { fast: '150ms', normal: '250ms', slow: '400ms' }, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', hoverScale: 1.02, revealDistance: '40px' },
+      layout: { style: 'asymmetric', maxWidth: '1280px', sectionSpacing: '5rem', useOverlaps: false, heroStyle: 'split' },
+      effects: { useNoise: false, useBlur: false, useGradientBlobs: false, useScanLines: false, borderStyle: 'subtle' },
+    },
+    innovator: {
+      radii: { style: 'rounded', default: '0.75rem', lg: '1rem', xl: '1.5rem', button: '0.75rem', card: '1rem', input: '0.5rem' },
+      motion: { style: 'snappy', duration: { fast: '150ms', normal: '300ms', slow: '500ms' }, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', hoverScale: 1.05, revealDistance: '40px' },
+      layout: { style: 'symmetric', maxWidth: '1440px', sectionSpacing: '5rem', useOverlaps: true, heroStyle: 'centered' },
+      effects: { useNoise: true, useBlur: true, useGradientBlobs: true, useScanLines: false, borderStyle: 'none' },
+    },
+    brutalist: {
+      radii: { style: 'sharp', default: '0', lg: '0', xl: '0', button: '0', card: '0', input: '0' },
+      motion: { style: 'bold', duration: { fast: '100ms', normal: '150ms', slow: '250ms' }, easing: 'cubic-bezier(0.85, 0, 0.15, 1)', hoverScale: 1.1, revealDistance: '80px' },
+      layout: { style: 'editorial', maxWidth: '1600px', sectionSpacing: '6rem', useOverlaps: true, heroStyle: 'fullwidth' },
+      effects: { useNoise: true, useBlur: false, useGradientBlobs: false, useScanLines: true, borderStyle: 'thick' },
+    },
+    organic: {
+      radii: { style: 'soft', default: '1rem', lg: '1.5rem', xl: '2rem', button: '9999px', card: '1.5rem', input: '1rem' },
+      motion: { style: 'playful', duration: { fast: '200ms', normal: '400ms', slow: '600ms' }, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', hoverScale: 1.08, revealDistance: '50px' },
+      layout: { style: 'organic', maxWidth: '1200px', sectionSpacing: '4rem', useOverlaps: true, heroStyle: 'editorial' },
+      effects: { useNoise: false, useBlur: true, useGradientBlobs: true, useScanLines: false, borderStyle: 'none' },
+    },
+  }
+
+  // Handler für Archetyp-Änderung - setzt automatisch passende Defaults
+  const handleArchetypeChange = (newArchetype: DesignArchetype) => {
+    setArchetype(newArchetype)
+    const defaults = ARCHETYPE_DEFAULTS[newArchetype]
+    setRadii(defaults.radii)
+    setMotion(defaults.motion)
+    setLayout(defaults.layout)
+    setEffects(defaults.effects)
+  }
+
   const [headerStyle, setHeaderStyle] = React.useState<'simple' | 'centered' | 'mega'>('simple')
   const [headerSticky, setHeaderSticky] = React.useState(true)
   const [headerCta, setHeaderCta] = React.useState(true)
@@ -259,6 +377,27 @@ export function SiteSetupModal({
 
       if (data.customColors && Object.keys(data.customColors).length > 0) {
         setCustomColors(data.customColors)
+      }
+
+      // NEW: Load archetype-based settings
+      if (data.archetype) {
+        setArchetype(data.archetype)
+      }
+
+      if (data.radii) {
+        setRadii(data.radii)
+      }
+
+      if (data.motion) {
+        setMotion(data.motion)
+      }
+
+      if (data.layout) {
+        setLayout(data.layout)
+      }
+
+      if (data.effects) {
+        setEffects(data.effects)
       }
 
       if (data.headerSettings) {
@@ -340,6 +479,12 @@ export function SiteSetupModal({
         tokens,
         gradient,
         customColors,
+        // NEW: Archetype-based settings
+        archetype,
+        radii,
+        motion,
+        layout,
+        effects,
         headerSettings: {
           style: headerStyle,
           menuItems: headerItems,
@@ -570,7 +715,7 @@ export function SiteSetupModal({
                     // Real Pages
                     pages.map((page, idx) => (
                       <div
-                        key={page.slug || 'home'}
+                        key={`page-${idx}-${page.slug}`}
                         className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-colors ${
                           page.selected
                             ? 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800'
@@ -656,8 +801,70 @@ export function SiteSetupModal({
           {/* STEP: Design */}
           {step === 'design' && (
             <div className="space-y-6">
-              {/* Colors Section */}
+              {/* Design Archetype */}
               <div>
+                <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-3 block">Design-Stil</label>
+                {loading ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1, 2, 3, 4].map(i => (
+                      <Skeleton key={i} className="h-20 rounded-xl" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { id: 'architect' as const, name: 'Architect', desc: 'Seriös', preview: 'rounded-none' },
+                      { id: 'innovator' as const, name: 'Innovator', desc: 'Modern', preview: 'rounded-xl' },
+                      { id: 'brutalist' as const, name: 'Brutalist', desc: 'Bold', preview: 'rounded-none' },
+                      { id: 'organic' as const, name: 'Organic', desc: 'Soft', preview: 'rounded-full' },
+                    ].map((arch) => (
+                      <button
+                        key={arch.id}
+                        onClick={() => handleArchetypeChange(arch.id)}
+                        className={`relative p-3 rounded-xl border-2 text-center transition-all ${
+                          archetype === arch.id
+                            ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-zinc-800'
+                            : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                        }`}
+                      >
+                        {/* Visual Preview Shape */}
+                        <div className={`mx-auto w-8 h-8 mb-2 border-2 border-zinc-400 dark:border-zinc-500 ${arch.preview}`} />
+                        <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block">{arch.name}</span>
+                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400">{arch.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Derived Settings Preview */}
+                {!loading && (
+                  <div className="mt-4 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
+                    <div className="grid grid-cols-4 gap-4 text-center">
+                      <div>
+                        <span className="text-[10px] text-zinc-400 block mb-1">Ecken</span>
+                        <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{radii.style}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-zinc-400 block mb-1">Animation</span>
+                        <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{motion.style}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-zinc-400 block mb-1">Layout</span>
+                        <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{layout.style}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-zinc-400 block mb-1">Effekte</span>
+                        <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                          {[effects.useNoise && 'Noise', effects.useBlur && 'Blur', effects.useGradientBlobs && 'Blobs'].filter(Boolean).join(', ') || 'Keine'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Colors Section */}
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700">
                 <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-3 block">Hauptfarben</label>
                 <div className="grid grid-cols-4 gap-3">
                   {[

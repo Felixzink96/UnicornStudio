@@ -696,34 +696,18 @@ export function extractGlobalComponents(html: string): ExtractedGlobalComponents
     }
   }
 
-  // Extract header from HTML
-  if (header) {
-    // Try <header> tag first
-    let headerMatch = html.match(/<header[^>]*>[\s\S]*?<\/header>/i)
-
-    // If no <header>, try <nav> with header indicators (fixed, sticky, top-0)
-    if (!headerMatch) {
-      headerMatch = html.match(/<nav[^>]*(?:class="[^"]*(?:fixed|sticky)[^"]*"|id="(?:header|nav|navigation)")[^>]*>[\s\S]*?<\/nav>/i)
-    }
-
-    // Try div with header ID
-    if (!headerMatch) {
-      headerMatch = html.match(/<div[^>]*id="(?:header|main-header|site-header)"[^>]*>[\s\S]*?<\/div>/i)
-    }
-
-    if (headerMatch) {
-      // Remove header from content HTML
-      contentHtml = contentHtml.replace(headerMatch[0], '').trim()
-    }
+  // Extract header from HTML - use the already detected HTML from analyzeHtmlForComponents
+  if (header && header.html) {
+    // Use the exact HTML that was detected (handles nested elements correctly)
+    contentHtml = contentHtml.replace(header.html, '').trim()
+    console.log('[extractGlobalComponents] Removed header, length:', header.html.length)
   }
 
-  // Extract footer from HTML
-  if (footer) {
-    const footerMatch = html.match(/<footer[^>]*>[\s\S]*?<\/footer>/i)
-    if (footerMatch) {
-      // Remove footer from content HTML
-      contentHtml = contentHtml.replace(footerMatch[0], '').trim()
-    }
+  // Extract footer from HTML - use the already detected HTML from analyzeHtmlForComponents
+  if (footer && footer.html) {
+    // Use the exact HTML that was detected (handles nested elements correctly)
+    contentHtml = contentHtml.replace(footer.html, '').trim()
+    console.log('[extractGlobalComponents] Removed footer, length:', footer.html.length)
   }
 
   // Clean up any empty lines left behind

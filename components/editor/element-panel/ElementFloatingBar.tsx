@@ -22,6 +22,13 @@ import {
   AlignRight,
 } from 'lucide-react'
 import { ImagePicker } from '../assets/ImagePicker'
+import {
+  ShadowEditor,
+  BorderRadiusEditor,
+  OpacityEditor,
+  ResponsiveBreakpointEditor,
+  TailwindClassAutocomplete
+} from '../style-editors'
 
 interface DropdownState {
   active: 'none' | 'edit' | 'prompt' | 'code' | 'style' | 'image'
@@ -33,6 +40,7 @@ export function ElementFloatingBar() {
   const [isModifying, setIsModifying] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const selectedElement = useEditorStore((s) => s.selectedElement)
   const clearSelection = useEditorStore((s) => s.clearSelection)
@@ -40,10 +48,14 @@ export function ElementFloatingBar() {
   const updateHtml = useEditorStore((s) => s.updateHtml)
   const siteId = useEditorStore((s) => s.siteId)
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside (check both bar and dropdown refs)
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const clickedInBar = barRef.current?.contains(target)
+      const clickedInDropdown = dropdownRef.current?.contains(target)
+
+      if (!clickedInBar && !clickedInDropdown) {
         setDropdown({ active: 'none' })
       }
     }
@@ -56,9 +68,14 @@ export function ElementFloatingBar() {
   // Determine element type for showing relevant tools
   const tagName = selectedElement.tagName?.toUpperCase()
   const isImage = tagName === 'IMG'
+  const hasBackgroundImage = selectedElement.hasBackgroundImage || false
   const isText = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'SPAN', 'A', 'BUTTON', 'LABEL'].includes(tagName)
   const isLink = tagName === 'A'
   const isContainer = ['DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'NAV', 'MAIN', 'ASIDE'].includes(tagName)
+
+  // Check if container has a child img element
+  const hasChildImage = isContainer && selectedElement.innerHTML?.includes('<img ')
+  const showImageTools = isImage || hasBackgroundImage || hasChildImage
 
   // Get element position for floating bar - positioned exactly at the element
   const elementRect = selectedElement.rect || { top: 100, left: 100, width: 200, height: 50 }
@@ -75,16 +92,45 @@ export function ElementFloatingBar() {
   // Get current classes
   const currentClasses = selectedElement?.className?.replace('unicorn-selected', '').replace('unicorn-hover-outline', '').trim() || ''
 
-  // Image attributes
+  // Image attributes (for IMG tags, background images, and child images)
   const getImageAttributes = () => {
-    if (!isImage || !selectedElement?.selector) return { src: null, alt: '' }
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    const img = doc.querySelector(selectedElement.selector) as HTMLImageElement
-    return { src: img?.src || null, alt: img?.alt || '' }
+    if (!selectedElement?.selector) return { src: null, alt: '', isBackgroundImage: false, isChildImage: false }
+
+    // For IMG tags
+    if (isImage) {
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      const img = doc.querySelector(selectedElement.selector) as HTMLImageElement
+      return { src: img?.src || null, alt: img?.alt || '', isBackgroundImage: false, isChildImage: false }
+    }
+
+    // For containers with child img
+    if (hasChildImage) {
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      const container = doc.querySelector(selectedElement.selector)
+      const childImg = container?.querySelector('img') as HTMLImageElement
+      return {
+        src: childImg?.src || null,
+        alt: childImg?.alt || '',
+        isBackgroundImage: false,
+        isChildImage: true
+      }
+    }
+
+    // For background images
+    if (hasBackgroundImage) {
+      return {
+        src: selectedElement.backgroundImage || null,
+        alt: selectedElement.ariaLabel || '',
+        isBackgroundImage: true,
+        isChildImage: false
+      }
+    }
+
+    return { src: null, alt: '', isBackgroundImage: false, isChildImage: false }
   }
   const imageAttrs = getImageAttributes()
 
-  // Update image src
+  // Update image src (for IMG tags)
   const updateImageSrc = (newSrc: string, newAlt?: string) => {
     if (!selectedElement?.selector) return
     const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -93,6 +139,74 @@ export function ElementFloatingBar() {
 
     element.src = newSrc
     if (newAlt !== undefined) element.alt = newAlt
+
+    let newHtml = '<!DOCTYPE html>\n<html'
+    Array.from(doc.documentElement.attributes).forEach(attr => {
+      newHtml += ` ${attr.name}="${attr.value}"`
+    })
+    newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+    updateHtml(newHtml, true)
+  }
+
+  // Update background image (for containers with background-image)
+  const updateBackgroundImage = (newSrc: string, ariaLabel?: string) => {
+    if (!selectedElement?.selector) return
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const element = doc.querySelector(selectedElement.selector) as HTMLElement
+    if (!element) return
+
+    // Remove old Tailwind background URL classes (if any)
+    const classes = (element.className || '').split(' ')
+    const filteredClasses = classes.filter(c => !c.startsWith('bg-[url('))
+    element.className = filteredClasses.join(' ')
+
+    // Use inline style for background-image (safer than dynamic Tailwind classes)
+    element.style.backgroundImage = `url('${newSrc}')`
+
+    // Set ARIA-Label for accessibility
+    if (ariaLabel) {
+      element.setAttribute('aria-label', ariaLabel)
+      element.setAttribute('role', 'img')
+    }
+
+    // Reconstruct and save HTML
+    let newHtml = '<!DOCTYPE html>\n<html'
+    Array.from(doc.documentElement.attributes).forEach(attr => {
+      newHtml += ` ${attr.name}="${attr.value}"`
+    })
+    newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+    updateHtml(newHtml, true)
+  }
+
+  // Update child image (for containers with img child)
+  const updateChildImage = (newSrc: string, newAlt?: string) => {
+    if (!selectedElement?.selector) return
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const container = doc.querySelector(selectedElement.selector)
+    const childImg = container?.querySelector('img') as HTMLImageElement
+    if (!childImg) return
+
+    childImg.src = newSrc
+    if (newAlt !== undefined) childImg.alt = newAlt
+
+    let newHtml = '<!DOCTYPE html>\n<html'
+    Array.from(doc.documentElement.attributes).forEach(attr => {
+      newHtml += ` ${attr.name}="${attr.value}"`
+    })
+    newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+    updateHtml(newHtml, true)
+  }
+
+  // Update element classes (for style editors)
+  const updateElementClasses = (newClasses: string) => {
+    if (!selectedElement?.selector) return
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const element = doc.querySelector(selectedElement.selector)
+    if (!element) return
+
+    // Clean and set new classes (keep unicorn-selected class)
+    const cleanClasses = newClasses.replace(/unicorn-selected|unicorn-hover-outline/g, '').trim()
+    element.setAttribute('class', `${cleanClasses} unicorn-selected`)
 
     let newHtml = '<!DOCTYPE html>\n<html'
     Array.from(doc.documentElement.attributes).forEach(attr => {
@@ -211,11 +325,11 @@ export function ElementFloatingBar() {
           />
         )}
 
-        {/* Image Tools - only for images */}
-        {isImage && (
+        {/* Image Tools - for IMG tags and containers with background-image */}
+        {showImageTools && (
           <ToolButton
             icon={ImageIcon}
-            label="Bild"
+            label={hasBackgroundImage && !isImage ? 'Hintergrund' : 'Bild'}
             onClick={() => setDropdown({ active: dropdown.active === 'image' ? 'none' : 'image' })}
             active={dropdown.active === 'image'}
           />
@@ -274,6 +388,7 @@ export function ElementFloatingBar() {
       {/* Dropdowns */}
       {dropdown.active !== 'none' && (
         <div
+          ref={dropdownRef}
           className="fixed z-[59] mt-2 w-72 bg-white dark:bg-zinc-800 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden"
           style={{
             top: barTop + 44,
@@ -325,9 +440,15 @@ export function ElementFloatingBar() {
             </div>
           )}
 
-          {/* Image Dropdown */}
-          {dropdown.active === 'image' && isImage && (
+          {/* Image Dropdown - for both IMG tags and background images */}
+          {dropdown.active === 'image' && showImageTools && (
             <div className="p-3 space-y-3">
+              {/* Image Type Badge */}
+              {hasBackgroundImage && !isImage && (
+                <div className="flex items-center gap-2 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-600 dark:text-blue-400">
+                  <span>Hintergrundbild</span>
+                </div>
+              )}
               {imageAttrs.src && (
                 <div className="relative rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
                   <img src={imageAttrs.src} alt="" className="w-full h-32 object-cover" />
@@ -338,43 +459,61 @@ export function ElementFloatingBar() {
                 className="w-full px-4 py-2.5 text-sm font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors flex items-center justify-center gap-2"
               >
                 <ImageIcon className="h-4 w-4" />
-                Bild ändern
+                {hasBackgroundImage && !isImage ? 'Hintergrundbild ändern' : 'Bild ändern'}
               </button>
               <div>
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 block mb-1.5">Alt-Text</label>
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 block mb-1.5">
+                  {hasBackgroundImage && !isImage ? 'ARIA-Label (Barrierefreiheit)' : 'Alt-Text'}
+                </label>
                 <input
                   type="text"
                   defaultValue={imageAttrs.alt}
-                  placeholder="Bildbeschreibung..."
+                  placeholder={hasBackgroundImage && !isImage ? 'Beschreibung für Screenreader...' : 'Bildbeschreibung...'}
                   className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
           )}
 
-          {/* Style Dropdown */}
+          {/* Style Dropdown - Enhanced with Visual Editors */}
           {dropdown.active === 'style' && (
-            <div className="p-3 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 block mb-1.5">Spacing</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {['mt', 'mr', 'mb', 'ml'].map((side) => (
-                    <div key={side} className="text-center">
-                      <span className="text-[10px] text-zinc-400 block mb-1">{side.toUpperCase()}</span>
-                      <input
-                        type="text"
-                        placeholder="0"
-                        className="w-full px-2 py-1.5 text-xs text-center bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  ))}
-                </div>
+            <div className="p-3 space-y-4 max-h-96 overflow-y-auto">
+              {/* Shadow Editor */}
+              <ShadowEditor
+                currentClasses={currentClasses}
+                onChange={updateElementClasses}
+              />
+
+              <div className="border-t border-zinc-100 dark:border-zinc-700 pt-3">
+                {/* Border Radius Editor */}
+                <BorderRadiusEditor
+                  currentClasses={currentClasses}
+                  onChange={updateElementClasses}
+                />
               </div>
-              <div>
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 block mb-1.5">Tailwind Classes</label>
-                <div className="p-2 bg-zinc-50 dark:bg-zinc-900 rounded-lg text-[10px] font-mono text-zinc-600 dark:text-zinc-400 break-all max-h-20 overflow-auto">
-                  {currentClasses || 'keine'}
-                </div>
+
+              <div className="border-t border-zinc-100 dark:border-zinc-700 pt-3">
+                {/* Opacity Editor */}
+                <OpacityEditor
+                  currentClasses={currentClasses}
+                  onChange={updateElementClasses}
+                />
+              </div>
+
+              <div className="border-t border-zinc-100 dark:border-zinc-700 pt-3">
+                {/* Responsive Breakpoints */}
+                <ResponsiveBreakpointEditor
+                  currentClasses={currentClasses}
+                  onChange={updateElementClasses}
+                />
+              </div>
+
+              <div className="border-t border-zinc-100 dark:border-zinc-700 pt-3">
+                {/* Tailwind Class Autocomplete */}
+                <TailwindClassAutocomplete
+                  currentClasses={currentClasses}
+                  onChange={updateElementClasses}
+                />
               </div>
             </div>
           )}
@@ -443,7 +582,14 @@ export function ElementFloatingBar() {
           open={showImagePicker}
           onOpenChange={setShowImagePicker}
           onSelect={(url, altText) => {
-            updateImageSrc(url, altText || imageAttrs.alt || '')
+            // Use correct update function based on image type
+            if (isImage) {
+              updateImageSrc(url, altText || imageAttrs.alt || '')
+            } else if (hasChildImage) {
+              updateChildImage(url, altText || imageAttrs.alt || '')
+            } else if (hasBackgroundImage) {
+              updateBackgroundImage(url, altText || imageAttrs.alt || '')
+            }
             setShowImagePicker(false)
           }}
           currentUrl={imageAttrs.src || undefined}

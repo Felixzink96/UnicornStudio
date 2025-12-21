@@ -1,11 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -14,7 +18,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import {
   Save,
   Eye,
@@ -28,9 +31,16 @@ import {
   Layers,
   Layout,
   LayoutGrid,
+  Sparkles,
+  Zap,
+  FileCode,
+  Type,
+  Star,
 } from 'lucide-react'
 import { createComponent, updateComponent } from '@/lib/supabase/queries/cms-components'
-import type { CMSComponent, CMSComponentType, ComponentVariant, ComponentProp } from '@/types/cms'
+import { getContentTypes } from '@/lib/supabase/queries/content-types'
+import { AIComponentGeneratorDialog } from './AIComponentGeneratorDialog'
+import type { CMSComponent, CMSComponentType, ComponentVariant, ComponentProp, JSInitStrategy, ContentType } from '@/types/cms'
 
 interface ComponentEditorProps {
   siteId: string
@@ -44,21 +54,77 @@ const typeConfig: Record<CMSComponentType, { label: string; icon: React.ElementT
   layout: { label: 'Layout', icon: LayoutGrid, description: 'Seitenstruktur (Header, Footer, Sidebar)' },
 }
 
+const jsInitStrategies: { value: JSInitStrategy; label: string; description: string }[] = [
+  { value: 'immediate', label: 'Sofort', description: 'Script wird sofort ausgeführt' },
+  { value: 'domready', label: 'DOM Ready', description: 'Nach DOMContentLoaded (Standard)' },
+  { value: 'scroll', label: 'Scroll', description: 'Wenn Element in Viewport sichtbar' },
+  { value: 'interaction', label: 'Interaktion', description: 'Bei erstem User-Klick' },
+]
+
 const propTypes = ['string', 'number', 'boolean', 'color', 'image', 'select', 'richtext'] as const
+
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[äöü]/g, (c) => ({ ä: 'ae', ö: 'oe', ü: 'ue' }[c] || c))
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
 
 export function ComponentEditor({ siteId, component }: ComponentEditorProps) {
   const router = useRouter()
   const isEditing = !!component
 
+  // Basic fields
   const [name, setName] = useState(component?.name || '')
   const [description, setDescription] = useState(component?.description || '')
-  const [type, setType] = useState<CMSComponentType>(component?.type || 'element')
+  const [type, setType] = useState<CMSComponentType>(component?.type || 'block')
   const [category, setCategory] = useState(component?.category || '')
+
+  // Code fields
   const [htmlContent, setHtmlContent] = useState(component?.html || '')
+  const [cssContent, setCssContent] = useState(component?.css || '')
+  const [jsContent, setJsContent] = useState(component?.js || '')
+  const [jsInit, setJsInit] = useState<JSInitStrategy>(component?.js_init || 'domready')
+
+  // AI Integration fields
+  const [slug, setSlug] = useState(component?.slug || '')
+  const [isRequired, setIsRequired] = useState(component?.is_required || false)
+  const [selectedContentTypeIds, setSelectedContentTypeIds] = useState<string[]>(
+    component?.content_type_ids || []
+  )
+  const [aiPrompt, setAiPrompt] = useState(component?.ai_prompt || '')
+
+  // Variants & Props
   const [variants, setVariants] = useState<ComponentVariant[]>(component?.variants || [])
   const [defaultVariant, setDefaultVariantState] = useState(component?.default_variant || '')
   const [props, setProps] = useState<ComponentProp[]>(component?.props || [])
+
+  // UI state
   const [isSaving, setIsSaving] = useState(false)
+  const [contentTypes, setContentTypes] = useState<ContentType[]>([])
+  const [activeCodeTab, setActiveCodeTab] = useState('html')
+
+  // Load content types
+  useEffect(() => {
+    async function loadContentTypes() {
+      try {
+        const types = await getContentTypes(siteId)
+        setContentTypes(types)
+      } catch (error) {
+        console.error('Failed to load content types:', error)
+      }
+    }
+    loadContentTypes()
+  }, [siteId])
+
+  // Auto-generate slug from name (only for new components or if slug is empty)
+  useEffect(() => {
+    if (!isEditing && name && !slug) {
+      setSlug(generateSlug(name))
+    }
+  }, [name, isEditing, slug])
 
   const handleSave = async () => {
     if (!name.trim() || !htmlContent.trim()) return
@@ -71,6 +137,13 @@ export function ComponentEditor({ siteId, component }: ComponentEditorProps) {
         type,
         category: category.trim() || null,
         html: htmlContent,
+        css: cssContent.trim() || null,
+        js: jsContent.trim() || null,
+        js_init: jsInit,
+        slug: slug.trim() || null,
+        is_required: isRequired,
+        content_type_ids: selectedContentTypeIds,
+        ai_prompt: aiPrompt.trim() || null,
         variants: variants.length > 0 ? variants : undefined,
         default_variant: defaultVariant || undefined,
         props: props.length > 0 ? props : undefined,
@@ -140,6 +213,38 @@ export function ComponentEditor({ siteId, component }: ComponentEditorProps) {
     setProps(props.filter((_, i) => i !== index))
   }
 
+  const toggleContentType = (contentTypeId: string) => {
+    setSelectedContentTypeIds((prev) =>
+      prev.includes(contentTypeId)
+        ? prev.filter((id) => id !== contentTypeId)
+        : [...prev, contentTypeId]
+    )
+  }
+
+  const handleAIGenerated = (generated: {
+    name: string
+    slug: string
+    description: string
+    type: CMSComponentType
+    category: string
+    html: string
+    css: string | null
+    js: string | null
+    js_init: JSInitStrategy
+    ai_prompt: string | null
+  }) => {
+    setName(generated.name)
+    setSlug(generated.slug)
+    setDescription(generated.description)
+    setType(generated.type)
+    setCategory(generated.category)
+    setHtmlContent(generated.html)
+    setCssContent(generated.css || '')
+    setJsContent(generated.js || '')
+    setJsInit(generated.js_init)
+    setAiPrompt(generated.ai_prompt || '')
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -149,10 +254,13 @@ export function ComponentEditor({ siteId, component }: ComponentEditorProps) {
             {isEditing ? 'Component bearbeiten' : 'Neue Component erstellen'}
           </h2>
           <p className="text-sm text-slate-400 mt-1">
-            Erstelle wiederverwendbare UI-Bausteine mit HTML
+            Erstelle wiederverwendbare UI-Bausteine mit HTML, CSS und JavaScript
           </p>
         </div>
         <div className="flex gap-2">
+          {!isEditing && (
+            <AIComponentGeneratorDialog siteId={siteId} onGenerated={handleAIGenerated} />
+          )}
           <Button variant="outline" className="border-slate-700 text-slate-300">
             <Eye className="h-4 w-4 mr-2" />
             Vorschau
@@ -185,9 +293,22 @@ export function ComponentEditor({ siteId, component }: ComponentEditorProps) {
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="z.B. Primary Button"
+                  placeholder="z.B. Inhaltsverzeichnis"
                   className="bg-slate-800 border-slate-700 text-white mt-1"
                 />
+              </div>
+
+              <div>
+                <Label className="text-slate-300">Slug (AI-Referenz)</Label>
+                <Input
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  placeholder="z.B. toc"
+                  className="bg-slate-800 border-slate-700 text-white mt-1 font-mono text-sm"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Eindeutiger Identifier für AI. Wird automatisch generiert.
+                </p>
               </div>
 
               <div>
@@ -230,9 +351,84 @@ export function ComponentEditor({ siteId, component }: ComponentEditorProps) {
                 <Input
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  placeholder="z.B. Buttons, Forms, Cards"
+                  placeholder="z.B. Navigation, Content, CTA"
                   className="bg-slate-800 border-slate-700 text-white mt-1"
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* AI Integration */}
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader>
+              <CardTitle className="text-white text-lg flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-purple-400" />
+                AI Integration
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Required Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-slate-300 flex items-center gap-2">
+                    <Star className="h-4 w-4 text-yellow-500" />
+                    Pflicht-Komponente
+                  </Label>
+                  <p className="text-xs text-slate-500">
+                    AI muss diese Komponente in jedem Beitrag verwenden
+                  </p>
+                </div>
+                <Switch
+                  checked={isRequired}
+                  onCheckedChange={setIsRequired}
+                />
+              </div>
+
+              {/* Content Types */}
+              <div>
+                <Label className="text-slate-300 mb-2 block">Für Content-Types</Label>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {contentTypes.length === 0 ? (
+                    <p className="text-sm text-slate-500">Keine Content-Types vorhanden</p>
+                  ) : (
+                    contentTypes.map((ct) => (
+                      <div
+                        key={ct.id}
+                        className="flex items-center space-x-2 p-2 rounded bg-slate-800 hover:bg-slate-750"
+                      >
+                        <Checkbox
+                          id={ct.id}
+                          checked={selectedContentTypeIds.includes(ct.id)}
+                          onCheckedChange={() => toggleContentType(ct.id)}
+                        />
+                        <label
+                          htmlFor={ct.id}
+                          className="text-sm text-slate-300 cursor-pointer flex-1"
+                        >
+                          {ct.label_plural}
+                        </label>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Leer = für alle Content-Types verfügbar
+                </p>
+              </div>
+
+              {/* AI Prompt */}
+              <div>
+                <Label className="text-slate-300">AI-Anweisung</Label>
+                <Textarea
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="z.B. Füge am Anfang des Artikels ein, nach der Einleitung..."
+                  className="bg-slate-800 border-slate-700 text-white mt-1"
+                  rows={3}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Anweisung für AI, wann/wie diese Komponente verwendet werden soll
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -383,35 +579,146 @@ export function ComponentEditor({ siteId, component }: ComponentEditorProps) {
         {/* Right Column - Code Editor */}
         <div className="lg:col-span-2">
           <Card className="bg-slate-900 border-slate-800 h-full">
-            <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <Code className="h-5 w-5" />
-                HTML Code
+                Code
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <p className="text-xs text-slate-500">
-                  Verwende {'{{prop_name}}'} für dynamische Werte
-                </p>
-                <Textarea
-                  value={htmlContent}
-                  onChange={(e) => setHtmlContent(e.target.value)}
-                  placeholder={`<button class="btn {{variant}}">
-  {{text}}
-</button>
+              <Tabs value={activeCodeTab} onValueChange={setActiveCodeTab} className="h-full">
+                <TabsList className="bg-slate-800 border-slate-700 mb-4">
+                  <TabsTrigger
+                    value="html"
+                    className="data-[state=active]:bg-slate-700 data-[state=active]:text-white flex items-center gap-2"
+                  >
+                    <FileCode className="h-4 w-4" />
+                    HTML
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="css"
+                    className="data-[state=active]:bg-slate-700 data-[state=active]:text-white flex items-center gap-2"
+                  >
+                    <Palette className="h-4 w-4" />
+                    CSS
+                    {cssContent && <span className="w-2 h-2 rounded-full bg-purple-500" />}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="js"
+                    className="data-[state=active]:bg-slate-700 data-[state=active]:text-white flex items-center gap-2"
+                  >
+                    <Zap className="h-4 w-4" />
+                    JavaScript
+                    {jsContent && <span className="w-2 h-2 rounded-full bg-yellow-500" />}
+                  </TabsTrigger>
+                </TabsList>
 
-<style>
-.btn {
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  background: var(--color-primary);
-  color: white;
+                <TabsContent value="html" className="mt-0">
+                  <p className="text-xs text-slate-500 mb-2">
+                    Verwende {'{{prop_name}}'} für dynamische Werte. Nutze data-component=&quot;{slug || 'slug'}&quot; für JS.
+                  </p>
+                  <Textarea
+                    value={htmlContent}
+                    onChange={(e) => setHtmlContent(e.target.value)}
+                    placeholder={`<nav class="toc" data-component="${slug || 'my-component'}">
+  <h3>{{title}}</h3>
+  <ul class="toc-list">
+    {{items}}
+  </ul>
+</nav>`}
+                    className="bg-slate-950 border-slate-700 text-white font-mono text-sm min-h-[500px]"
+                  />
+                </TabsContent>
+
+                <TabsContent value="css" className="mt-0">
+                  <p className="text-xs text-slate-500 mb-2">
+                    CSS wird in den Export inkludiert. Verwende CSS-Variablen: var(--color-brand-primary), etc.
+                  </p>
+                  <Textarea
+                    value={cssContent}
+                    onChange={(e) => setCssContent(e.target.value)}
+                    placeholder={`.toc {
+  background: var(--color-neutral-muted);
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  margin: 2rem 0;
 }
-</style>`}
-                  className="bg-slate-950 border-slate-700 text-white font-mono text-sm min-h-[600px]"
-                />
-              </div>
+
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.toc a {
+  color: var(--color-neutral-foreground);
+  text-decoration: none;
+}
+
+.toc a:hover {
+  color: var(--color-brand-primary);
+}`}
+                    className="bg-slate-950 border-slate-700 text-white font-mono text-sm min-h-[500px]"
+                  />
+                </TabsContent>
+
+                <TabsContent value="js" className="mt-0">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="flex-1">
+                      <Label className="text-slate-400 text-xs">Initialisierung</Label>
+                      <Select value={jsInit} onValueChange={(v) => setJsInit(v as JSInitStrategy)}>
+                        <SelectTrigger className="bg-slate-800 border-slate-700 text-white mt-1 h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-700">
+                          {jsInitStrategies.map((strategy) => (
+                            <SelectItem key={strategy.value} value={strategy.value} className="text-slate-300">
+                              <div className="flex flex-col">
+                                <span>{strategy.label}</span>
+                                <span className="text-xs text-slate-500">{strategy.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Vanilla JavaScript. Verwende data-component Attribute zum Selektieren.
+                  </p>
+                  <Textarea
+                    value={jsContent}
+                    onChange={(e) => setJsContent(e.target.value)}
+                    placeholder={`// Alle Komponenten mit data-component="${slug || 'my-component'}" initialisieren
+document.querySelectorAll('[data-component="${slug || 'my-component'}"]').forEach(el => {
+  // Finde alle Überschriften im Dokument
+  const headings = document.querySelectorAll('h2, h3');
+  const list = el.querySelector('.toc-list');
+
+  headings.forEach((heading, index) => {
+    // ID setzen falls nicht vorhanden
+    if (!heading.id) {
+      heading.id = 'heading-' + index;
+    }
+
+    // Link erstellen
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = '#' + heading.id;
+    a.textContent = heading.textContent;
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      heading.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    li.appendChild(a);
+    list.appendChild(li);
+  });
+});`}
+                    className="bg-slate-950 border-slate-700 text-white font-mono text-sm min-h-[450px]"
+                  />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>

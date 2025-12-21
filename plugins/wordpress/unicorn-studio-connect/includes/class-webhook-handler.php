@@ -243,6 +243,16 @@ class Unicorn_Studio_Webhook_Handler {
                 return $synced;
 
             // ========================================
+            // CMS Components Events (JavaScript)
+            // ========================================
+            case 'cms_components.sync':
+                // Sync CMS components JavaScript
+                if (isset($data['components']) && is_array($data['components'])) {
+                    return Unicorn_Studio_CMS_Components::sync_js($data['components']);
+                }
+                return true;
+
+            // ========================================
             // Full Sync Event
             // ========================================
             case 'sync.full':

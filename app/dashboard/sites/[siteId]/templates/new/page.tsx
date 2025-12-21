@@ -1,8 +1,6 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { ArrowLeft, LayoutTemplate } from 'lucide-react'
-import { TemplateEditor } from '@/components/templates/TemplateEditor'
+import { TemplateTypeSelector } from '@/components/templates/TemplateTypeSelector'
 
 interface NewTemplatePageProps {
   params: Promise<{ siteId: string }>
@@ -12,7 +10,7 @@ export default async function NewTemplatePage({ params }: NewTemplatePageProps) 
   const { siteId } = await params
   const supabase = await createClient()
 
-  // Get site
+  // Verify site exists
   const { data: site, error: siteError } = await supabase
     .from('sites')
     .select('id, name')
@@ -23,30 +21,19 @@ export default async function NewTemplatePage({ params }: NewTemplatePageProps) 
     notFound()
   }
 
+  // Get all content types for this site
+  const { data: contentTypes } = await supabase
+    .from('content_types')
+    .select('id, name, slug, label_singular, label_plural, has_archive, has_single')
+    .eq('site_id', siteId)
+    .order('name')
+
   return (
-    <div className="p-8">
-      {/* Back Link */}
-      <Link
-        href={`/dashboard/sites/${siteId}/templates`}
-        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Zurück zu Templates
-      </Link>
-
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-          <LayoutTemplate className="h-8 w-8 text-purple-500" />
-          Neues Template
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Erstelle ein neues Layout für deine Inhalte
-        </p>
-      </div>
-
-      {/* Template Editor */}
-      <TemplateEditor siteId={siteId} />
+    <div className="fixed inset-0 z-50 bg-zinc-950/90 flex items-center justify-center p-8">
+      <TemplateTypeSelector
+        siteId={siteId}
+        contentTypes={contentTypes || []}
+      />
     </div>
   )
 }

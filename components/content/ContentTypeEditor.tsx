@@ -50,6 +50,7 @@ export function ContentTypeEditor({
         <FieldBuilder
           siteId={siteId}
           contentTypeId={contentType.id}
+          contentTypeName={contentType.label_plural || contentType.name}
           initialFields={initialFields}
           taxonomies={taxonomies}
           allContentTypes={allContentTypes}

@@ -18,7 +18,7 @@ interface ImagePickerProps {
   siteId: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSelect: (url: string, altText?: string) => void
+  onSelect: (url: string, altText?: string, assetId?: string) => void
   currentUrl?: string
   currentAlt?: string
 }
@@ -41,7 +41,7 @@ export function ImagePicker({
     alt_text: string | null
     name: string
   }) => {
-    onSelect(image.file_url, image.alt_text || image.name)
+    onSelect(image.file_url, image.alt_text || image.name, image.id)
     onOpenChange(false)
   }
 

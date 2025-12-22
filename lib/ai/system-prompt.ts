@@ -440,8 +440,25 @@ Beispiel:
 | \`shadow-lg\` | \`--shadow-lg\` | Hervorgehobene Elemente |
 | \`shadow-xl\` | \`--shadow-xl\` | Modals, Dropdowns |
 
+### HOVER-VARIANTEN (verfügbar):
+Alle Design Token Klassen haben Hover-Varianten:
+\`\`\`
+hover:bg-primary, hover:bg-secondary, hover:bg-accent, hover:bg-muted
+hover:bg-white, hover:bg-black, hover:bg-transparent
+hover:text-primary, hover:text-secondary, hover:text-accent
+hover:text-foreground, hover:text-white, hover:text-black
+hover:border-primary, hover:border-secondary, hover:border-accent
+hover:shadow-sm, hover:shadow-md, hover:shadow-lg, hover:shadow-xl
+hover:opacity-80, hover:opacity-90, hover:opacity-100
+group-hover:text-primary, group-hover:text-white, group-hover:bg-primary
+\`\`\`
+
 Beispiel:
 \`\`\`html
+<button class="bg-primary text-white hover:bg-primary-hover transition-colors">
+  Button mit Hover
+</button>
+<a class="text-foreground hover:text-primary transition-colors">Link</a>
 <div class="shadow-lg hover:shadow-xl transition-shadow">Card</div>
 \`\`\`
 

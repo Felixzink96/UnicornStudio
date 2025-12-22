@@ -149,8 +149,56 @@ ${gradients?.primary?.enabled ? `
 .font-body { font-family: var(--font-body); }
 .font-mono { font-family: var(--font-mono); }
 
-/* Hover States */
+/* Shadows */
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-xl { box-shadow: var(--shadow-xl); }
+
+/* ============================================
+   HOVER STATES
+   ============================================ */
+
+/* Hover Background */
+.hover\\:bg-primary:hover { background-color: var(--color-brand-primary); }
 .hover\\:bg-primary-hover:hover { background-color: var(--color-brand-primary-hover); }
+.hover\\:bg-secondary:hover { background-color: var(--color-brand-secondary); }
+.hover\\:bg-accent:hover { background-color: var(--color-brand-accent); }
+.hover\\:bg-muted:hover { background-color: var(--color-neutral-muted); }
+.hover\\:bg-white:hover { background-color: #ffffff; }
+.hover\\:bg-black:hover { background-color: #000000; }
+.hover\\:bg-transparent:hover { background-color: transparent; }
+
+/* Hover Text */
+.hover\\:text-primary:hover { color: var(--color-brand-primary); }
+.hover\\:text-secondary:hover { color: var(--color-brand-secondary); }
+.hover\\:text-accent:hover { color: var(--color-brand-accent); }
+.hover\\:text-foreground:hover { color: var(--color-neutral-foreground); }
+.hover\\:text-muted:hover { color: var(--color-neutral-muted); }
+.hover\\:text-white:hover { color: #ffffff; }
+.hover\\:text-black:hover { color: #000000; }
+
+/* Hover Border */
+.hover\\:border-primary:hover { border-color: var(--color-brand-primary); }
+.hover\\:border-secondary:hover { border-color: var(--color-brand-secondary); }
+.hover\\:border-accent:hover { border-color: var(--color-brand-accent); }
+
+/* Hover Shadow */
+.hover\\:shadow-sm:hover { box-shadow: var(--shadow-sm); }
+.hover\\:shadow-md:hover { box-shadow: var(--shadow-md); }
+.hover\\:shadow-lg:hover { box-shadow: var(--shadow-lg); }
+.hover\\:shadow-xl:hover { box-shadow: var(--shadow-xl); }
+
+/* Hover Opacity */
+.hover\\:opacity-80:hover { opacity: 0.8; }
+.hover\\:opacity-90:hover { opacity: 0.9; }
+.hover\\:opacity-100:hover { opacity: 1; }
+
+/* Group Hover */
+.group:hover .group-hover\\:text-primary { color: var(--color-brand-primary); }
+.group:hover .group-hover\\:text-white { color: #ffffff; }
+.group:hover .group-hover\\:bg-primary { background-color: var(--color-brand-primary); }
+.group:hover .group-hover\\:opacity-100 { opacity: 1; }
 `.trim()
 }
 

@@ -910,7 +910,60 @@ function generateFallbackCSS(classes: Set<string>): string {
     // ==========================================
     // ARBITRARY VALUES SUPPORT
     // Handle Tailwind arbitrary value syntax: property-[value]
+    // Including state prefixes: hover:, focus:, active:, group-hover:
     // ==========================================
+
+    // Parse state prefix (hover:, focus:, active:, group-hover:, etc.)
+    const stateMatch = cls.match(/^(hover|focus|active|group-hover|focus-within|focus-visible|disabled):(.+)$/)
+    if (stateMatch) {
+      const [, state, baseClass] = stateMatch
+
+      // Handle arbitrary value in the base class
+      const arbitraryMatch = baseClass.match(/^([\w-]+)-\[([^\]]+)\]$/)
+      if (arbitraryMatch) {
+        const [, property, rawValue] = arbitraryMatch
+        const value = rawValue.replace(/_/g, ' ')
+
+        // Map property to CSS
+        const propertyMap: Record<string, string> = {
+          'text': value.startsWith('var(') || value.startsWith('#') || value.startsWith('rgb') || value.startsWith('hsl') ? 'color' : 'font-size',
+          'bg': value.startsWith('url(') || value.startsWith('linear-gradient') || value.startsWith('radial-gradient') ? 'background-image' : 'background-color',
+          'border': 'border-color',
+          'shadow': 'box-shadow',
+          'opacity': 'opacity',
+          'scale': 'transform',
+          'rotate': 'transform',
+          'translate': 'transform',
+        }
+
+        const cssProp = propertyMap[property] || property
+        let cssValue = value
+
+        // Handle transform values
+        if (property === 'scale') cssValue = `scale(${value})`
+        if (property === 'rotate') cssValue = `rotate(${value})`
+
+        // Generate pseudo-class selector
+        const stateMap: Record<string, string> = {
+          'hover': ':hover',
+          'focus': ':focus',
+          'active': ':active',
+          'focus-within': ':focus-within',
+          'focus-visible': ':focus-visible',
+          'disabled': ':disabled',
+          'group-hover': '', // Special case
+        }
+
+        const pseudoClass = stateMap[state] || `:${state}`
+
+        if (state === 'group-hover') {
+          cssRules.push(`.group:hover .${escapeClassName(cls)} { ${cssProp}: ${cssValue}; }`)
+        } else {
+          cssRules.push(`.${escapeClassName(cls)}${pseudoClass} { ${cssProp}: ${cssValue}; }`)
+        }
+        return
+      }
+    }
 
     // Handle arbitrary shadow values: shadow-[10px_10px_0px_0px_rgba(255,255,255,1)]
     const arbitraryShadowMatch = cls.match(/^shadow-\[([^\]]+)\]$/)
@@ -928,12 +981,12 @@ function generateFallbackCSS(classes: Set<string>): string {
       return
     }
 
-    // Handle arbitrary text size: text-[12vw], text-[2rem]
+    // Handle arbitrary text size/color: text-[12vw], text-[#fff], text-[var(--color)]
     const arbitraryTextMatch = cls.match(/^text-\[([^\]]+)\]$/)
     if (arbitraryTextMatch) {
       const value = arbitraryTextMatch[1]
-      // Check if it's a color (starts with # or rgb/hsl) or a size
-      if (value.startsWith('#') || value.startsWith('rgb') || value.startsWith('hsl')) {
+      // Check if it's a color (starts with #, rgb, hsl, or var)
+      if (value.startsWith('#') || value.startsWith('rgb') || value.startsWith('hsl') || value.startsWith('var(')) {
         cssRules.push(`.${escapeClassName(cls)} { color: ${value}; }`)
       } else {
         cssRules.push(`.${escapeClassName(cls)} { font-size: ${value}; }`)

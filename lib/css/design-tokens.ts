@@ -49,6 +49,49 @@ export function generateDesignTokensCSS(designVars: DesignVariables | null): str
 
   return `
 /* ============================================
+   BASE RESET (Tailwind Preflight)
+   ============================================ */
+
+*, ::before, ::after {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;
+}
+
+button, [role="button"] {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+button, input, optgroup, select, textarea {
+  font-family: inherit;
+  font-size: 100%;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  margin: 0;
+  padding: 0;
+}
+
+img, svg, video, canvas, audio, iframe, embed, object {
+  display: block;
+  vertical-align: middle;
+}
+
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
+[hidden] {
+  display: none;
+}
+
+/* ============================================
    DESIGN TOKENS - Auto-generated
    ============================================ */
 

@@ -218,9 +218,69 @@ class Unicorn_Studio_Global_Components {
         // Replace menu placeholders
         $html = self::replace_menu_placeholders($html);
 
+        // Auto-fix: Add x-data if header has Alpine directives but missing x-data
+        $html = self::ensure_alpine_xdata($html, 'header');
+
         if ($echo) {
             echo $html;
             return null;
+        }
+
+        return $html;
+    }
+
+    /**
+     * Ensure Alpine.js x-data attribute exists on elements that need it
+     *
+     * If an element has @click, x-show, or :class but is missing x-data,
+     * automatically add the required x-data attribute.
+     *
+     * @param string $html The HTML content
+     * @param string $tag  The tag to check (header, nav, etc.)
+     * @return string Fixed HTML
+     */
+    private static function ensure_alpine_xdata(string $html, string $tag = 'header'): string {
+        // Check if HTML has Alpine directives
+        $has_alpine_directives = (
+            strpos($html, '@click') !== false ||
+            strpos($html, 'x-show') !== false ||
+            strpos($html, 'x-transition') !== false ||
+            strpos($html, ':class') !== false
+        );
+
+        if (!$has_alpine_directives) {
+            return $html;
+        }
+
+        // Check if x-data already exists on the root element
+        $pattern = '/^(\s*<' . $tag . ')([^>]*)(>)/i';
+        if (preg_match($pattern, $html, $matches)) {
+            $tag_content = $matches[2];
+
+            // If x-data is missing, add it
+            if (strpos($tag_content, 'x-data') === false) {
+                // Determine what x-data to add based on directives found
+                $xdata = '{ mobileMenuOpen: false }';
+
+                // Check for other common patterns
+                if (strpos($html, 'dropdownOpen') !== false) {
+                    $xdata = '{ mobileMenuOpen: false, dropdownOpen: false }';
+                }
+                if (strpos($html, 'searchOpen') !== false) {
+                    $xdata = '{ mobileMenuOpen: false, searchOpen: false }';
+                }
+
+                $html = preg_replace(
+                    $pattern,
+                    '$1 x-data="' . $xdata . '"$2$3',
+                    $html,
+                    1
+                );
+
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('[Unicorn] Auto-added x-data to ' . $tag);
+                }
+            }
         }
 
         return $html;

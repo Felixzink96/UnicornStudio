@@ -275,11 +275,34 @@ Menu-Placeholder NICHT in \`<ul>\`:
 ❌ \`bg-[var(--color-brand-primary)]/20\` → funktioniert NICHT!
 ✅ \`bg-[rgb(var(--color-brand-primary-rgb)/0.2)]\`
 
-### 3. MOBILE MENU = PFLICHT
-Jeder Header MUSS ein funktionierendes Mobile-Menu haben:
-- Button mit \`@click\` Toggle (Alpine.js)
-- Menu-Panel mit \`x-show\` und \`x-transition\`
-- \`{{menu:header-menu}}\` im Mobile-Panel
+### 3. MOBILE MENU = PFLICHT (Alpine.js)
+Jeder Header MUSS ein funktionierendes Mobile-Menu haben.
+
+**KRITISCH: x-data MUSS auf dem header Element sein!**
+\`\`\`html
+<header x-data="{ mobileMenuOpen: false }" class="...">
+  <!-- Hamburger Button -->
+  <button @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden">
+    <span :class="mobileMenuOpen ? 'rotate-45' : ''">...</span>
+  </button>
+
+  <!-- Mobile Menu Panel -->
+  <div x-show="mobileMenuOpen"
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       class="lg:hidden">
+    {{menu:header-menu}}
+  </div>
+</header>
+\`\`\`
+
+**Checkliste:**
+- ✅ \`x-data="{ mobileMenuOpen: false }"\` auf \`<header>\`
+- ✅ \`@click="mobileMenuOpen = !mobileMenuOpen"\` auf Button
+- ✅ \`x-show="mobileMenuOpen"\` auf Mobile-Panel
+- ✅ \`x-transition\` für Animation
+- ❌ NIEMALS \`x-data\` vergessen!
 
 ### 4. LOGO VERWENDEN
 Wenn \`{{logoUrl}}\` konfiguriert ist:

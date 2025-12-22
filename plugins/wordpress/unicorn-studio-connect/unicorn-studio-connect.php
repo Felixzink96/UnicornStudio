@@ -524,7 +524,7 @@ register_activation_hook(__FILE__, function() {
         'cpt_prefix' => 'us_',
         'enable_gsap' => true,
         'enable_alpine' => true,
-        'load_scripts_globally' => false,
+        'load_scripts_globally' => true,
     ]);
 
     // Create CSS and fonts directories

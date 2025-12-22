@@ -519,6 +519,63 @@ function extractAllClasses(html: string): Set<string> {
     })
   }
 
+  // Extract classes from Alpine.js :class bindings
+  // Pattern 1: :class="condition ? 'classes' : 'classes'"
+  const alpineTernaryPattern = /:class=["'][^"']*\?\s*['"]([^'"]+)['"][^:]*:\s*['"]([^'"]*)['"]/gi
+  while ((match = alpineTernaryPattern.exec(html)) !== null) {
+    // Extract classes from both sides of ternary
+    const trueClasses = match[1] || ''
+    const falseClasses = match[2] || ''
+    ;[trueClasses, falseClasses].forEach((classStr) => {
+      classStr.split(/\s+/).forEach((cls) => {
+        const trimmed = cls.trim()
+        if (trimmed && !trimmed.includes('{') && !trimmed.includes('(')) {
+          classes.add(trimmed)
+        }
+      })
+    })
+  }
+
+  // Pattern 2: :class="{ 'class': condition }" - object syntax
+  const alpineObjectPattern = /:class=["']\{([^}]+)\}["']/gi
+  while ((match = alpineObjectPattern.exec(html)) !== null) {
+    const objectContent = match[1]
+    // Extract class names from object keys: 'rotate-45': condition
+    const classKeyPattern = /['"]([^'"]+)['"]\s*:/g
+    let classMatch
+    while ((classMatch = classKeyPattern.exec(objectContent)) !== null) {
+      const className = classMatch[1].trim()
+      if (className && !className.includes('{') && !className.includes('(')) {
+        classes.add(className)
+      }
+    }
+  }
+
+  // Pattern 3: Simple :class="'classes'" or x-bind:class="'classes'"
+  const alpineSimplePattern = /(?::|x-bind:)class=["']['"]([^'"]+)['"]["']/gi
+  while ((match = alpineSimplePattern.exec(html)) !== null) {
+    const classString = match[1]
+    classString.split(/\s+/).forEach((cls) => {
+      const trimmed = cls.trim()
+      if (trimmed) {
+        classes.add(trimmed)
+      }
+    })
+  }
+
+  // Pattern 4: Extract any quoted strings that look like Tailwind classes within :class
+  // This catches: :class="mobileMenuOpen ? 'rotate-45 translate-y-2.5 bg-red-500' : ''"
+  const alpineQuotedClassPattern = /:class=["'][^"']*['"]([a-z][\w\-\[\]\.\/\:]+(?:\s+[a-z][\w\-\[\]\.\/\:]+)*)['"][^"']*["']/gi
+  while ((match = alpineQuotedClassPattern.exec(html)) !== null) {
+    const classString = match[1]
+    classString.split(/\s+/).forEach((cls) => {
+      const trimmed = cls.trim()
+      if (trimmed && /^[a-z]/.test(trimmed)) {
+        classes.add(trimmed)
+      }
+    })
+  }
+
   return classes
 }
 

@@ -123,10 +123,58 @@ export function LivePreview() {
     return generateDesignTokensCSS(designVariables)
   }, [designVariables])
 
+  // State for resolved entries HTML
+  const [resolvedEntriesHtml, setResolvedEntriesHtml] = useState<string | null>(null)
+  const [isResolvingEntries, setIsResolvingEntries] = useState(false)
+
+  // Check if HTML has entries placeholders
+  const hasEntriesPlaceholders = useMemo(() => {
+    const hasPlaceholders = debouncedHtml.includes('{{#entries:') || debouncedHtml.includes('{{entries:')
+    console.log('[LivePreview] hasEntriesPlaceholders:', hasPlaceholders)
+    return hasPlaceholders
+  }, [debouncedHtml])
+
+  // Resolve entries placeholders via API
+  useEffect(() => {
+    if (!hasEntriesPlaceholders || !siteId || isCurrentlyStreaming) {
+      setResolvedEntriesHtml(null)
+      return
+    }
+
+    const resolveEntries = async () => {
+      setIsResolvingEntries(true)
+      try {
+        const response = await fetch(`/api/v1/sites/${siteId}/preview/resolve-entries`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html: debouncedHtml }),
+        })
+        const data = await response.json()
+        console.log('[LivePreview] API response:', { resolved: data.resolved, htmlLength: data.html?.length })
+        if (data.resolved) {
+          console.log('[LivePreview] Setting resolved HTML, first 200 chars:', data.html?.slice(0, 200))
+          setResolvedEntriesHtml(data.html)
+        } else {
+          console.log('[LivePreview] API returned resolved=false')
+        }
+      } catch (error) {
+        console.error('[LivePreview] Failed to resolve entries:', error)
+      } finally {
+        setIsResolvingEntries(false)
+      }
+    }
+
+    resolveEntries()
+  }, [debouncedHtml, siteId, hasEntriesPlaceholders, isCurrentlyStreaming])
+
   // Combine page HTML with global header/footer and inject menus
   const previewHtml = useMemo(() => {
+    // Use resolved entries HTML if available, otherwise use original
+    const baseHtml = resolvedEntriesHtml || debouncedHtml
+    console.log('[LivePreview] previewHtml using resolved:', !!resolvedEntriesHtml, 'baseHtml includes {{#entries:', baseHtml.includes('{{#entries:'))
+
     // First insert global components (header/footer)
-    let htmlWithComponents = insertGlobalComponents(debouncedHtml, globalHeader, globalFooter)
+    let htmlWithComponents = insertGlobalComponents(baseHtml, globalHeader, globalFooter)
 
     // Inject design tokens CSS if not present in HTML
     if (designTokensCss && !htmlWithComponents.includes('--color-brand-primary')) {
@@ -153,7 +201,7 @@ export function LivePreview() {
       })
     }
     return htmlWithComponents
-  }, [debouncedHtml, globalHeader, globalFooter, menus, designTokensCss])
+  }, [debouncedHtml, resolvedEntriesHtml, globalHeader, globalFooter, menus, designTokensCss])
 
   const getHtmlWithScript = useCallback((html: string, pauseAnimations: boolean): string => {
     if (viewMode !== 'design') return html

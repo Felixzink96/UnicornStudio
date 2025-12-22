@@ -16,6 +16,7 @@ import {
 import type { Json } from '@/types/database'
 import { injectMenusIntoHtml } from '@/lib/menus/render-menu'
 import type { MenuWithItems, MenuItem } from '@/types/menu'
+import { resolveEntriesInTemplate, hasEntriesPlaceholders } from '@/lib/templates/entries-resolver'
 
 interface RouteParams {
   params: Promise<{ siteId: string }>
@@ -175,12 +176,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       if (pages && pages.length > 0) {
         for (const page of pages) {
+          // Resolve entries placeholders in page HTML (server-side for SEO)
+          let processedHtmlContent = page.html_content || ''
+          if (processedHtmlContent && hasEntriesPlaceholders(processedHtmlContent)) {
+            const { html: resolvedHtml } = await resolveEntriesInTemplate(
+              processedHtmlContent,
+              siteId
+            )
+            processedHtmlContent = resolvedHtml
+          }
+
           // Include header/footer settings in page data
           await sendWebhook(webhookUrl, headers, {
             event: 'page.updated',
             site_id: siteId,
             data: {
               ...page,
+              // Use processed HTML with resolved entries
+              html_content: processedHtmlContent,
               // Explicitly include header/footer control fields
               header_footer_settings: {
                 hide_header: page.hide_header || false,

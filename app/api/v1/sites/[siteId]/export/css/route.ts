@@ -423,6 +423,23 @@ async function compileTailwindCSS(classes: Set<string>, customConfig?: TailwindC
 
     console.log(`[CSS Export] Tailwind generated ${css.length} bytes of CSS`)
 
+    // Log arbitrary values for debugging
+    const arbitraryClasses = classArray.filter(cls => cls.includes('[') && cls.includes(']'))
+    if (arbitraryClasses.length > 0) {
+      console.log(`[CSS Export] Arbitrary values found (${arbitraryClasses.length}):`, arbitraryClasses.slice(0, 10))
+
+      // Check if arbitrary classes are in the output
+      const missingClasses = arbitraryClasses.filter(cls => {
+        // Escape for CSS selector check
+        const escaped = cls.replace(/([:\[\]\/\\.\-\(\)\,\'\"#])/g, '\\$1')
+        return !css.includes(escaped) && !css.includes(cls)
+      })
+
+      if (missingClasses.length > 0) {
+        console.warn(`[CSS Export] Missing arbitrary classes in Tailwind output:`, missingClasses)
+      }
+    }
+
     return css
   } catch (error) {
     console.error('Tailwind v4 compile error:', error)
@@ -889,6 +906,239 @@ function generateFallbackCSS(classes: Set<string>): string {
         return
       }
     }
+
+    // ==========================================
+    // ARBITRARY VALUES SUPPORT
+    // Handle Tailwind arbitrary value syntax: property-[value]
+    // ==========================================
+
+    // Handle arbitrary shadow values: shadow-[10px_10px_0px_0px_rgba(255,255,255,1)]
+    const arbitraryShadowMatch = cls.match(/^shadow-\[([^\]]+)\]$/)
+    if (arbitraryShadowMatch) {
+      const value = arbitraryShadowMatch[1].replace(/_/g, ' ')
+      cssRules.push(`.${escapeClassName(cls)} { box-shadow: ${value}; }`)
+      return
+    }
+
+    // Handle arbitrary font: font-['Anton'] or font-["Anton"]
+    const arbitraryFontMatch = cls.match(/^font-\[['"]?([^'"\]]+)['"]?\]$/)
+    if (arbitraryFontMatch) {
+      const fontName = arbitraryFontMatch[1]
+      cssRules.push(`.${escapeClassName(cls)} { font-family: '${fontName}', sans-serif; }`)
+      return
+    }
+
+    // Handle arbitrary text size: text-[12vw], text-[2rem]
+    const arbitraryTextMatch = cls.match(/^text-\[([^\]]+)\]$/)
+    if (arbitraryTextMatch) {
+      const value = arbitraryTextMatch[1]
+      // Check if it's a color (starts with # or rgb/hsl) or a size
+      if (value.startsWith('#') || value.startsWith('rgb') || value.startsWith('hsl')) {
+        cssRules.push(`.${escapeClassName(cls)} { color: ${value}; }`)
+      } else {
+        cssRules.push(`.${escapeClassName(cls)} { font-size: ${value}; }`)
+      }
+      return
+    }
+
+    // Handle arbitrary leading: leading-[0.8], leading-[1.5rem]
+    const arbitraryLeadingMatch = cls.match(/^leading-\[([^\]]+)\]$/)
+    if (arbitraryLeadingMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { line-height: ${arbitraryLeadingMatch[1]}; }`)
+      return
+    }
+
+    // Handle arbitrary tracking: tracking-[0.1em]
+    const arbitraryTrackingMatch = cls.match(/^tracking-\[([^\]]+)\]$/)
+    if (arbitraryTrackingMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { letter-spacing: ${arbitraryTrackingMatch[1]}; }`)
+      return
+    }
+
+    // Handle arbitrary width: w-[100px], w-[50%]
+    const arbitraryWidthMatch = cls.match(/^w-\[([^\]]+)\]$/)
+    if (arbitraryWidthMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { width: ${arbitraryWidthMatch[1]}; }`)
+      return
+    }
+
+    // Handle arbitrary height: h-[100px], h-[50vh]
+    const arbitraryHeightMatch = cls.match(/^h-\[([^\]]+)\]$/)
+    if (arbitraryHeightMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { height: ${arbitraryHeightMatch[1]}; }`)
+      return
+    }
+
+    // Handle arbitrary margin: m-[10px], mx-[auto], mt-[2rem]
+    const arbitraryMarginMatch = cls.match(/^m([tlbrxy])?-\[([^\]]+)\]$/)
+    if (arbitraryMarginMatch) {
+      const [, dir, value] = arbitraryMarginMatch
+      const directions: Record<string, string[]> = {
+        't': ['top'], 'r': ['right'], 'b': ['bottom'], 'l': ['left'],
+        'x': ['left', 'right'], 'y': ['top', 'bottom'],
+        '': ['top', 'right', 'bottom', 'left'],
+      }
+      const props = (directions[dir || ''] || directions['']).map(d => `margin-${d}: ${value}`).join('; ')
+      cssRules.push(`.${escapeClassName(cls)} { ${props}; }`)
+      return
+    }
+
+    // Handle arbitrary padding: p-[10px], px-[2rem], pt-[5%]
+    const arbitraryPaddingMatch = cls.match(/^p([tlbrxy])?-\[([^\]]+)\]$/)
+    if (arbitraryPaddingMatch) {
+      const [, dir, value] = arbitraryPaddingMatch
+      const directions: Record<string, string[]> = {
+        't': ['top'], 'r': ['right'], 'b': ['bottom'], 'l': ['left'],
+        'x': ['left', 'right'], 'y': ['top', 'bottom'],
+        '': ['top', 'right', 'bottom', 'left'],
+      }
+      const props = (directions[dir || ''] || directions['']).map(d => `padding-${d}: ${value}`).join('; ')
+      cssRules.push(`.${escapeClassName(cls)} { ${props}; }`)
+      return
+    }
+
+    // Handle arbitrary gap: gap-[20px], gap-x-[1rem]
+    const arbitraryGapMatch = cls.match(/^gap(-[xy])?-\[([^\]]+)\]$/)
+    if (arbitraryGapMatch) {
+      const [, dir, value] = arbitraryGapMatch
+      if (dir === '-x') {
+        cssRules.push(`.${escapeClassName(cls)} { column-gap: ${value}; }`)
+      } else if (dir === '-y') {
+        cssRules.push(`.${escapeClassName(cls)} { row-gap: ${value}; }`)
+      } else {
+        cssRules.push(`.${escapeClassName(cls)} { gap: ${value}; }`)
+      }
+      return
+    }
+
+    // Handle arbitrary rounded: rounded-[10px], rounded-[50%]
+    const arbitraryRoundedMatch = cls.match(/^rounded(-[tlbr]{1,2})?-\[([^\]]+)\]$/)
+    if (arbitraryRoundedMatch) {
+      const [, corner, value] = arbitraryRoundedMatch
+      if (!corner) {
+        cssRules.push(`.${escapeClassName(cls)} { border-radius: ${value}; }`)
+      } else {
+        // Handle corner-specific: rounded-tl-[10px], rounded-tr-[10px]
+        const cornerMap: Record<string, string> = {
+          '-t': 'border-top-left-radius: VAL; border-top-right-radius: VAL;',
+          '-b': 'border-bottom-left-radius: VAL; border-bottom-right-radius: VAL;',
+          '-l': 'border-top-left-radius: VAL; border-bottom-left-radius: VAL;',
+          '-r': 'border-top-right-radius: VAL; border-bottom-right-radius: VAL;',
+          '-tl': 'border-top-left-radius: VAL;',
+          '-tr': 'border-top-right-radius: VAL;',
+          '-bl': 'border-bottom-left-radius: VAL;',
+          '-br': 'border-bottom-right-radius: VAL;',
+        }
+        const cssValue = (cornerMap[corner] || `border-radius: VAL;`).replace(/VAL/g, value)
+        cssRules.push(`.${escapeClassName(cls)} { ${cssValue} }`)
+      }
+      return
+    }
+
+    // Handle arbitrary background: bg-[#ff0000], bg-[url('...')], bg-[linear-gradient(...)]
+    const arbitraryBgMatch = cls.match(/^bg-\[([^\]]+)\]$/)
+    if (arbitraryBgMatch) {
+      const value = arbitraryBgMatch[1].replace(/_/g, ' ')
+      if (value.startsWith('url(') || value.startsWith('linear-gradient') || value.startsWith('radial-gradient')) {
+        cssRules.push(`.${escapeClassName(cls)} { background-image: ${value}; }`)
+      } else {
+        cssRules.push(`.${escapeClassName(cls)} { background-color: ${value}; }`)
+      }
+      return
+    }
+
+    // Handle arbitrary border: border-[2px], border-[#fff]
+    const arbitraryBorderMatch = cls.match(/^border(-[tlbrxy])?-\[([^\]]+)\]$/)
+    if (arbitraryBorderMatch) {
+      const [, dir, value] = arbitraryBorderMatch
+      // Determine if it's a width or color
+      const isWidth = /^\d/.test(value) || value.includes('px') || value.includes('rem')
+      const prop = isWidth ? 'border-width' : 'border-color'
+
+      if (!dir) {
+        cssRules.push(`.${escapeClassName(cls)} { ${prop}: ${value}; }`)
+      } else {
+        const dirMap: Record<string, string> = { '-t': 'top', '-r': 'right', '-b': 'bottom', '-l': 'left' }
+        const side = dirMap[dir] || ''
+        if (side) {
+          cssRules.push(`.${escapeClassName(cls)} { border-${side}-${isWidth ? 'width' : 'color'}: ${value}; }`)
+        }
+      }
+      return
+    }
+
+    // Handle arbitrary inset: top-[10px], left-[50%], inset-[0]
+    const arbitraryInsetMatch = cls.match(/^(top|right|bottom|left|inset)-\[([^\]]+)\]$/)
+    if (arbitraryInsetMatch) {
+      const [, prop, value] = arbitraryInsetMatch
+      if (prop === 'inset') {
+        cssRules.push(`.${escapeClassName(cls)} { top: ${value}; right: ${value}; bottom: ${value}; left: ${value}; }`)
+      } else {
+        cssRules.push(`.${escapeClassName(cls)} { ${prop}: ${value}; }`)
+      }
+      return
+    }
+
+    // Handle arbitrary z-index: z-[999], z-[9999]
+    const arbitraryZMatch = cls.match(/^z-\[([^\]]+)\]$/)
+    if (arbitraryZMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { z-index: ${arbitraryZMatch[1]}; }`)
+      return
+    }
+
+    // Handle arbitrary opacity: opacity-[0.5], opacity-[75%]
+    const arbitraryOpacityMatch = cls.match(/^opacity-\[([^\]]+)\]$/)
+    if (arbitraryOpacityMatch) {
+      let value = arbitraryOpacityMatch[1]
+      if (value.endsWith('%')) {
+        value = String(parseFloat(value) / 100)
+      }
+      cssRules.push(`.${escapeClassName(cls)} { opacity: ${value}; }`)
+      return
+    }
+
+    // Handle arbitrary max-width: max-w-[500px], max-w-[80%]
+    const arbitraryMaxWMatch = cls.match(/^max-w-\[([^\]]+)\]$/)
+    if (arbitraryMaxWMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { max-width: ${arbitraryMaxWMatch[1]}; }`)
+      return
+    }
+
+    // Handle arbitrary min-width: min-w-[100px]
+    const arbitraryMinWMatch = cls.match(/^min-w-\[([^\]]+)\]$/)
+    if (arbitraryMinWMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { min-width: ${arbitraryMinWMatch[1]}; }`)
+      return
+    }
+
+    // Handle arbitrary max-height: max-h-[500px]
+    const arbitraryMaxHMatch = cls.match(/^max-h-\[([^\]]+)\]$/)
+    if (arbitraryMaxHMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { max-height: ${arbitraryMaxHMatch[1]}; }`)
+      return
+    }
+
+    // Handle arbitrary min-height: min-h-[100px]
+    const arbitraryMinHMatch = cls.match(/^min-h-\[([^\]]+)\]$/)
+    if (arbitraryMinHMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { min-height: ${arbitraryMinHMatch[1]}; }`)
+      return
+    }
+
+    // Handle arbitrary grid-cols: grid-cols-[repeat(auto-fill,minmax(200px,1fr))]
+    const arbitraryGridColsMatch = cls.match(/^grid-cols-\[([^\]]+)\]$/)
+    if (arbitraryGridColsMatch) {
+      const value = arbitraryGridColsMatch[1].replace(/_/g, ' ')
+      cssRules.push(`.${escapeClassName(cls)} { grid-template-columns: ${value}; }`)
+      return
+    }
+
+    // Handle arbitrary aspect ratio: aspect-[16/9], aspect-[4/3]
+    const arbitraryAspectMatch = cls.match(/^aspect-\[([^\]]+)\]$/)
+    if (arbitraryAspectMatch) {
+      cssRules.push(`.${escapeClassName(cls)} { aspect-ratio: ${arbitraryAspectMatch[1]}; }`)
+      return
+    }
   })
 
   // Build final CSS with media queries
@@ -909,9 +1159,11 @@ function generateFallbackCSS(classes: Set<string>): string {
 
 /**
  * Escape class name for CSS selector
+ * Handles all special characters including those in arbitrary values
  */
 function escapeClassName(cls: string): string {
-  return cls.replace(/([:\[\]\/\\.\-])/g, '\\$1')
+  // Escape: : [ ] / \ . - ( ) , ' "
+  return cls.replace(/([:\[\]\/\\.\-\(\)\,\'\"#])/g, '\\$1')
 }
 
 /**

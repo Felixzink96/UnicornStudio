@@ -12,6 +12,7 @@ export type ReferenceCategory =
   | 'section'
   | 'entry'
   | 'token'
+  | 'content_type'
 
 // Basis-Interface für alle Referenzen
 export interface BaseReference {
@@ -67,6 +68,21 @@ export interface TokenReference extends BaseReference {
   value: string
 }
 
+// Content Type-Referenz (für dynamische Entries)
+export interface ContentTypeReference extends BaseReference {
+  category: 'content_type'
+  slug: string
+  labelSingular: string
+  labelPlural: string
+  entryCount: number
+  fields: Array<{
+    name: string
+    label: string
+    type: string
+    required: boolean
+  }>
+}
+
 // Union Type für alle Referenzen
 export type Reference =
   | PageReference
@@ -75,6 +91,7 @@ export type Reference =
   | SectionReference
   | EntryReference
   | TokenReference
+  | ContentTypeReference
 
 // Gruppierte Referenzen für das Dropdown
 export interface ReferenceGroup {
@@ -85,13 +102,14 @@ export interface ReferenceGroup {
 }
 
 // Kategorien-Konfiguration
-export const REFERENCE_CATEGORIES: Record<ReferenceCategory, { label: string; icon: string; emoji: string }> = {
-  page: { label: 'Seiten', icon: 'file-text', emoji: '📄' },
-  menu: { label: 'Menüs', icon: 'menu', emoji: '🧭' },
-  component: { label: 'Components', icon: 'component', emoji: '🧩' },
-  section: { label: 'Sections', icon: 'square', emoji: '📦' },
-  entry: { label: 'Einträge', icon: 'file', emoji: '📝' },
-  token: { label: 'Design Tokens', icon: 'palette', emoji: '🎨' },
+export const REFERENCE_CATEGORIES: Record<ReferenceCategory, { label: string; icon: string }> = {
+  page: { label: 'Seiten', icon: 'file-text' },
+  menu: { label: 'Menus', icon: 'menu' },
+  component: { label: 'Components', icon: 'component' },
+  section: { label: 'Sections', icon: 'square' },
+  entry: { label: 'Eintraege', icon: 'file' },
+  token: { label: 'Design Tokens', icon: 'palette' },
+  content_type: { label: 'Content Types', icon: 'database' },
 }
 
 // Ausgewählte Referenz im Chat
@@ -154,6 +172,25 @@ export interface ReferenceDataForAI {
     type: 'color' | 'font' | 'fontSize' | 'lineHeight' | 'letterSpacing' | 'fontWeight' | 'spacing' | 'gradient'
     value: string
     category: string
+  }>
+  contentTypes?: Array<{
+    id: string
+    name: string
+    slug: string
+    labelSingular: string
+    labelPlural: string
+    entryCount: number
+    fields: Array<{
+      name: string
+      label: string
+      type: string
+      required: boolean
+      instructions?: string
+    }>
+    // API endpoint for fetching entries
+    apiEndpoint: string
+    // Handlebars syntax example
+    syntaxExample: string
   }>
 }
 

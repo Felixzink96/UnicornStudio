@@ -120,6 +120,17 @@ export async function POST(request: Request) {
         sections?: Array<{ id: string; selector: string; tagName: string; html: string }>
         entries?: Array<{ id: string; title: string; slug: string; contentType: string; contentTypeId: string; data: Record<string, unknown> }>
         tokens?: Array<{ id: string; name: string; displayName: string; type: string; value: string; category: string }>
+        contentTypes?: Array<{
+          id: string
+          name: string
+          slug: string
+          labelSingular: string
+          labelPlural: string
+          entryCount: number
+          fields: Array<{ name: string; label: string; type: string; required: boolean; instructions?: string }>
+          apiEndpoint: string
+          syntaxExample: string
+        }>
       }
       thinkingEnabled?: boolean
       // Gemini Tools
@@ -277,7 +288,8 @@ export async function POST(request: Request) {
       references.menus?.length ||
       references.sections?.length ||
       references.tokens?.length ||
-      references.entries?.length
+      references.entries?.length ||
+      references.contentTypes?.length
     )
 
     if (hasReferences) {
@@ -334,6 +346,37 @@ export async function POST(request: Request) {
         for (const entry of references.entries) {
           userMessage += `### @${entry.title} (${entry.contentType} - ID: ${entry.id})\n`
           userMessage += `Daten: ${JSON.stringify(entry.data, null, 2)}\n\n`
+        }
+      }
+
+      // Content Types (für dynamische Entries-Anzeige)
+      if (references.contentTypes && references.contentTypes.length > 0) {
+        userMessage += `### CONTENT TYPES (für dynamische Inhalte)\n\n`
+        userMessage += `⚠️ WICHTIG: Verwende die {{#entries:...}} Syntax um Inhalte dynamisch anzuzeigen!\n`
+        userMessage += `Diese werden serverseitig gerendert (SEO-freundlich).\n\n`
+
+        for (const ct of references.contentTypes) {
+          userMessage += `#### @${ct.labelPlural} (Content Type: ${ct.name})\n`
+          userMessage += `- Slug: \`${ct.slug}\`\n`
+          userMessage += `- Einträge: ${ct.entryCount} veröffentlicht\n`
+          userMessage += `- Felder:\n`
+          for (const field of ct.fields) {
+            userMessage += `  - \`${field.name}\` (${field.type})${field.required ? ' *required*' : ''}: ${field.label}\n`
+          }
+          userMessage += `\n**Syntax-Beispiel:**\n\`\`\`handlebars\n${ct.syntaxExample}\n\`\`\`\n\n`
+          userMessage += `**Verfügbare Variablen im Loop:**\n`
+          userMessage += `- \`{{title}}\` - Titel des Eintrags\n`
+          userMessage += `- \`{{slug}}\` - URL-Slug\n`
+          userMessage += `- \`{{url}}\` - Vollständige URL zum Eintrag\n`
+          userMessage += `- \`{{excerpt}}\` - Kurztext\n`
+          userMessage += `- \`{{featured_image}}\` - Bild-URL\n`
+          userMessage += `- \`{{published_at}}\` - Veröffentlichungsdatum\n`
+          userMessage += `- \`{{data.FELDNAME}}\` - Custom Fields (z.B. {{data.preis}}, {{data.datum}})\n\n`
+          userMessage += `**Optionen:**\n`
+          userMessage += `- \`limit=N\` - Anzahl der Einträge (z.B. limit=4)\n`
+          userMessage += `- \`sort="feld:asc|desc"\` - Sortierung (z.B. sort="data.datum:asc")\n`
+          userMessage += `- \`wrapper="div"\` - Wrapper-Element\n`
+          userMessage += `- \`wrapperClass="grid grid-cols-4"\` - CSS-Klassen für Wrapper\n\n`
         }
       }
 

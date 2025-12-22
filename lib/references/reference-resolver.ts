@@ -14,6 +14,7 @@ import type {
   SectionReference,
   EntryReference,
   TokenReference,
+  ContentTypeReference,
   ReferenceDataForAI,
   REFERENCE_CATEGORIES,
 } from './reference-types'
@@ -41,6 +42,7 @@ export async function loadAllReferences(options: ResolverOptions): Promise<Refer
     cmsComponentsResult,
     entriesResult,
     tokensResult,
+    contentTypesResult,
   ] = await Promise.all([
     // Seiten
     (!includeCategories || includeCategories.includes('page'))
@@ -97,6 +99,15 @@ export async function loadAllReferences(options: ResolverOptions): Promise<Refer
           .eq('site_id', siteId)
           .single()
       : Promise.resolve({ data: null }),
+
+    // Content Types mit Fields
+    (!includeCategories || includeCategories.includes('content_type'))
+      ? supabase
+          .from('content_types')
+          .select('id, name, slug, label_singular, label_plural, icon')
+          .eq('site_id', siteId)
+          .order('name')
+      : Promise.resolve({ data: null }),
   ])
 
   // Seiten verarbeiten
@@ -149,7 +160,7 @@ export async function loadAllReferences(options: ResolverOptions): Promise<Refer
       allComponentRefs.push({
         id: comp.id,
         name: comp.name,
-        displayName: `${comp.position === 'header' ? '🔝' : '🔻'} ${comp.name}`,
+        displayName: comp.name,
         category: 'component' as const,
         icon: 'component',
         position: comp.position as 'header' | 'footer' | 'content',
@@ -164,7 +175,7 @@ export async function loadAllReferences(options: ResolverOptions): Promise<Refer
       allComponentRefs.push({
         id: `cms_${comp.id}`, // Prefix to distinguish from legacy
         name: comp.name,
-        displayName: `🧩 ${comp.name}`,
+        displayName: comp.name,
         category: 'component' as const,
         icon: 'puzzle',
         position: 'content' as const,
@@ -232,6 +243,63 @@ export async function loadAllReferences(options: ResolverOptions): Promise<Refer
         items: tokenRefs,
       })
     }
+  }
+
+  // Content Types verarbeiten
+  if (contentTypesResult.data && contentTypesResult.data.length > 0) {
+    // Load fields for each content type
+    const contentTypeIds = contentTypesResult.data.map(ct => ct.id)
+    const { data: fields } = await supabase
+      .from('fields')
+      .select('id, name, label, type, required, instructions, content_type_id')
+      .in('content_type_id', contentTypeIds)
+      .order('position')
+
+    // Group fields by content type
+    const fieldsByContentType = new Map<string, typeof fields>()
+    fields?.forEach(field => {
+      const existing = fieldsByContentType.get(field.content_type_id) || []
+      existing.push(field)
+      fieldsByContentType.set(field.content_type_id, existing)
+    })
+
+    // Count entries per content type
+    const { data: entryCounts } = await supabase
+      .from('entries')
+      .select('content_type_id')
+      .eq('site_id', siteId)
+      .eq('status', 'published')
+
+    const countByContentType = new Map<string, number>()
+    entryCounts?.forEach(entry => {
+      const current = countByContentType.get(entry.content_type_id) || 0
+      countByContentType.set(entry.content_type_id, current + 1)
+    })
+
+    const contentTypeRefs: ContentTypeReference[] = contentTypesResult.data.map((ct) => ({
+      id: ct.id,
+      name: ct.name,
+      displayName: ct.label_plural || ct.name,
+      category: 'content_type' as const,
+      icon: ct.icon || 'database',
+      slug: ct.slug || ct.name,
+      labelSingular: ct.label_singular || ct.name,
+      labelPlural: ct.label_plural || ct.name,
+      entryCount: countByContentType.get(ct.id) || 0,
+      fields: (fieldsByContentType.get(ct.id) || []).map(f => ({
+        name: f.name,
+        label: f.label,
+        type: f.type,
+        required: f.required || false,
+      })),
+    }))
+
+    groups.push({
+      category: 'content_type',
+      label: 'Content Types',
+      icon: 'database',
+      items: contentTypeRefs,
+    })
   }
 
   return groups
@@ -615,6 +683,71 @@ export async function resolveReferencesForAI(
             result.tokens = tokens
           }
         })
+    )
+  }
+
+  // Content Types (mit Fields für dynamische Entries)
+  if (byCategory.content_type) {
+    promises.push(
+      (async () => {
+        // Get content types
+        const { data: contentTypes } = await supabase
+          .from('content_types')
+          .select('id, name, slug, label_singular, label_plural')
+          .in('id', byCategory.content_type!)
+
+        if (!contentTypes) return
+
+        // Get fields for these content types
+        const { data: fields } = await supabase
+          .from('fields')
+          .select('id, name, label, type, required, instructions, content_type_id')
+          .in('content_type_id', byCategory.content_type!)
+          .order('position')
+
+        // Group fields by content type
+        const fieldsByContentType = new Map<string, typeof fields>()
+        fields?.forEach(field => {
+          const existing = fieldsByContentType.get(field.content_type_id) || []
+          existing.push(field)
+          fieldsByContentType.set(field.content_type_id, existing)
+        })
+
+        // Count entries per content type
+        const { data: entryCounts } = await supabase
+          .from('entries')
+          .select('content_type_id')
+          .eq('site_id', siteId)
+          .eq('status', 'published')
+          .in('content_type_id', byCategory.content_type!)
+
+        const countByContentType = new Map<string, number>()
+        entryCounts?.forEach(entry => {
+          const current = countByContentType.get(entry.content_type_id) || 0
+          countByContentType.set(entry.content_type_id, current + 1)
+        })
+
+        result.contentTypes = contentTypes.map(ct => {
+          const ctFields = fieldsByContentType.get(ct.id) || []
+          return {
+            id: ct.id,
+            name: ct.name,
+            slug: ct.slug || ct.name,
+            labelSingular: ct.label_singular || ct.name,
+            labelPlural: ct.label_plural || ct.name,
+            entryCount: countByContentType.get(ct.id) || 0,
+            fields: ctFields.map(f => ({
+              name: f.name,
+              label: f.label,
+              type: f.type,
+              required: f.required || false,
+              instructions: f.instructions || undefined,
+            })),
+            apiEndpoint: `/api/v1/sites/${siteId}/public/entries?content_type=${ct.slug || ct.name}`,
+            syntaxExample: `{{#entries:${ct.slug || ct.name} limit=4}}\n  <article>\n    <h3>{{title}}</h3>\n    ${ctFields.slice(0, 3).map(f => `<p>{{data.${f.name}}}</p>`).join('\n    ')}\n    <a href="{{url}}">Mehr</a>\n  </article>\n{{/entries}}`,
+          }
+        })
+      })()
     )
   }
 

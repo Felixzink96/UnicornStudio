@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { renderTemplateWithComponents, type RenderContext } from '@/lib/templates/engine'
 import { resolveTemplate, getRelatedEntries } from '@/lib/templates/resolver'
+import { resolveEntriesInTemplate } from '@/lib/templates/entries-resolver'
 import type { ContentType, Entry, Template, CMSComponent } from '@/types/cms'
 
 interface RouteParams {
@@ -162,9 +163,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .eq('site_id', siteId)
       .not('slug', 'is', null)
 
-    // Render the template with component resolution
-    const { html: renderedHtml, components: usedComponents } = renderTemplateWithComponents(
+    // Step 1: Resolve entries placeholders ({{#entries:type}}...{{/entries}})
+    // This happens BEFORE Handlebars so entries are rendered server-side for SEO
+    const { html: entriesResolvedHtml } = await resolveEntriesInTemplate(
       template.html,
+      siteId
+    )
+
+    // Step 2: Render the template with component resolution and Handlebars
+    const { html: renderedHtml, components: usedComponents } = renderTemplateWithComponents(
+      entriesResolvedHtml,
       context,
       (cmsComponents || []) as CMSComponent[]
     )

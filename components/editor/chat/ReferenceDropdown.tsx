@@ -8,9 +8,11 @@ import {
   Square,
   FileEdit,
   Palette,
+  Database,
   X,
   Search,
   ChevronRight,
+  ChevronDown,
 } from 'lucide-react'
 import type { ReferenceGroup, Reference, ReferenceCategory } from '@/lib/references/reference-types'
 import { REFERENCE_CATEGORIES } from '@/lib/references/reference-types'
@@ -34,6 +36,7 @@ const CategoryIcons: Record<ReferenceCategory, React.ComponentType<{ className?:
   section: Square,
   entry: FileEdit,
   token: Palette,
+  content_type: Database,
 }
 
 // Kategorie Farben (Hintergrund + Text)
@@ -74,6 +77,12 @@ const CategoryColors: Record<ReferenceCategory, { bg: string; bgHover: string; t
     text: 'text-cyan-700',
     border: 'border-cyan-200',
   },
+  content_type: {
+    bg: 'bg-indigo-50',
+    bgHover: 'hover:bg-indigo-100',
+    text: 'text-indigo-700',
+    border: 'border-indigo-200',
+  },
 }
 
 // Kategorie Labels (ohne Emojis)
@@ -84,6 +93,7 @@ const CategoryLabels: Record<ReferenceCategory, string> = {
   section: 'Sections',
   entry: 'Eintr\u00e4ge',
   token: 'Design Tokens',
+  content_type: 'Content Types',
 }
 
 export function ReferenceDropdown({
@@ -97,7 +107,21 @@ export function ReferenceDropdown({
   const [groups, setGroups] = useState<ReferenceGroup[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [expandedCategories, setExpandedCategories] = useState<Set<ReferenceCategory>>(new Set())
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Toggle category expansion
+  const toggleCategory = (category: ReferenceCategory) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(category)) {
+        next.delete(category)
+      } else {
+        next.add(category)
+      }
+      return next
+    })
+  }
 
   // Alle Referenzen laden
   useEffect(() => {
@@ -126,10 +150,17 @@ export function ReferenceDropdown({
     return searchReferences(groups, searchQuery)
   }, [groups, searchQuery])
 
-  // Flache Liste aller Items fur Navigation
+  // Flache Liste aller sichtbaren Items fur Navigation
   const flatItems = useMemo(() => {
-    return filteredGroups.flatMap((group) => group.items)
-  }, [filteredGroups])
+    // Bei Suche: alle Items anzeigen
+    if (searchQuery) {
+      return filteredGroups.flatMap((group) => group.items)
+    }
+    // Sonst: nur Items aus expandierten Kategorien
+    return filteredGroups
+      .filter((group) => expandedCategories.has(group.category))
+      .flatMap((group) => group.items)
+  }, [filteredGroups, expandedCategories, searchQuery])
 
   // Reset selection bei Suche
   useEffect(() => {
@@ -237,14 +268,22 @@ export function ReferenceDropdown({
               const CategoryIcon = CategoryIcons[group.category]
               const colors = CategoryColors[group.category]
               const label = CategoryLabels[group.category]
+              const isExpanded = searchQuery ? true : expandedCategories.has(group.category)
 
               return (
                 <div key={group.category} className="mb-1">
-                  {/* Kategorie Header */}
-                  <div
-                    className={`mx-2 px-3 py-2 rounded-lg ${colors.bg} border ${colors.border} mb-1`}
+                  {/* Kategorie Header - klickbar */}
+                  <button
+                    onClick={() => !searchQuery && toggleCategory(group.category)}
+                    className={`w-full mx-2 px-3 py-2 rounded-lg ${colors.bg} border ${colors.border} mb-1 text-left transition-colors ${!searchQuery ? 'hover:opacity-80 cursor-pointer' : ''}`}
+                    style={{ width: 'calc(100% - 1rem)' }}
                   >
                     <div className="flex items-center gap-2">
+                      {!searchQuery && (
+                        <ChevronDown
+                          className={`h-4 w-4 ${colors.text} transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+                        />
+                      )}
                       <CategoryIcon className={`h-4 w-4 ${colors.text}`} />
                       <span className={`text-xs font-semibold uppercase tracking-wide ${colors.text}`}>
                         {label}
@@ -253,90 +292,92 @@ export function ReferenceDropdown({
                         ({group.items.length})
                       </span>
                     </div>
-                  </div>
+                  </button>
 
-                  {/* Items */}
-                  <div className="px-2">
-                    {group.items.map((item) => {
-                      const itemIndex = flatItems.indexOf(item)
-                      const isSelected = itemIndex === selectedIndex
+                  {/* Items - nur wenn expandiert oder bei Suche */}
+                  {isExpanded && (
+                    <div className="px-2">
+                      {group.items.map((item) => {
+                        const itemIndex = flatItems.indexOf(item)
+                        const isSelected = itemIndex === selectedIndex
 
-                      return (
-                        <button
-                          key={`${item.category}-${item.id}`}
-                          className={`w-full px-3 py-2.5 text-left flex items-center gap-3 rounded-lg transition-all mb-0.5 ${
-                            isSelected
-                              ? `${colors.bg} ${colors.border} border`
-                              : `hover:bg-zinc-50 border border-transparent`
-                          }`}
-                          onClick={() => onSelect(item)}
-                          onMouseEnter={() => setSelectedIndex(itemIndex)}
-                        >
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                              isSelected ? colors.bg : 'bg-zinc-100'
+                        return (
+                          <button
+                            key={`${item.category}-${item.id}`}
+                            className={`w-full px-3 py-2.5 text-left flex items-center gap-3 rounded-lg transition-all mb-0.5 ${
+                              isSelected
+                                ? `${colors.bg} ${colors.border} border`
+                                : `hover:bg-zinc-50 border border-transparent`
                             }`}
+                            onClick={() => onSelect(item)}
+                            onMouseEnter={() => setSelectedIndex(itemIndex)}
                           >
-                            <CategoryIcon
-                              className={`h-4 w-4 ${isSelected ? colors.text : 'text-zinc-500'}`}
-                            />
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-zinc-400">@</span>
-                              <span
-                                className={`text-sm font-medium truncate ${
-                                  isSelected ? colors.text : 'text-zinc-800'
-                                }`}
-                              >
-                                {item.displayName}
-                              </span>
+                            <div
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                isSelected ? colors.bg : 'bg-zinc-100'
+                              }`}
+                            >
+                              <CategoryIcon
+                                className={`h-4 w-4 ${isSelected ? colors.text : 'text-zinc-500'}`}
+                              />
                             </div>
 
-                            {/* Zusaetzliche Info */}
-                            {item.category === 'page' && (item as { slug?: string }).slug && (
-                              <span className="text-xs text-zinc-400">
-                                /{(item as { slug: string }).slug}
-                              </span>
-                            )}
-                            {item.category === 'menu' && (
-                              <span className="text-xs text-zinc-400">
-                                {(item as { position: string }).position}
-                              </span>
-                            )}
-                            {item.category === 'component' && (
-                              <span className="text-xs text-zinc-400">
-                                {(item as { position: string }).position}
-                              </span>
-                            )}
-                            {item.category === 'section' && (
-                              <span className="text-xs text-zinc-400">
-                                #{item.id}
-                              </span>
-                            )}
-                          </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-zinc-400">@</span>
+                                <span
+                                  className={`text-sm font-medium truncate ${
+                                    isSelected ? colors.text : 'text-zinc-800'
+                                  }`}
+                                >
+                                  {item.displayName}
+                                </span>
+                              </div>
 
-                          {/* Color Preview for Tokens */}
-                          {item.category === 'token' &&
-                            (item as { tokenType: string; value: string }).tokenType === 'color' && (
-                              <div
-                                className="w-6 h-6 rounded-md border border-zinc-200 shadow-sm"
-                                style={{
-                                  backgroundColor: (item as { value: string }).value,
-                                }}
-                              />
-                            )}
+                              {/* Zusaetzliche Info */}
+                              {item.category === 'page' && (item as { slug?: string }).slug && (
+                                <span className="text-xs text-zinc-400">
+                                  /{(item as { slug: string }).slug}
+                                </span>
+                              )}
+                              {item.category === 'menu' && (
+                                <span className="text-xs text-zinc-400">
+                                  {(item as { position: string }).position}
+                                </span>
+                              )}
+                              {item.category === 'component' && (
+                                <span className="text-xs text-zinc-400">
+                                  {(item as { position: string }).position}
+                                </span>
+                              )}
+                              {item.category === 'section' && (
+                                <span className="text-xs text-zinc-400">
+                                  #{item.id}
+                                </span>
+                              )}
+                            </div>
 
-                          <ChevronRight
-                            className={`h-4 w-4 flex-shrink-0 ${
-                              isSelected ? colors.text : 'text-zinc-300'
-                            }`}
-                          />
-                        </button>
-                      )
-                    })}
-                  </div>
+                            {/* Color Preview for Tokens */}
+                            {item.category === 'token' &&
+                              (item as { tokenType: string; value: string }).tokenType === 'color' && (
+                                <div
+                                  className="w-6 h-6 rounded-md border border-zinc-200 shadow-sm"
+                                  style={{
+                                    backgroundColor: (item as { value: string }).value,
+                                  }}
+                                />
+                              )}
+
+                            <ChevronRight
+                              className={`h-4 w-4 flex-shrink-0 ${
+                                isSelected ? colors.text : 'text-zinc-300'
+                              }`}
+                            />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}

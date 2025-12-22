@@ -408,6 +408,43 @@ selector: "#hero"
 <design-tokens>
 ## 🎨 DESIGN TOKENS (CSS-VARIABLEN)
 
+### ⚠️ WICHTIG: KEINE ARBITRARY VALUES!
+Du darfst NIEMALS Tailwind Arbitrary Values verwenden:
+- ❌ VERBOTEN: \`font-['Anton']\`, \`font-["Inter"]\`
+- ❌ VERBOTEN: \`shadow-[10px_10px_0px_0px_rgba(255,255,255,1)]\`
+- ❌ VERBOTEN: \`text-[12vw]\`, \`leading-[0.8]\`
+
+Stattdessen IMMER Design Token Klassen verwenden:
+- ✅ RICHTIG: \`font-heading\`, \`font-body\`, \`font-mono\`
+- ✅ RICHTIG: \`shadow-sm\`, \`shadow-md\`, \`shadow-lg\`, \`shadow-xl\`
+- ✅ RICHTIG: Standard Tailwind: \`text-4xl\`, \`leading-tight\`
+
+### FONTS (Utility-Klassen):
+| Klasse | CSS Variable | Verwendung |
+|--------|--------------|------------|
+| \`font-heading\` | \`--font-heading\` | Überschriften (H1-H6) |
+| \`font-body\` | \`--font-body\` | Fließtext, Paragraphen |
+| \`font-mono\` | \`--font-mono\` | Code, technische Texte |
+
+Beispiel:
+\`\`\`html
+<h1 class="font-heading text-5xl font-bold">Überschrift</h1>
+<p class="font-body text-lg">Fließtext</p>
+\`\`\`
+
+### SHADOWS (Utility-Klassen):
+| Klasse | CSS Variable | Verwendung |
+|--------|--------------|------------|
+| \`shadow-sm\` | \`--shadow-sm\` | Subtile Schatten (Inputs) |
+| \`shadow-md\` | \`--shadow-md\` | Standard Cards |
+| \`shadow-lg\` | \`--shadow-lg\` | Hervorgehobene Elemente |
+| \`shadow-xl\` | \`--shadow-xl\` | Modals, Dropdowns |
+
+Beispiel:
+\`\`\`html
+<div class="shadow-lg hover:shadow-xl transition-shadow">Card</div>
+\`\`\`
+
 ### FARBEN:
 | Variable | Verwendung |
 |----------|------------|
@@ -420,10 +457,15 @@ selector: "#hero"
 | \`--color-neutral-muted\` | Cards, subtile Bereiche |
 | \`--color-neutral-border\` | Rahmen, Trennlinien |
 
-### FONTS:
+Farben als Utility-Klassen:
 \`\`\`html
-<h1 style="font-family: var(--font-heading)">Überschrift</h1>
-<p style="font-family: var(--font-body)">Text</p>
+<button class="bg-primary text-white hover:bg-primary-hover">Button</button>
+<div class="bg-muted border-border">Card</div>
+\`\`\`
+
+Oder mit CSS-Variablen:
+\`\`\`html
+<button class="bg-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary-hover)]">
 \`\`\`
 
 ### RGB-VERSIONEN FÜR OPACITY:
@@ -433,7 +475,7 @@ Jede Farbe hat zwei Versionen:
 --color-brand-primary-rgb: 230 57 70;
 \`\`\`
 
-Verwendung:
+Verwendung für transparente Hintergründe:
 \`\`\`html
 <div class="bg-[rgb(var(--color-brand-primary-rgb)/0.1)]">
   Transparenter Primary Background

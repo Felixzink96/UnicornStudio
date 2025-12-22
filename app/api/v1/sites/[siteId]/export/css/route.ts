@@ -576,6 +576,33 @@ function extractAllClasses(html: string): Set<string> {
     })
   }
 
+  // Pattern 5: Extract classes from x-transition:* attributes (Alpine.js transitions)
+  // x-transition:enter="transition ease-out duration-300"
+  // x-transition:enter-start="opacity-0 -translate-y-full"
+  const xTransitionPattern = /x-transition(?::[a-z-]+)?=["']([^"']+)["']/gi
+  while ((match = xTransitionPattern.exec(html)) !== null) {
+    const classString = match[1]
+    classString.split(/\s+/).forEach((cls) => {
+      const trimmed = cls.trim()
+      if (trimmed && /^-?[a-z]/.test(trimmed)) {
+        classes.add(trimmed)
+      }
+    })
+  }
+
+  // Pattern 6: Extract classes from x-bind:* attributes (other Alpine bindings)
+  // x-bind:class is already handled, but other bindings might have classes
+  const xBindPattern = /x-bind:[a-z]+="[^"]*['"]([a-z][\w\-\s]+)['"][^"]*"/gi
+  while ((match = xBindPattern.exec(html)) !== null) {
+    const classString = match[1]
+    classString.split(/\s+/).forEach((cls) => {
+      const trimmed = cls.trim()
+      if (trimmed && /^[a-z]/.test(trimmed)) {
+        classes.add(trimmed)
+      }
+    })
+  }
+
   return classes
 }
 

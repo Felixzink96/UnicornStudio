@@ -108,11 +108,30 @@ class Unicorn_Studio_CSS_Manager {
             wp_mkdir_p($this->css_dir);
         }
 
-        // Add .htaccess for security
+        // Add .htaccess for security AND caching
         $htaccess = $this->css_dir . '.htaccess';
-        if (!file_exists($htaccess)) {
-            file_put_contents($htaccess, "Options -Indexes\n");
-        }
+        $htaccess_content = <<<HTACCESS
+Options -Indexes
+
+# Cache Headers for CSS/Fonts (1 year, immutable)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|woff2?|ttf|otf)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>
+HTACCESS;
+        file_put_contents($htaccess, $htaccess_content);
+
+        // Minify CSS for smaller file size (PageSpeed optimization)
+        $css = $this->minify_css($css);
 
         // Write CSS file
         $css_file = $this->css_dir . 'styles.css';
@@ -126,6 +145,41 @@ class Unicorn_Studio_CSS_Manager {
         update_option('unicorn_studio_css_version', time());
 
         return true;
+    }
+
+    /**
+     * Minify CSS by removing comments, whitespace, and line breaks
+     *
+     * @param string $css CSS content
+     * @return string Minified CSS
+     */
+    private function minify_css($css) {
+        // Remove comments
+        $css = preg_replace('!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $css);
+
+        // Remove single-line comments (// style) that may exist
+        $css = preg_replace('/\/\/.*$/m', '', $css);
+
+        // Remove whitespace around special characters
+        $css = preg_replace('/\s*([{}:;,>+~])\s*/', '$1', $css);
+
+        // Remove multiple spaces
+        $css = preg_replace('/\s+/', ' ', $css);
+
+        // Remove spaces around selectors
+        $css = preg_replace('/\s*{\s*/', '{', $css);
+        $css = preg_replace('/\s*}\s*/', '}', $css);
+
+        // Remove last semicolon before }
+        $css = preg_replace('/;+}/', '}', $css);
+
+        // Remove newlines and tabs
+        $css = str_replace(["\r\n", "\r", "\n", "\t"], '', $css);
+
+        // Trim
+        $css = trim($css);
+
+        return $css;
     }
 
     /**

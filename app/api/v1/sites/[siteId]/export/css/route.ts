@@ -289,8 +289,8 @@ ${pagesCustomCSS}
 
 ${arbitraryFallbackCSS ? `/* ----------------------------------------------------------------
    ARBITRARY VALUE FALLBACKS
-   CSS for arbitrary Tailwind values like bg-[var(...)], border-[...]
-   These are generated because Tailwind v4 may not compile CSS variables
+   CSS for arbitrary Tailwind values with CSS variables
+   These are generated because Tailwind v4 may not compile them
    ---------------------------------------------------------------- */
 ${arbitraryFallbackCSS}` : ''}
 `.trim()
@@ -1416,6 +1416,132 @@ function generateArbitraryValuesFallback(classes: Set<string>): string {
     // Shadow
     else if (baseClass.match(/^shadow-\[/)) {
       cssRule = `.${escaped} { box-shadow: ${value}; }`
+    }
+    // Z-index
+    else if (baseClass.match(/^z-\[/)) {
+      cssRule = `.${escaped} { z-index: ${value}; }`
+    }
+    // Width
+    else if (baseClass.match(/^w-\[/)) {
+      cssRule = `.${escaped} { width: ${value}; }`
+    }
+    // Height
+    else if (baseClass.match(/^h-\[/)) {
+      cssRule = `.${escaped} { height: ${value}; }`
+    }
+    // Min/Max width/height
+    else if (baseClass.match(/^min-w-\[/)) {
+      cssRule = `.${escaped} { min-width: ${value}; }`
+    }
+    else if (baseClass.match(/^max-w-\[/)) {
+      cssRule = `.${escaped} { max-width: ${value}; }`
+    }
+    else if (baseClass.match(/^min-h-\[/)) {
+      cssRule = `.${escaped} { min-height: ${value}; }`
+    }
+    else if (baseClass.match(/^max-h-\[/)) {
+      cssRule = `.${escaped} { max-height: ${value}; }`
+    }
+    // Padding
+    else if (baseClass.match(/^p-\[/)) {
+      cssRule = `.${escaped} { padding: ${value}; }`
+    }
+    else if (baseClass.match(/^p[xytblr]-\[/)) {
+      const dir = baseClass.match(/p([xytblr])-/)?.[1]
+      const propMap: Record<string, string> = {
+        x: 'padding-left: VAL; padding-right: VAL',
+        y: 'padding-top: VAL; padding-bottom: VAL',
+        t: 'padding-top: VAL', b: 'padding-bottom: VAL',
+        l: 'padding-left: VAL', r: 'padding-right: VAL'
+      }
+      cssRule = `.${escaped} { ${(propMap[dir || ''] || '').replace(/VAL/g, value)}; }`
+    }
+    // Margin
+    else if (baseClass.match(/^-?m-\[/)) {
+      const isNeg = baseClass.startsWith('-')
+      cssRule = `.${escaped} { margin: ${isNeg ? '-' : ''}${value}; }`
+    }
+    else if (baseClass.match(/^-?m[xytblr]-\[/)) {
+      const isNeg = baseClass.startsWith('-')
+      const dir = baseClass.match(/m([xytblr])-/)?.[1]
+      const propMap: Record<string, string> = {
+        x: 'margin-left: VAL; margin-right: VAL',
+        y: 'margin-top: VAL; margin-bottom: VAL',
+        t: 'margin-top: VAL', b: 'margin-bottom: VAL',
+        l: 'margin-left: VAL', r: 'margin-right: VAL'
+      }
+      cssRule = `.${escaped} { ${(propMap[dir || ''] || '').replace(/VAL/g, (isNeg ? '-' : '') + value)}; }`
+    }
+    // Gap
+    else if (baseClass.match(/^gap-\[/)) {
+      cssRule = `.${escaped} { gap: ${value}; }`
+    }
+    // Top/Right/Bottom/Left
+    else if (baseClass.match(/^(top|right|bottom|left|inset)-\[/)) {
+      const prop = baseClass.match(/^(top|right|bottom|left|inset)-/)?.[1]
+      if (prop === 'inset') {
+        cssRule = `.${escaped} { top: ${value}; right: ${value}; bottom: ${value}; left: ${value}; }`
+      } else {
+        cssRule = `.${escaped} { ${prop}: ${value}; }`
+      }
+    }
+    // Text size (only if it looks like a size)
+    else if (baseClass.match(/^text-\[/) && value.match(/^\d|^var/)) {
+      cssRule = `.${escaped} { font-size: ${value}; }`
+    }
+    // Leading (line-height)
+    else if (baseClass.match(/^leading-\[/)) {
+      cssRule = `.${escaped} { line-height: ${value}; }`
+    }
+    // Tracking (letter-spacing)
+    else if (baseClass.match(/^tracking-\[/)) {
+      cssRule = `.${escaped} { letter-spacing: ${value}; }`
+    }
+    // Rounded
+    else if (baseClass.match(/^rounded-\[/)) {
+      cssRule = `.${escaped} { border-radius: ${value}; }`
+    }
+    // Opacity
+    else if (baseClass.match(/^opacity-\[/)) {
+      cssRule = `.${escaped} { opacity: ${value}; }`
+    }
+    // Translate
+    else if (baseClass.match(/^translate-[xy]-\[/)) {
+      const axis = baseClass.includes('-x-') ? 'X' : 'Y'
+      cssRule = `.${escaped} { transform: translate${axis}(${value}); }`
+    }
+    else if (baseClass.match(/^-translate-[xy]-\[/)) {
+      const axis = baseClass.includes('-x-') ? 'X' : 'Y'
+      cssRule = `.${escaped} { transform: translate${axis}(-${value}); }`
+    }
+    // Scale
+    else if (baseClass.match(/^scale-\[/)) {
+      cssRule = `.${escaped} { transform: scale(${value}); }`
+    }
+    // Rotate
+    else if (baseClass.match(/^rotate-\[/)) {
+      cssRule = `.${escaped} { transform: rotate(${value}); }`
+    }
+    // Duration
+    else if (baseClass.match(/^duration-\[/)) {
+      cssRule = `.${escaped} { transition-duration: ${value}; }`
+    }
+    // Grid
+    else if (baseClass.match(/^grid-cols-\[/)) {
+      cssRule = `.${escaped} { grid-template-columns: ${value}; }`
+    }
+    else if (baseClass.match(/^grid-rows-\[/)) {
+      cssRule = `.${escaped} { grid-template-rows: ${value}; }`
+    }
+    else if (baseClass.match(/^col-span-\[/)) {
+      cssRule = `.${escaped} { grid-column: span ${value} / span ${value}; }`
+    }
+    else if (baseClass.match(/^row-span-\[/)) {
+      cssRule = `.${escaped} { grid-row: span ${value} / span ${value}; }`
+    }
+    // Aspect ratio
+    else if (baseClass.match(/^aspect-\[/)) {
+      cssRule = `.${escaped} { aspect-ratio: ${value}; }`
     }
 
     if (!cssRule) return

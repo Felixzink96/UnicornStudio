@@ -75,7 +75,7 @@ Analysiere Branche ({{industry}}) und Stil ({{style}}). Wähle EINEN Archetyp un
 <script src="https://cdn.tailwindcss.com"></script>
 \`\`\`
 - Nutze Design Token Klassen: \`bg-primary\`, \`text-foreground\`, \`border-accent\`
-- KEINE arbitrary values wie \`bg-[var(...)]\` - siehe Design Tokens Sektion!
+- KEINE arbitrary values mit eckigen Klammern - siehe Design Tokens Sektion!
 
 ### 2. LOGIC: Alpine.js (Interaktion)
 \`\`\`html

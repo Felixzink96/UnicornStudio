@@ -30,19 +30,55 @@ interface TailwindCustomConfig {
 // Cache the real Tailwind CSS source file content
 let tailwindCSSContent: string | null = null
 
+// Minimal Tailwind v4 source for fallback (if node_modules read fails)
+const MINIMAL_TAILWIND_SOURCE = `
+@layer theme, base, components, utilities;
+
+@layer theme {
+  :root, :host {
+    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --color-black: #000;
+    --color-white: #fff;
+    --spacing: 0.25rem;
+    --default-font-family: var(--font-sans);
+  }
+}
+
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+}
+`
+
 function getTailwindCSSContent(): string {
   if (tailwindCSSContent) return tailwindCSSContent
 
-  try {
-    // Read the REAL tailwindcss/index.css from node_modules
-    const tailwindPath = join(process.cwd(), 'node_modules', 'tailwindcss', 'index.css')
-    tailwindCSSContent = readFileSync(tailwindPath, 'utf-8')
-    console.log(`[CSS Export] Loaded Tailwind CSS source: ${tailwindCSSContent.length} bytes`)
-    return tailwindCSSContent
-  } catch (error) {
-    console.error('[CSS Export] Failed to load tailwindcss/index.css:', error)
-    throw new Error('Could not load Tailwind CSS source file')
+  // Try multiple paths to find tailwindcss/index.css
+  const possiblePaths = [
+    join(process.cwd(), 'node_modules', 'tailwindcss', 'index.css'),
+    join(__dirname, '..', '..', '..', '..', '..', 'node_modules', 'tailwindcss', 'index.css'),
+    '/var/task/node_modules/tailwindcss/index.css', // Vercel path
+  ]
+
+  for (const tailwindPath of possiblePaths) {
+    try {
+      tailwindCSSContent = readFileSync(tailwindPath, 'utf-8')
+      console.log(`[CSS Export] Loaded Tailwind CSS source from ${tailwindPath}: ${tailwindCSSContent.length} bytes`)
+      return tailwindCSSContent
+    } catch (e) {
+      console.log(`[CSS Export] Could not load from ${tailwindPath}`)
+    }
   }
+
+  // Fallback to minimal source
+  console.warn('[CSS Export] Using minimal Tailwind source as fallback')
+  tailwindCSSContent = MINIMAL_TAILWIND_SOURCE
+  return tailwindCSSContent
 }
 
 /**
@@ -432,25 +468,32 @@ async function compileTailwindCSS(classes: Set<string>, customConfig?: TailwindC
     })
 
     // Build CSS from the extracted classes
-    const css = compiler.build(classArray)
+    let css = compiler.build(classArray)
 
     console.log(`[CSS Export] Tailwind generated ${css.length} bytes of CSS`)
 
-    // Log arbitrary values for debugging
-    const arbitraryClasses = classArray.filter(cls => cls.includes('[') && cls.includes(']'))
-    if (arbitraryClasses.length > 0) {
-      console.log(`[CSS Export] Arbitrary values found (${arbitraryClasses.length}):`, arbitraryClasses.slice(0, 10))
-
-      // Check if arbitrary classes are in the output
-      const missingClasses = arbitraryClasses.filter(cls => {
-        // Escape for CSS selector check
-        const escaped = cls.replace(/([:\[\]\/\\.\-\(\)\,\'\"#])/g, '\\$1')
-        return !css.includes(escaped) && !css.includes(cls)
-      })
-
-      if (missingClasses.length > 0) {
-        console.warn(`[CSS Export] Missing arbitrary classes in Tailwind output:`, missingClasses)
+    // Validate: Check which classes are missing from the output
+    const missingClasses: string[] = []
+    for (const cls of classArray) {
+      // Escape for CSS selector check
+      const escaped = cls.replace(/([:\[\]\/\\.\-\(\)\,\'\"#])/g, '\\$1')
+      // Check if class appears as a selector in the CSS (with . prefix)
+      if (!css.includes('.' + escaped) && !css.includes('.' + cls)) {
+        missingClasses.push(cls)
       }
+    }
+
+    if (missingClasses.length > 0) {
+      console.warn(`[CSS Export] ${missingClasses.length} classes missing from Tailwind output:`, missingClasses.slice(0, 20))
+
+      // Generate fallback CSS for missing classes
+      const fallbackCSS = generateFallbackForMissingClasses(missingClasses)
+      if (fallbackCSS) {
+        console.log(`[CSS Export] Generated fallback CSS for ${missingClasses.length} missing classes`)
+        css += '\n\n/* === FALLBACK CSS FOR MISSING CLASSES === */\n' + fallbackCSS
+      }
+    } else {
+      console.log('[CSS Export] All classes found in Tailwind output')
     }
 
     return css
@@ -1348,6 +1391,198 @@ function generateFallbackCSS(classes: Set<string>): string {
 function escapeClassName(cls: string): string {
   // Escape: : [ ] / \ . - ( ) , ' "
   return cls.replace(/([:\[\]\/\\.\-\(\)\,\'\"#])/g, '\\$1')
+}
+
+/**
+ * Generate fallback CSS for classes that Tailwind didn't generate
+ * Handles: state variants, responsive, opacity modifiers, decimals, arbitrary values
+ */
+function generateFallbackForMissingClasses(classes: string[]): string {
+  const cssRules: string[] = []
+  const breakpoints: Record<string, string> = {
+    sm: '640px', md: '768px', lg: '1024px', xl: '1280px', '2xl': '1536px'
+  }
+
+  for (const cls of classes) {
+    const escaped = escapeClassName(cls)
+    let rule = ''
+
+    // Skip custom/unknown classes (like mobileMenuOpen, Alpine state classes)
+    if (!cls.includes(':') && !cls.includes('[') && !cls.includes('/') && !cls.includes('.')) {
+      continue
+    }
+
+    // 1. Handle responsive prefixes: md:flex-row, lg:grid-cols-4
+    const responsiveMatch = cls.match(/^(sm|md|lg|xl|2xl):(.+)$/)
+    if (responsiveMatch) {
+      const [, prefix, baseClass] = responsiveMatch
+      const baseRule = generateSingleClassCSS(baseClass)
+      if (baseRule) {
+        rule = `@media (min-width: ${breakpoints[prefix]}) {\n  .${escaped} { ${baseRule} }\n}`
+      }
+    }
+    // 2. Handle hover/focus/active/group-hover variants
+    else if (cls.match(/^(hover|focus|active|focus-within|focus-visible|group-hover):(.+)$/)) {
+      const match = cls.match(/^(hover|focus|active|focus-within|focus-visible|group-hover):(.+)$/)
+      if (match) {
+        const [, state, baseClass] = match
+        const baseRule = generateSingleClassCSS(baseClass)
+        if (baseRule) {
+          if (state === 'group-hover') {
+            rule = `.group:hover .${escaped} { ${baseRule} }`
+          } else {
+            rule = `.${escaped}:${state} { ${baseRule} }`
+          }
+        }
+      }
+    }
+    // 3. Handle opacity modifiers: bg-black/30, border-white/20, text-gray-500/50
+    else if (cls.match(/^(bg|text|border)-(white|black|.+)\/(\d+)$/)) {
+      const match = cls.match(/^(bg|text|border)-(white|black|.+)\/(\d+)$/)
+      if (match) {
+        const [, type, color, opacity] = match
+        const opacityValue = parseInt(opacity) / 100
+        let baseColor = color === 'white' ? '255, 255, 255' : color === 'black' ? '0, 0, 0' : null
+
+        if (baseColor) {
+          if (type === 'bg') {
+            rule = `.${escaped} { background-color: rgba(${baseColor}, ${opacityValue}); }`
+          } else if (type === 'text') {
+            rule = `.${escaped} { color: rgba(${baseColor}, ${opacityValue}); }`
+          } else if (type === 'border') {
+            rule = `.${escaped} { border-color: rgba(${baseColor}, ${opacityValue}); }`
+          }
+        }
+      }
+    }
+    // 4. Handle decimal values: gap-1.5, p-2.5
+    else if (cls.match(/^(gap|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr)-(\d+\.\d+)$/)) {
+      const match = cls.match(/^(gap|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr)-(\d+\.\d+)$/)
+      if (match) {
+        const [, prop, value] = match
+        const remValue = parseFloat(value) * 0.25
+        const propMap: Record<string, string> = {
+          'gap': 'gap',
+          'p': 'padding', 'px': 'padding-inline', 'py': 'padding-block',
+          'pt': 'padding-top', 'pb': 'padding-bottom', 'pl': 'padding-left', 'pr': 'padding-right',
+          'm': 'margin', 'mx': 'margin-inline', 'my': 'margin-block',
+          'mt': 'margin-top', 'mb': 'margin-bottom', 'ml': 'margin-left', 'mr': 'margin-right',
+        }
+        rule = `.${escaped} { ${propMap[prop]}: ${remValue}rem; }`
+      }
+    }
+    // 5. Handle arbitrary values with [...]
+    else if (cls.includes('[') && cls.includes(']')) {
+      const valueMatch = cls.match(/\[([^\]]+)\]/)
+      if (valueMatch) {
+        const value = valueMatch[1].replace(/_/g, ' ')
+
+        if (cls.match(/^bg-\[/)) rule = `.${escaped} { background-color: ${value}; }`
+        else if (cls.match(/^text-\[/) && !value.match(/^\d/)) rule = `.${escaped} { color: ${value}; }`
+        else if (cls.match(/^text-\[/) && value.match(/^\d/)) rule = `.${escaped} { font-size: ${value}; }`
+        else if (cls.match(/^border-\[/) && !value.match(/^\d/)) rule = `.${escaped} { border-color: ${value}; }`
+        else if (cls.match(/^w-\[/)) rule = `.${escaped} { width: ${value}; }`
+        else if (cls.match(/^h-\[/)) rule = `.${escaped} { height: ${value}; }`
+        else if (cls.match(/^max-w-\[/)) rule = `.${escaped} { max-width: ${value}; }`
+        else if (cls.match(/^min-w-\[/)) rule = `.${escaped} { min-width: ${value}; }`
+        else if (cls.match(/^z-\[/)) rule = `.${escaped} { z-index: ${value}; }`
+        else if (cls.match(/^shadow-\[/)) rule = `.${escaped} { box-shadow: ${value}; }`
+        else if (cls.match(/^font-\[/)) {
+          const fontName = value.replace(/['"]/g, '')
+          rule = `.${escaped} { font-family: '${fontName}', sans-serif; }`
+        }
+        else if (cls.match(/^leading-\[/)) rule = `.${escaped} { line-height: ${value}; }`
+        else if (cls.match(/^tracking-\[/)) rule = `.${escaped} { letter-spacing: ${value}; }`
+        else if (cls.match(/^translate-x-\[/)) rule = `.${escaped} { transform: translateX(${value}); }`
+        else if (cls.match(/^translate-y-\[/)) rule = `.${escaped} { transform: translateY(${value}); }`
+      }
+    }
+
+    if (rule) {
+      cssRules.push(rule)
+    }
+  }
+
+  return cssRules.join('\n')
+}
+
+/**
+ * Generate CSS property for a single utility class (without escaping)
+ */
+function generateSingleClassCSS(cls: string): string | null {
+  // Standard Tailwind utilities
+  const utilities: Record<string, string> = {
+    // Display
+    'flex': 'display: flex',
+    'block': 'display: block',
+    'inline': 'display: inline',
+    'hidden': 'display: none',
+    'grid': 'display: grid',
+    // Flex
+    'flex-row': 'flex-direction: row',
+    'flex-col': 'flex-direction: column',
+    'flex-wrap': 'flex-wrap: wrap',
+    'flex-nowrap': 'flex-wrap: nowrap',
+    'items-center': 'align-items: center',
+    'items-start': 'align-items: flex-start',
+    'items-end': 'align-items: flex-end',
+    'justify-center': 'justify-content: center',
+    'justify-between': 'justify-content: space-between',
+    'justify-start': 'justify-content: flex-start',
+    'justify-end': 'justify-content: flex-end',
+    // Colors
+    'bg-white': 'background-color: #fff',
+    'bg-black': 'background-color: #000',
+    'bg-transparent': 'background-color: transparent',
+    'text-white': 'color: #fff',
+    'text-black': 'color: #000',
+    'border-white': 'border-color: #fff',
+    'border-black': 'border-color: #000',
+    // Outline
+    'outline-none': 'outline: none',
+    // Shadow
+    'shadow-none': 'box-shadow: none',
+    // Underline
+    'underline': 'text-decoration: underline',
+    'no-underline': 'text-decoration: none',
+  }
+
+  if (utilities[cls]) {
+    return utilities[cls]
+  }
+
+  // Grid columns: grid-cols-1, grid-cols-2, etc.
+  const gridColsMatch = cls.match(/^grid-cols-(\d+)$/)
+  if (gridColsMatch) {
+    return `grid-template-columns: repeat(${gridColsMatch[1]}, minmax(0, 1fr))`
+  }
+
+  // Margin/Padding with number: mt-0, px-4, etc.
+  const spacingMatch = cls.match(/^(p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr)-(\d+)$/)
+  if (spacingMatch) {
+    const [, prop, value] = spacingMatch
+    const remValue = parseInt(value) * 0.25
+    const propMap: Record<string, string> = {
+      'p': 'padding', 'px': 'padding-inline', 'py': 'padding-block',
+      'pt': 'padding-top', 'pb': 'padding-bottom', 'pl': 'padding-left', 'pr': 'padding-right',
+      'm': 'margin', 'mx': 'margin-inline', 'my': 'margin-block',
+      'mt': 'margin-top', 'mb': 'margin-bottom', 'ml': 'margin-left', 'mr': 'margin-right',
+    }
+    return `${propMap[prop]}: ${remValue}rem`
+  }
+
+  // Handle arbitrary values
+  if (cls.includes('[') && cls.includes(']')) {
+    const valueMatch = cls.match(/\[([^\]]+)\]/)
+    if (valueMatch) {
+      const value = valueMatch[1].replace(/_/g, ' ')
+      if (cls.match(/^bg-\[/)) return `background-color: ${value}`
+      if (cls.match(/^text-\[/) && !value.match(/^\d/)) return `color: ${value}`
+      if (cls.match(/^border-\[/)) return `border-color: ${value}`
+    }
+  }
+
+  return null
 }
 
 /**

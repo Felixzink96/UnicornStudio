@@ -81,13 +81,34 @@ foreach ($pages as $page) {
 $all_classes = array_unique($all_classes);
 sort($all_classes);
 
-// Check which classes have CSS
+// Check which classes have CSS (supports CSS Nesting from Tailwind v4)
 function check_class_in_css($class, $css) {
-    // Escape for CSS selector
-    $escaped = preg_replace_callback('/([:\[\]\/\\\\.\-\(\)\,\'\"\#])/', function($m) {
+    // Escape special characters for CSS selector
+    $escaped = preg_replace_callback('/([:\[\]\/\\\\.\-\(\)\,\'\"\#\%])/', function($m) {
         return '\\' . $m[1];
     }, $class);
-    return strpos($css, '.' . $escaped) !== false || strpos($css, '.' . $class) !== false;
+
+    // Build regex pattern to find .escaped-class followed by { or , or whitespace
+    // This works with both flat CSS and CSS Nesting
+    // Example: .hover\:bg-white { or .hover\:bg-white, or .hover\:bg-white {
+    $escaped_for_regex = str_replace('\\', '\\\\', $escaped);
+    $pattern = '/\.' . $escaped_for_regex . '\s*[\{,\s]/';
+
+    if (preg_match($pattern, $css) === 1) {
+        return true;
+    }
+
+    // Fallback: simple string search for the escaped class
+    if (strpos($css, '.' . $escaped) !== false) {
+        return true;
+    }
+
+    // Also check unescaped (some generators don't escape)
+    if (strpos($css, '.' . $class) !== false) {
+        return true;
+    }
+
+    return false;
 }
 
 $classes_with_css = [];

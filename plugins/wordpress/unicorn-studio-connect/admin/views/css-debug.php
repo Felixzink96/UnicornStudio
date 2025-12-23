@@ -17,9 +17,10 @@ $css_exists = file_exists($css_file);
 $css_content = $css_exists ? file_get_contents($css_file) : '';
 $css_size = $css_exists ? size_format(filesize($css_file)) : '0 KB';
 
-// Extract classes from header and footer
-$header = get_option('unicorn_studio_components', [])['global_header'] ?? null;
-$footer = get_option('unicorn_studio_components', [])['global_footer'] ?? null;
+// Extract classes from header and footer (stored in unicorn_studio_global_components)
+$global_components = get_option('unicorn_studio_global_components', []);
+$header = $global_components['header'] ?? null;
+$footer = $global_components['footer'] ?? null;
 $header_html = $header['html'] ?? '';
 $footer_html = $footer['html'] ?? '';
 

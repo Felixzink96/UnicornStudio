@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const [pagesRes, componentsRes, templatesRes, cmsComponentsRes] = await Promise.all([
       supabase.from('pages').select('id, name, slug, html_content').eq('site_id', siteId),
       supabase.from('components').select('id, name, position, html').eq('site_id', siteId),
-      supabase.from('templates').select('id, name, html_content').eq('site_id', siteId),
+      supabase.from('templates').select('id, name, html').eq('site_id', siteId),
       supabase.from('cms_components').select('id, name, html').eq('site_id', siteId),
     ])
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Templates
     templates.forEach(tmpl => {
-      const classes = extractClasses(tmpl.html_content || '')
+      const classes = extractClasses(tmpl.html || '')
       if (classes.length > 0) {
         classesPerSource[`template:${tmpl.id}`] = {
           source: `Template: ${tmpl.name}`,

@@ -56,6 +56,22 @@ export function generateDesignTokensCSS(designVars: DesignVariables | null): str
   box-sizing: border-box;
   border-width: 0;
   border-style: solid;
+
+  /* Tailwind v4 transform variables - must be initialized for modern browsers */
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-rotate: 0deg;
+  --tw-skew-x: 0deg;
+  --tw-skew-y: 0deg;
+
+  /* Tailwind v4 shadow/ring variables */
+  --tw-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-inset-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-inset-ring-shadow: 0 0 #0000;
 }
 
 button, [role="button"] {

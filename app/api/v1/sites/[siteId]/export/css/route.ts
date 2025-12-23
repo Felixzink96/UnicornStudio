@@ -271,11 +271,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       customUtilities += buildBackgroundImageUtilities(tailwindConfig.backgroundImage) + '\n\n'
     }
 
-    // 11b. Generate fallback CSS for arbitrary values (Tailwind v4 may not compile CSS variables)
-    const arbitraryFallbackCSS = generateArbitraryValuesFallback(extractedClasses)
-    if (arbitraryFallbackCSS) {
-      console.log(`[CSS Export] Generated ${arbitraryFallbackCSS.split('\n').length} lines of arbitrary value fallback CSS`)
-    }
+    // 11b. REMOVED: Arbitrary value fallback generation
+    // Tailwind v4 compiles all arbitrary values correctly.
+    // The fallback was causing selector bugs (space before :hover) and duplicate CSS.
 
     // 12. Combine everything
     const fullCSS = `
@@ -328,13 +326,6 @@ ${cmsComponentsCSS}
    Design tokens are NOT duplicated here (managed via CSS Variables above)
    ---------------------------------------------------------------- */
 ${pagesCustomCSS}
-
-${arbitraryFallbackCSS ? `/* ----------------------------------------------------------------
-   ARBITRARY VALUE FALLBACKS
-   CSS for arbitrary Tailwind values with CSS variables
-   These are generated because Tailwind v4 may not compile them
-   ---------------------------------------------------------------- */
-${arbitraryFallbackCSS}` : ''}
 `.trim()
 
     // 9. Return CSS with proper headers
@@ -1595,7 +1586,7 @@ function generateArbitraryValuesFallback(classes: Set<string>): string {
 
     // Add hover pseudo-class if needed
     if (isHover) {
-      cssRule = cssRule.replace('{', ':hover {')
+      cssRule = cssRule.replace(' {', ':hover {')
     }
 
     // Add to appropriate bucket

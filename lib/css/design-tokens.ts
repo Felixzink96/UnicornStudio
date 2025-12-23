@@ -321,18 +321,8 @@ ${gradients?.primary?.enabled ? `
 .opacity-90 { opacity: 0.9; }
 .opacity-100 { opacity: 1; }
 
-/* Transform */
-.scale-100 { transform: scale(1); }
-.scale-105 { transform: scale(1.05); }
-.scale-110 { transform: scale(1.1); }
-.-translate-y-1 { transform: translateY(-0.25rem); }
-.-translate-y-2 { transform: translateY(-0.5rem); }
-.translate-y-0 { transform: translateY(0px); }
-.translate-y-1 { transform: translateY(0.25rem); }
-.translate-y-2 { transform: translateY(0.5rem); }
-.rotate-45 { transform: rotate(45deg); }
-.rotate-90 { transform: rotate(90deg); }
-.rotate-180 { transform: rotate(180deg); }
+/* Transform - REMOVED: Tailwind v4 generates these with individual properties (translate, rotate, scale) */
+/* Using combined 'transform' here would conflict with Tailwind's individual properties */
 
 /* ============================================
    HOVER STATES
@@ -379,11 +369,7 @@ ${gradients?.primary?.enabled ? `
 .group:hover .group-hover\\:bg-primary { background-color: var(--color-brand-primary); }
 .group:hover .group-hover\\:opacity-100 { opacity: 1; }
 
-/* Hover Transform */
-.hover\\:scale-105:hover { transform: scale(1.05); }
-.hover\\:scale-110:hover { transform: scale(1.1); }
-.hover\\:-translate-y-1:hover { transform: translateY(-0.25rem); }
-.hover\\:-translate-y-2:hover { transform: translateY(-0.5rem); }
+/* Hover Transform - REMOVED: Tailwind v4 generates these with individual properties */
 
 /* ============================================
    FOCUS STATES

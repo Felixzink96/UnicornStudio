@@ -73,15 +73,25 @@ class Unicorn_Studio_CSS_Manager {
         }
 
         if (file_exists($css_file)) {
-            wp_enqueue_style(
+            // Register the style but don't enqueue it yet
+            wp_register_style(
                 'unicorn-studio-styles',
                 $this->css_url . 'styles.css',
                 [],
                 $version
             );
 
+            // Add preload link for non-blocking CSS loading
+            add_action('wp_head', function() use ($version) {
+                $css_url = $this->css_url . 'styles.css?ver=' . $version;
+                // Preload the CSS for faster loading
+                echo '<link rel="preload" href="' . esc_url($css_url) . '" as="style" onload="this.onload=null;this.rel=\'stylesheet\'">' . "\n";
+                // Fallback for browsers without JS
+                echo '<noscript><link rel="stylesheet" href="' . esc_url($css_url) . '"></noscript>' . "\n";
+            }, 5);
+
             if ($debug) {
-                error_log('[Unicorn Studio CSS] Style enqueued successfully with version: ' . $version);
+                error_log('[Unicorn Studio CSS] Style preloaded for non-blocking render');
             }
         } else {
             if ($debug) {

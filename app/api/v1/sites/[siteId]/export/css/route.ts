@@ -16,6 +16,8 @@ import { generateDesignTokensCSS } from '@/lib/css/design-tokens'
 import type { DesignVariables } from '@/types/cms'
 import postcss from 'postcss'
 import postcssNesting from 'postcss-nesting'
+import postcssCascadeLayers from '@csstools/postcss-cascade-layers'
+import postcssMediaMinmax from 'postcss-media-minmax'
 
 interface RouteParams {
   params: Promise<{ siteId: string }>
@@ -483,16 +485,22 @@ async function compileTailwindCSS(classes: Set<string>, customConfig?: TailwindC
 }
 
 /**
- * Flatten CSS Nesting using PostCSS
- * Transforms `&:hover` style nesting to flat `.class:hover` selectors
+ * Transform CSS for maximum browser compatibility
+ * 1. postcss-nesting: Flatten `&:hover` to `.class:hover`
+ * 2. postcss-cascade-layers: Remove @layer wrappers (emulates specificity)
+ * 3. postcss-media-minmax: Convert `(width >= 64rem)` to `(min-width: 64rem)`
  */
 async function flattenCSS(css: string): Promise<string> {
   try {
-    const result = await postcss([postcssNesting]).process(css, { from: undefined })
-    console.log(`[CSS Export] Flattened CSS nesting: ${css.length} -> ${result.css.length} bytes`)
+    const result = await postcss([
+      postcssNesting,
+      postcssCascadeLayers,
+      postcssMediaMinmax,
+    ]).process(css, { from: undefined })
+    console.log(`[CSS Export] Transformed CSS for compatibility: ${css.length} -> ${result.css.length} bytes`)
     return result.css
   } catch (error) {
-    console.error('[CSS Export] PostCSS nesting transform failed:', error)
+    console.error('[CSS Export] PostCSS transform failed:', error)
     // Return original CSS if transformation fails
     return css
   }

@@ -339,12 +339,37 @@ Englischer Prompt → ALLE Texte Englisch
 - Success-State Element: \`id="form-success"\` mit \`hidden\`
 - JavaScript Handler (siehe Form-System)
 
-### 10. SEO & ACCESSIBILITY
+### 10. SEO & ACCESSIBILITY (KRITISCH für PageSpeed!)
 - NUR EINE \`<h1>\` pro Seite
-- Heading-Hierarchie: h1 → h2 → h3
+- **Heading-Hierarchie: h1 → h2 → h3 → h4 (NIEMALS Ebenen überspringen!)**
+  - ❌ h1 → h4 (springt h2, h3 über)
+  - ❌ h2 → h4 (springt h3 über)
+  - ✅ h1 → h2 → h3 → h4 (korrekte Reihenfolge)
 - Aussagekräftige \`alt\` Texte
 - \`aria-label\` für Icon-only Buttons
 - Focus-States für Keyboard
+- **FORM-LABELS PFLICHT:**
+  - Jedes \`<select>\`, \`<input>\`, \`<textarea>\` MUSS ein Label haben!
+  - Label mit \`for\` Attribut ODER umschließend
+
+\`\`\`html
+<!-- ✅ RICHTIG: Label mit for-Attribut -->
+<label for="subject" class="sr-only">Betreff auswählen</label>
+<select id="subject" name="subject" class="...">
+  <option>Option 1</option>
+</select>
+
+<!-- ✅ RICHTIG: Umschließendes Label -->
+<label class="block">
+  <span class="text-sm">E-Mail</span>
+  <input type="email" name="email" class="...">
+</label>
+
+<!-- ❌ FALSCH: Kein Label! -->
+<select name="subject" class="...">
+  <option>Option 1</option>
+</select>
+\`\`\`
 
 **🚫 VERBOTEN:**
 - Emojis als Icons (nutze SVG!)
@@ -560,12 +585,35 @@ Verwendung für transparente Hintergründe:
 <form-system>
 ## 📝 FORMULAR-SYSTEM
 
-### PFLICHT-STRUKTUR:
+### PFLICHT-STRUKTUR (mit Labels für Accessibility!):
 \`\`\`html
 <form id="contact-form" class="space-y-4">
-  <input type="text" name="name" placeholder="Name" required class="...">
-  <input type="email" name="email" placeholder="E-Mail" required class="...">
-  <textarea name="message" placeholder="Nachricht" required class="..."></textarea>
+  <!-- Jedes Input MUSS ein Label haben! -->
+  <div>
+    <label for="name" class="block text-sm font-medium mb-1">Name</label>
+    <input type="text" id="name" name="name" placeholder="Ihr Name" required class="...">
+  </div>
+
+  <div>
+    <label for="email" class="block text-sm font-medium mb-1">E-Mail</label>
+    <input type="email" id="email" name="email" placeholder="ihre@email.de" required class="...">
+  </div>
+
+  <!-- Select mit Label (PFLICHT!) -->
+  <div>
+    <label for="subject" class="block text-sm font-medium mb-1">Betreff</label>
+    <select id="subject" name="subject" class="...">
+      <option value="">Bitte wählen...</option>
+      <option value="anfrage">Allgemeine Anfrage</option>
+      <option value="support">Support</option>
+    </select>
+  </div>
+
+  <div>
+    <label for="message" class="block text-sm font-medium mb-1">Nachricht</label>
+    <textarea id="message" name="message" placeholder="Ihre Nachricht..." required class="..."></textarea>
+  </div>
+
   <button type="submit" class="bg-[var(--color-brand-primary)] ...">Senden</button>
 </form>
 
@@ -758,12 +806,14 @@ COMPONENT_NAME: [Name]
 ☐ Opacity-Syntax korrekt (rgb mit Variable)?
 ☐ Sprache konsistent (keine Mischung)?
 
-### 🟡 WICHTIG:
+### 🟡 WICHTIG (Accessibility/PageSpeed):
 ☐ Responsive (sm:, md:, lg:)?
 ☐ Semantisches HTML (section, article, nav)?
 ☐ Alt-Texte für Bilder?
 ☐ Focus-States für Buttons?
 ☐ Form hat Success-State?
+☐ **Heading-Hierarchie korrekt (h1 → h2 → h3, keine Sprünge)?**
+☐ **Alle Form-Elemente haben Labels (select, input, textarea)?**
 
 ### 🟢 NICE-TO-HAVE:
 ☐ GSAP Animations?

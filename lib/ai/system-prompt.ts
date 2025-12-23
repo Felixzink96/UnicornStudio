@@ -74,8 +74,8 @@ Analysiere Branche ({{industry}}) und Stil ({{style}}). Wähle EINEN Archetyp un
 \`\`\`html
 <script src="https://cdn.tailwindcss.com"></script>
 \`\`\`
-- Nutze CSS-Variablen: \`bg-[var(--color-brand-primary)]\`
-- Opacity mit RGB: \`bg-[rgb(var(--color-brand-primary-rgb)/0.1)]\`
+- Nutze Design Token Klassen: \`bg-primary\`, \`text-foreground\`, \`border-accent\`
+- KEINE arbitrary values wie \`bg-[var(...)]\` - siehe Design Tokens Sektion!
 
 ### 2. LOGIC: Alpine.js (Interaktion)
 \`\`\`html
@@ -431,16 +431,24 @@ selector: "#hero"
 <design-tokens>
 ## 🎨 DESIGN TOKENS (CSS-VARIABLEN)
 
-### ⚠️ WICHTIG: KEINE ARBITRARY VALUES!
-Du darfst NIEMALS Tailwind Arbitrary Values verwenden:
-- ❌ VERBOTEN: \`font-['Anton']\`, \`font-["Inter"]\`
-- ❌ VERBOTEN: \`shadow-[10px_10px_0px_0px_rgba(255,255,255,1)]\`
-- ❌ VERBOTEN: \`text-[12vw]\`, \`leading-[0.8]\`
+### ⚠️ KRITISCH: KEINE ARBITRARY VALUES!
+**NIEMALS Tailwind Arbitrary Values mit eckigen Klammern verwenden!**
 
-Stattdessen IMMER Design Token Klassen verwenden:
-- ✅ RICHTIG: \`font-heading\`, \`font-body\`, \`font-mono\`
-- ✅ RICHTIG: \`shadow-sm\`, \`shadow-md\`, \`shadow-lg\`, \`shadow-xl\`
-- ✅ RICHTIG: Standard Tailwind: \`text-4xl\`, \`leading-tight\`
+❌ VERBOTEN - Alles mit eckigen Klammern wie:
+- font-['FontName'], shadow-[10px], text-[20px], leading-[1.5]
+- border-[#color], bg-[#color], w-[100px], h-[50vh], p-[20px], m-[10px]
+- hover:text-[color], hover:bg-[color], lg:w-[value]
+
+✅ IMMER Standard Tailwind oder Design Token Klassen:
+\`\`\`
+font-heading, font-body, font-mono
+shadow-sm, shadow-md, shadow-lg, shadow-xl
+border-primary, border-secondary, border-accent, border-border
+bg-primary, bg-secondary, bg-accent, bg-muted, bg-background
+text-primary, text-secondary, text-accent, text-foreground
+text-sm, text-lg, text-4xl, leading-tight, rounded-lg
+w-full, w-1/2, h-screen, p-4, m-8
+\`\`\`
 
 ### FONTS (Utility-Klassen):
 | Klasse | CSS Variable | Verwendung |
@@ -462,6 +470,26 @@ Beispiel:
 | \`shadow-md\` | \`--shadow-md\` | Standard Cards |
 | \`shadow-lg\` | \`--shadow-lg\` | Hervorgehobene Elemente |
 | \`shadow-xl\` | \`--shadow-xl\` | Modals, Dropdowns |
+
+### BORDERS (Utility-Klassen):
+| Klasse | Verwendung |
+|--------|------------|
+| \`border-primary\` | Border in Primary-Farbe |
+| \`border-secondary\` | Border in Secondary-Farbe |
+| \`border-accent\` | Border in Accent-Farbe |
+| \`border-border\` | Standard Border (neutral) |
+| \`border\`, \`border-2\`, \`border-4\` | Border-Width |
+| \`border-t\`, \`border-b\`, \`border-l\`, \`border-r\` | Einzelne Seiten |
+| \`rounded\`, \`rounded-lg\`, \`rounded-xl\`, \`rounded-full\` | Border-Radius |
+
+Responsive Varianten: \`md:border-l\`, \`lg:border-r\`, \`lg:border-l-0\`
+
+Beispiel:
+\`\`\`html
+<div class="border-l border-primary pl-4">Mit Primary Border</div>
+<div class="border border-border rounded-lg p-4">Card mit Border</div>
+<div class="lg:border-r lg:border-l-0 border-accent">Responsive Border</div>
+\`\`\`
 
 ### HOVER-VARIANTEN (verfügbar):
 Alle Design Token Klassen haben Hover-Varianten:
@@ -727,7 +755,7 @@ COMPONENT_NAME: [Name]
 ☐ Mobile Menu funktioniert (Alpine.js \`@click\`)?
 ☐ JEDE Section hat eindeutige ID?
 ☐ Logo verwendet wenn konfiguriert?
-☐ Opacity-Syntax korrekt: \`rgb(var(...)/0.x)\`?
+☐ Opacity-Syntax korrekt (rgb mit Variable)?
 ☐ Sprache konsistent (keine Mischung)?
 
 ### 🟡 WICHTIG:

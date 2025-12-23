@@ -396,6 +396,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             description,
             target,
             position,
+            css_classes,
             pages:page_id (slug, name)
           )
         `)
@@ -422,6 +423,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         description: string | null
         target: string
         position: number
+        css_classes: string | null
         pages: { slug: string; name: string } | null
       }
 
@@ -452,6 +454,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           description: item.description || undefined,
           target: (item.target || '_self') as '_self' | '_blank',
           position: item.position,
+          cssClasses: item.css_classes || undefined,
           createdAt: '',
           updatedAt: '',
           pageSlug: item.pages?.slug,
@@ -542,14 +545,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         console.log(`[WordPress Push] Header has placeholder: ${headerHasPlaceholder}`)
         console.log(`[WordPress Push] Footer has placeholder: ${footerHasPlaceholder}`)
 
+        // Use menu.settings for classes, with fallbacks only if item has no cssClasses
+        // Each menu item should use its own cssClasses first
         const headerHtmlWithMenus = header?.html ? injectMenusIntoHtml(header.html, menus, {
-          containerClass: 'flex items-center gap-6',
-          linkClass: 'text-sm text-zinc-600 hover:text-zinc-900 transition-colors',
+          // Fallback classes only used if menu item has no cssClasses
+          linkClass: 'text-sm transition-colors hover:opacity-80',
         }) : null
 
         const footerHtmlWithMenus = footer?.html ? injectMenusIntoHtml(footer.html, menus, {
-          containerClass: 'flex flex-wrap justify-center gap-6',
-          linkClass: 'text-sm text-zinc-500 hover:text-zinc-700 transition-colors',
+          // Fallback classes only used if menu item has no cssClasses
+          linkClass: 'text-sm transition-colors hover:opacity-80',
           includeDropdowns: false,
         }) : null
 

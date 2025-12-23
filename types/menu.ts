@@ -26,6 +26,12 @@ export interface MenuSettings {
   alignment?: 'left' | 'center' | 'right'
   spacing?: 'tight' | 'normal' | 'loose'
 
+  // CSS Classes for rendered menu items (used as defaults if item has no cssClasses)
+  linkClass?: string
+  containerClass?: string
+  itemClass?: string
+  activeClass?: string
+
   // Verhalten
   showIcons?: boolean
   showDescriptions?: boolean
@@ -236,6 +242,7 @@ export interface MenuForWordPress {
   name: string
   slug: string
   position: MenuPosition
+  settings?: MenuSettings
   items: Array<{
     label: string
     linkType: MenuItemLinkType
@@ -247,6 +254,7 @@ export interface MenuForWordPress {
     parentPosition?: number // Für Hierarchie
     icon?: string
     description?: string
+    cssClasses?: string // CSS classes for styling the menu item
   }>
 }
 

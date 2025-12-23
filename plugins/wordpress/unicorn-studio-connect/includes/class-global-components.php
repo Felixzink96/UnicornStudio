@@ -422,12 +422,24 @@ class Unicorn_Studio_Global_Components {
      * Output collected CSS in wp_head
      */
     public function output_collected_css() {
-        if (empty(self::$collected_css)) {
+        // Get header and footer HTML for arbitrary value scanning
+        $header = self::get_global_header();
+        $footer = self::get_global_footer();
+        $html_to_scan = ($header['html'] ?? '') . ($footer['html'] ?? '');
+
+        // Generate CSS for any arbitrary Tailwind values
+        $arbitrary_css = '';
+        if (!empty($html_to_scan) && class_exists('Unicorn_Studio_CSS_Manager')) {
+            $arbitrary_css = Unicorn_Studio_CSS_Manager::generate_arbitrary_css($html_to_scan);
+        }
+
+        if (empty(self::$collected_css) && empty($arbitrary_css)) {
             return;
         }
 
         echo "\n<style id=\"unicorn-global-components-css\">\n";
         echo self::$collected_css;
+        echo $arbitrary_css;
         echo "\n</style>\n";
     }
 
@@ -558,6 +570,15 @@ class Unicorn_Studio_Global_Components {
                     error_log("[Unicorn Menu] Found Unicorn menu: " . ($unicorn_menu['name'] ?? 'unknown') . " with " . count($unicorn_menu['items']) . " items");
                 }
 
+                // Default link classes - only used if item has no cssClasses
+                $default_classes = 'text-sm transition-colors hover:opacity-80';
+
+                // Check menu settings for linkClass override
+                $menu_settings = $unicorn_menu['settings'] ?? [];
+                if (!empty($menu_settings['linkClass'])) {
+                    $default_classes = $menu_settings['linkClass'];
+                }
+
                 $output = '';
                 foreach ($unicorn_menu['items'] as $item) {
                     // Build URL based on link type
@@ -576,7 +597,11 @@ class Unicorn_Studio_Global_Components {
                     $label = $item['label'] ?? '';
                     $target = ($item['target'] ?? '_self') === '_blank' ? ' target="_blank" rel="noopener noreferrer"' : '';
 
-                    $output .= '<a href="' . esc_url($url) . '"' . $target . '>' . esc_html($label) . '</a>' . "\n";
+                    // Use item-specific cssClasses if available, otherwise default
+                    // Check both cssClasses (camelCase from API) and css_classes (snake_case)
+                    $link_class = $item['cssClasses'] ?? $item['css_classes'] ?? $default_classes;
+
+                    $output .= '<a href="' . esc_url($url) . '" class="' . esc_attr($link_class) . '"' . $target . '>' . esc_html($label) . '</a>' . "\n";
                 }
 
                 return $output;

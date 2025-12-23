@@ -350,12 +350,30 @@ final class Unicorn_Studio {
         }
 
         $css = get_post_meta($post->ID, '_unicorn_studio_css', true);
-        if (empty($css)) {
+
+        // Get page HTML content for arbitrary value scanning
+        $html_content = get_post_meta($post->ID, '_unicorn_studio_html', true);
+        if (empty($html_content)) {
+            $html_content = $post->post_content;
+        }
+
+        // Generate CSS for any arbitrary Tailwind values in page content
+        $arbitrary_css = '';
+        if (!empty($html_content) && class_exists('Unicorn_Studio_CSS_Manager')) {
+            $arbitrary_css = Unicorn_Studio_CSS_Manager::generate_arbitrary_css($html_content);
+        }
+
+        if (empty($css) && empty($arbitrary_css)) {
             return;
         }
 
         echo "\n<style id=\"unicorn-studio-page-css\">\n";
-        echo $css;
+        if (!empty($css)) {
+            echo $css;
+        }
+        if (!empty($arbitrary_css)) {
+            echo $arbitrary_css;
+        }
         echo "\n</style>\n";
     }
 

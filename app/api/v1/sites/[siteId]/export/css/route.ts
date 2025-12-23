@@ -229,6 +229,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       customUtilities += buildBackgroundImageUtilities(tailwindConfig.backgroundImage) + '\n\n'
     }
 
+    // 11b. Generate fallback CSS for arbitrary values (Tailwind v4 may not compile CSS variables)
+    const arbitraryFallbackCSS = generateArbitraryValuesFallback(extractedClasses)
+    if (arbitraryFallbackCSS) {
+      console.log(`[CSS Export] Generated ${arbitraryFallbackCSS.split('\n').length} lines of arbitrary value fallback CSS`)
+    }
+
     // 12. Combine everything
     const fullCSS = `
 /* ==================================================================
@@ -280,6 +286,13 @@ ${cmsComponentsCSS}
    Design tokens are NOT duplicated here (managed via CSS Variables above)
    ---------------------------------------------------------------- */
 ${pagesCustomCSS}
+
+${arbitraryFallbackCSS ? `/* ----------------------------------------------------------------
+   ARBITRARY VALUE FALLBACKS
+   CSS for arbitrary Tailwind values like bg-[var(...)], border-[...]
+   These are generated because Tailwind v4 may not compile CSS variables
+   ---------------------------------------------------------------- */
+${arbitraryFallbackCSS}` : ''}
 `.trim()
 
     // 9. Return CSS with proper headers
@@ -1335,6 +1348,101 @@ function generateFallbackCSS(classes: Set<string>): string {
 function escapeClassName(cls: string): string {
   // Escape: : [ ] / \ . - ( ) , ' "
   return cls.replace(/([:\[\]\/\\.\-\(\)\,\'\"#])/g, '\\$1')
+}
+
+/**
+ * Generate fallback CSS specifically for arbitrary values with CSS variables
+ * Tailwind v4 may not compile these correctly, so we generate them manually
+ */
+function generateArbitraryValuesFallback(classes: Set<string>): string {
+  const cssRules: string[] = []
+  const responsiveRules: Record<string, string[]> = { sm: [], md: [], lg: [], xl: [], '2xl': [] }
+  const hoverRules: string[] = []
+
+  const breakpoints: Record<string, string> = {
+    sm: '640px', md: '768px', lg: '1024px', xl: '1280px', '2xl': '1536px'
+  }
+
+  classes.forEach((cls) => {
+    // Only process arbitrary values (classes with [...])
+    if (!cls.includes('[') || !cls.includes(']')) return
+
+    // Extract responsive/state prefix
+    let baseClass = cls
+    let responsivePrefix = ''
+    let isHover = false
+
+    const responsiveMatch = cls.match(/^(sm|md|lg|xl|2xl):(.+)$/)
+    if (responsiveMatch) {
+      responsivePrefix = responsiveMatch[1]
+      baseClass = responsiveMatch[2]
+    }
+
+    if (baseClass.startsWith('hover:')) {
+      isHover = true
+      baseClass = baseClass.replace('hover:', '')
+    }
+
+    // Extract the value from [...]
+    const valueMatch = baseClass.match(/\[([^\]]+)\]/)
+    if (!valueMatch) return
+    const value = valueMatch[1].replace(/_/g, ' ')
+
+    let cssRule = ''
+    const escaped = escapeClassName(cls)
+
+    // Background color
+    if (baseClass.match(/^bg-\[/)) {
+      cssRule = `.${escaped} { background-color: ${value}; }`
+    }
+    // Text color
+    else if (baseClass.match(/^text-\[/) && !value.match(/^\d/)) {
+      cssRule = `.${escaped} { color: ${value}; }`
+    }
+    // Border color
+    else if (baseClass.match(/^border-\[/) && !value.match(/^\d/)) {
+      cssRule = `.${escaped} { border-color: ${value}; }`
+    }
+    else if (baseClass.match(/^border-[tlbr]-\[/) && !value.match(/^\d/)) {
+      const side = baseClass.match(/border-([tlbr])-/)?.[1]
+      const sideMap: Record<string, string> = { t: 'top', r: 'right', b: 'bottom', l: 'left' }
+      cssRule = `.${escaped} { border-${sideMap[side || ''] || ''}-color: ${value}; }`
+    }
+    // Font family
+    else if (baseClass.match(/^font-\[/)) {
+      const fontName = value.replace(/['"]/g, '')
+      cssRule = `.${escaped} { font-family: '${fontName}', sans-serif; }`
+    }
+    // Shadow
+    else if (baseClass.match(/^shadow-\[/)) {
+      cssRule = `.${escaped} { box-shadow: ${value}; }`
+    }
+
+    if (!cssRule) return
+
+    // Add hover pseudo-class if needed
+    if (isHover) {
+      cssRule = cssRule.replace('{', ':hover {')
+    }
+
+    // Add to appropriate bucket
+    if (responsivePrefix && breakpoints[responsivePrefix]) {
+      responsiveRules[responsivePrefix].push(cssRule)
+    } else {
+      cssRules.push(cssRule)
+    }
+  })
+
+  // Build final CSS
+  let result = cssRules.join('\n')
+
+  for (const [bp, rules] of Object.entries(responsiveRules)) {
+    if (rules.length > 0) {
+      result += `\n\n@media (min-width: ${breakpoints[bp]}) {\n  ${rules.join('\n  ')}\n}`
+    }
+  }
+
+  return result
 }
 
 /**

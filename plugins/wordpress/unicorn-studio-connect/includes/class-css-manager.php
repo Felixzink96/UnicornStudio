@@ -218,4 +218,243 @@ class Unicorn_Studio_CSS_Manager {
 
         return true;
     }
+
+    /**
+     * Generate CSS for arbitrary Tailwind values found in HTML
+     *
+     * Handles classes like: border-[var(--color-brand-primary)], bg-[#fff], w-[100px]
+     *
+     * @param string $html HTML content to scan
+     * @return string Generated CSS
+     */
+    public static function generate_arbitrary_css($html) {
+        $css_rules = [];
+
+        // Extract all classes from HTML
+        preg_match_all('/class=["\']([^"\']+)["\']/', $html, $matches);
+        $all_classes = [];
+
+        foreach ($matches[1] as $class_string) {
+            $classes = preg_split('/\s+/', $class_string);
+            $all_classes = array_merge($all_classes, $classes);
+        }
+
+        $all_classes = array_unique($all_classes);
+
+        foreach ($all_classes as $cls) {
+            $cls = trim($cls);
+            if (empty($cls) || strpos($cls, '[') === false) {
+                continue;
+            }
+
+            $rule = self::parse_arbitrary_class($cls);
+            if ($rule) {
+                $css_rules[] = $rule;
+            }
+        }
+
+        if (empty($css_rules)) {
+            return '';
+        }
+
+        return "\n/* Arbitrary Values (auto-generated) */\n" . implode("\n", array_unique($css_rules)) . "\n";
+    }
+
+    /**
+     * Parse a single arbitrary Tailwind class and return CSS rule
+     *
+     * @param string $cls The class name
+     * @return string|null CSS rule or null
+     */
+    private static function parse_arbitrary_class($cls) {
+        // Remove responsive/state prefixes for parsing, but keep for selector
+        $base_cls = preg_replace('/^(sm:|md:|lg:|xl:|2xl:|hover:|focus:|active:|group-hover:)+/', '', $cls);
+
+        // Extract the arbitrary value
+        if (!preg_match('/\[([^\]]+)\]/', $base_cls, $value_match)) {
+            return null;
+        }
+
+        $value = $value_match[1];
+        // Replace underscores with spaces (Tailwind convention)
+        $value = str_replace('_', ' ', $value);
+
+        $escaped = self::escape_class_name($cls);
+        $css = null;
+
+        // Border color: border-[...] or border-x-[...]
+        if (preg_match('/^border(-[tlbrxy])?-\[/', $base_cls)) {
+            $is_width = preg_match('/^\d/', $value) || strpos($value, 'px') !== false || strpos($value, 'rem') !== false;
+            $prop = $is_width ? 'border-width' : 'border-color';
+
+            if (preg_match('/^border-([tlbr])-\[/', $base_cls, $dir_match)) {
+                $dir_map = ['t' => 'top', 'r' => 'right', 'b' => 'bottom', 'l' => 'left'];
+                $side = $dir_map[$dir_match[1]] ?? '';
+                if ($side) {
+                    $css = ".{$escaped} { border-{$side}-" . ($is_width ? 'width' : 'color') . ": {$value}; }";
+                }
+            } else {
+                $css = ".{$escaped} { {$prop}: {$value}; }";
+            }
+        }
+        // Background: bg-[...]
+        elseif (preg_match('/^bg-\[/', $base_cls)) {
+            $css = ".{$escaped} { background-color: {$value}; }";
+        }
+        // Text color: text-[...]
+        elseif (preg_match('/^text-\[/', $base_cls)) {
+            // Could be color or size
+            $is_size = preg_match('/^\d/', $value) || strpos($value, 'px') !== false || strpos($value, 'rem') !== false || strpos($value, 'vw') !== false;
+            $prop = $is_size ? 'font-size' : 'color';
+            $css = ".{$escaped} { {$prop}: {$value}; }";
+        }
+        // Width: w-[...]
+        elseif (preg_match('/^w-\[/', $base_cls)) {
+            $css = ".{$escaped} { width: {$value}; }";
+        }
+        // Height: h-[...]
+        elseif (preg_match('/^h-\[/', $base_cls)) {
+            $css = ".{$escaped} { height: {$value}; }";
+        }
+        // Min/Max width/height
+        elseif (preg_match('/^(min|max)-(w|h)-\[/', $base_cls, $m)) {
+            $prop = ($m[1] === 'min' ? 'min-' : 'max-') . ($m[2] === 'w' ? 'width' : 'height');
+            $css = ".{$escaped} { {$prop}: {$value}; }";
+        }
+        // Padding: p-[...], px-[...], py-[...], pt-[...], etc.
+        elseif (preg_match('/^p([xytblr])?-\[/', $base_cls, $m)) {
+            $dir = $m[1] ?? '';
+            $prop_map = [
+                '' => 'padding',
+                'x' => 'padding-left: %s; padding-right',
+                'y' => 'padding-top: %s; padding-bottom',
+                't' => 'padding-top',
+                'b' => 'padding-bottom',
+                'l' => 'padding-left',
+                'r' => 'padding-right',
+            ];
+            if ($dir === 'x' || $dir === 'y') {
+                $css = ".{$escaped} { " . sprintf($prop_map[$dir], $value) . ": {$value}; }";
+            } else {
+                $css = ".{$escaped} { {$prop_map[$dir]}: {$value}; }";
+            }
+        }
+        // Margin: m-[...], mx-[...], my-[...], mt-[...], etc.
+        elseif (preg_match('/^-?m([xytblr])?-\[/', $base_cls, $m)) {
+            $dir = $m[1] ?? '';
+            $is_negative = strpos($base_cls, '-m') === 0;
+            $val = $is_negative ? "-{$value}" : $value;
+            $prop_map = [
+                '' => 'margin',
+                'x' => 'margin-left: %s; margin-right',
+                'y' => 'margin-top: %s; margin-bottom',
+                't' => 'margin-top',
+                'b' => 'margin-bottom',
+                'l' => 'margin-left',
+                'r' => 'margin-right',
+            ];
+            if ($dir === 'x' || $dir === 'y') {
+                $css = ".{$escaped} { " . sprintf($prop_map[$dir], $val) . ": {$val}; }";
+            } else {
+                $css = ".{$escaped} { {$prop_map[$dir]}: {$val}; }";
+            }
+        }
+        // Gap: gap-[...]
+        elseif (preg_match('/^gap-\[/', $base_cls)) {
+            $css = ".{$escaped} { gap: {$value}; }";
+        }
+        // Font: font-[...]
+        elseif (preg_match('/^font-\[/', $base_cls)) {
+            // Remove quotes if present
+            $font = trim($value, "\"'");
+            $css = ".{$escaped} { font-family: '{$font}', sans-serif; }";
+        }
+        // Leading (line-height): leading-[...]
+        elseif (preg_match('/^leading-\[/', $base_cls)) {
+            $css = ".{$escaped} { line-height: {$value}; }";
+        }
+        // Tracking (letter-spacing): tracking-[...]
+        elseif (preg_match('/^tracking-\[/', $base_cls)) {
+            $css = ".{$escaped} { letter-spacing: {$value}; }";
+        }
+        // Shadow: shadow-[...]
+        elseif (preg_match('/^shadow-\[/', $base_cls)) {
+            $css = ".{$escaped} { box-shadow: {$value}; }";
+        }
+        // Rounded: rounded-[...]
+        elseif (preg_match('/^rounded(-[tlbr]{1,2})?-\[/', $base_cls)) {
+            $css = ".{$escaped} { border-radius: {$value}; }";
+        }
+        // Inset: top-[...], left-[...], right-[...], bottom-[...], inset-[...]
+        elseif (preg_match('/^(top|right|bottom|left|inset)-\[/', $base_cls, $m)) {
+            $css = ".{$escaped} { {$m[1]}: {$value}; }";
+        }
+        // Z-index: z-[...]
+        elseif (preg_match('/^z-\[/', $base_cls)) {
+            $css = ".{$escaped} { z-index: {$value}; }";
+        }
+        // Opacity: opacity-[...]
+        elseif (preg_match('/^opacity-\[/', $base_cls)) {
+            $css = ".{$escaped} { opacity: {$value}; }";
+        }
+        // Transform: scale-[...], translate-x-[...], rotate-[...]
+        elseif (preg_match('/^(scale|rotate)-\[/', $base_cls, $m)) {
+            $fn = $m[1];
+            $css = ".{$escaped} { transform: {$fn}({$value}); }";
+        }
+        elseif (preg_match('/^translate-([xy])-\[/', $base_cls, $m)) {
+            $axis = $m[1] === 'x' ? 'X' : 'Y';
+            $css = ".{$escaped} { transform: translate{$axis}({$value}); }";
+        }
+        // Duration: duration-[...]
+        elseif (preg_match('/^duration-\[/', $base_cls)) {
+            $css = ".{$escaped} { transition-duration: {$value}; }";
+        }
+        // Grid cols/rows: grid-cols-[...], grid-rows-[...]
+        elseif (preg_match('/^grid-(cols|rows)-\[/', $base_cls, $m)) {
+            $prop = $m[1] === 'cols' ? 'grid-template-columns' : 'grid-template-rows';
+            $css = ".{$escaped} { {$prop}: {$value}; }";
+        }
+        // Col/Row span: col-span-[...], row-span-[...]
+        elseif (preg_match('/^(col|row)-span-\[/', $base_cls, $m)) {
+            $prop = $m[1] === 'col' ? 'grid-column' : 'grid-row';
+            $css = ".{$escaped} { {$prop}: span {$value} / span {$value}; }";
+        }
+
+        // Handle responsive prefixes
+        if ($css && preg_match('/^(sm|md|lg|xl|2xl):/', $cls, $prefix_match)) {
+            $breakpoints = [
+                'sm' => '640px',
+                'md' => '768px',
+                'lg' => '1024px',
+                'xl' => '1280px',
+                '2xl' => '1536px',
+            ];
+            $bp = $breakpoints[$prefix_match[1]] ?? null;
+            if ($bp) {
+                $css = "@media (min-width: {$bp}) { {$css} }";
+            }
+        }
+
+        // Handle hover prefix
+        if ($css && strpos($cls, 'hover:') !== false) {
+            $css = str_replace('.', '.', $css); // Keep as is, add :hover
+            $css = preg_replace('/\.([^ ]+) \{/', '.$1:hover {', $css);
+        }
+
+        return $css;
+    }
+
+    /**
+     * Escape class name for CSS selector
+     *
+     * @param string $cls Class name
+     * @return string Escaped class name
+     */
+    private static function escape_class_name($cls) {
+        // Escape special CSS characters
+        return preg_replace_callback('/([:\[\]\/\\\\.\-\(\)\,\'\"\#\%])/', function($m) {
+            return '\\' . $m[1];
+        }, $cls);
+    }
 }

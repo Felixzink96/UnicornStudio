@@ -354,6 +354,7 @@ export async function getMenusForWordPress(siteId: string): Promise<MenuForWordP
           parentPosition,
           icon: item.icon,
           description: item.description,
+          cssClasses: item.cssClasses,
         })
 
         if (item.children) {
@@ -369,6 +370,7 @@ export async function getMenusForWordPress(siteId: string): Promise<MenuForWordP
       name: menu.name,
       slug: menu.slug,
       position: menu.position,
+      settings: menu.settings,
       items: flatItems,
     })
   }

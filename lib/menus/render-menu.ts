@@ -78,9 +78,11 @@ function renderMenuItem(
 ): string {
   const url = getItemUrl(item)
   const isActive = options.currentPath === url
+  // Use item-specific cssClasses if available, otherwise fall back to options.linkClass
+  const baseLinkClass = item.cssClasses || options.linkClass || ''
   const linkClasses = isActive
-    ? `${options.linkClass} ${options.activeClass}`
-    : options.linkClass
+    ? `${baseLinkClass} ${options.activeClass || ''}`
+    : baseLinkClass
 
   // Einfaches Item ohne Kinder
   if (children.length === 0 || !options.includeDropdowns) {

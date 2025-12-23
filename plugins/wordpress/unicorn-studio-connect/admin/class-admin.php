@@ -77,6 +77,15 @@ class Unicorn_Studio_Admin {
             [$this, 'render_design_page']
         );
 
+        add_submenu_page(
+            'unicorn-studio',
+            __('CSS Debug', 'unicorn-studio'),
+            __('CSS Debug', 'unicorn-studio'),
+            'manage_options',
+            'unicorn-studio-css-debug',
+            [$this, 'render_css_debug_page']
+        );
+
         // Hidden page for iframe editor (no menu item)
         add_submenu_page(
             null, // No parent = hidden from menu
@@ -159,6 +168,13 @@ class Unicorn_Studio_Admin {
      */
     public function render_design_page() {
         include UNICORN_STUDIO_PLUGIN_DIR . 'admin/views/design.php';
+    }
+
+    /**
+     * Render CSS Debug page
+     */
+    public function render_css_debug_page() {
+        include UNICORN_STUDIO_PLUGIN_DIR . 'admin/views/css-debug.php';
     }
 
     /**

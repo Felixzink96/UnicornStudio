@@ -181,11 +181,28 @@ ${gradients?.primary?.enabled ? `
 .text-accent { color: var(--color-brand-accent); }
 .text-foreground { color: var(--color-neutral-foreground); }
 .text-muted { color: var(--color-neutral-muted); }
+.text-white { color: #ffffff; }
+.text-black { color: #000000; }
+.text-transparent { color: transparent; }
+.text-current { color: currentColor; }
+.text-inherit { color: inherit; }
+
+/* Background Standard Colors */
+.bg-white { background-color: #ffffff; }
+.bg-black { background-color: #000000; }
+.bg-transparent { background-color: transparent; }
+.bg-current { background-color: currentColor; }
+.bg-inherit { background-color: inherit; }
 
 /* Border Colors */
 .border-primary { border-color: var(--color-brand-primary); }
 .border-secondary { border-color: var(--color-brand-secondary); }
+.border-accent { border-color: var(--color-brand-accent); }
 .border-border { border-color: var(--color-neutral-border); }
+.border-white { border-color: #ffffff; }
+.border-black { border-color: #000000; }
+.border-transparent { border-color: transparent; }
+.border-current { border-color: currentColor; }
 
 /* Font Families */
 .font-heading { font-family: var(--font-heading); }

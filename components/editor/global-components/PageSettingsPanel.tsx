@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
@@ -19,13 +19,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import { Settings, LayoutTemplate, Eye, EyeOff, Search, ChevronDown } from 'lucide-react'
+  Settings,
+  LayoutTemplate,
+  Eye,
+  EyeOff,
+  Search,
+  ChevronDown,
+  Loader2,
+  Check,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GlobalComponent, PageComponentSettings } from '@/types/global-components'
 
@@ -38,7 +41,7 @@ interface PageSEO {
   robots_index?: boolean
   robots_follow?: boolean
   canonical_url?: string
-  [key: string]: string | boolean | undefined // Index signature for Json compatibility
+  [key: string]: string | boolean | undefined
 }
 
 interface PageSettingsPanelProps {
@@ -58,6 +61,7 @@ export function PageSettingsPanel({
 }: PageSettingsPanelProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [headers, setHeaders] = useState<GlobalComponent[]>([])
   const [footers, setFooters] = useState<GlobalComponent[]>([])
   const [settings, setSettings] = useState<PageComponentSettings>({
@@ -79,11 +83,12 @@ export function PageSettingsPanel({
     robots_follow: true,
     canonical_url: '',
   })
-  const [seoOpen, setSeoOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'layout' | 'seo'>('layout')
 
   useEffect(() => {
     if (open && siteId && pageId) {
       loadData()
+      setSaved(false)
     }
   }, [open, siteId, pageId])
 
@@ -132,7 +137,6 @@ export function PageSettingsPanel({
           custom_header_id: page.custom_header_id || null,
           custom_footer_id: page.custom_footer_id || null,
         })
-        // Load SEO settings
         const pageSeo = (page.seo as PageSEO) || {}
         setSeo({
           meta_title: pageSeo.meta_title || '',
@@ -154,10 +158,10 @@ export function PageSettingsPanel({
 
   async function handleSave() {
     setSaving(true)
+    setSaved(false)
     try {
       const supabase = createClient()
 
-      // Clean SEO object - remove empty strings
       const cleanSeo: PageSEO = {}
       if (seo.meta_title) cleanSeo.meta_title = seo.meta_title
       if (seo.meta_description) cleanSeo.meta_description = seo.meta_description
@@ -181,8 +185,13 @@ export function PageSettingsPanel({
 
       if (error) throw error
 
+      setSaved(true)
       onUpdate?.()
-      onClose()
+
+      // Auto-close after success
+      setTimeout(() => {
+        onClose()
+      }, 500)
     } catch (err) {
       console.error('Save error:', err)
     } finally {
@@ -196,253 +205,319 @@ export function PageSettingsPanel({
   const activeFooter = footers.find((f) => f.id === activeFooterId)
 
   return (
-    <Sheet open={open} onOpenChange={() => onClose()}>
-      <SheetContent className="w-[400px] sm:w-[540px]">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Page Settings
-          </SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={() => onClose()}>
+      <DialogContent className="!max-w-lg w-[95vw] p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-900">
+        <VisuallyHidden>
+          <DialogTitle>Page Settings</DialogTitle>
+        </VisuallyHidden>
 
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-purple-600 border-t-transparent" />
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center">
+              <Settings className="h-5 w-5 text-white dark:text-zinc-900" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                Page Settings
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {pageName || 'Seite'}
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className="mt-6 space-y-6">
-            {/* Header Settings */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium flex items-center gap-2">
-                  <LayoutTemplate className="w-4 h-4" />
-                  Header
-                </h3>
-                <div className="flex items-center gap-2">
-                  {settings.hide_header ? (
-                    <EyeOff className="w-4 h-4 text-zinc-400" />
-                  ) : (
-                    <Eye className="w-4 h-4 text-green-600" />
-                  )}
-                  <Switch
-                    checked={!settings.hide_header}
-                    onCheckedChange={(checked) =>
-                      setSettings({ ...settings, hide_header: !checked })
-                    }
-                  />
-                  <Label className="text-sm">Anzeigen</Label>
+
+          {/* Tabs */}
+          <div className="flex items-center gap-1 mt-4">
+            <button
+              onClick={() => setActiveTab('layout')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                activeTab === 'layout'
+                  ? 'bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <LayoutTemplate className="h-3.5 w-3.5" />
+              Layout
+            </button>
+            <button
+              onClick={() => setActiveTab('seo')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                activeTab === 'seo'
+                  ? 'bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Search className="h-3.5 w-3.5" />
+              SEO
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="h-[400px] overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+            </div>
+          ) : activeTab === 'layout' ? (
+            <div className="space-y-6">
+              {/* Header Settings */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-sm text-zinc-900 dark:text-zinc-100">Header</h3>
+                  <div className="flex items-center gap-2">
+                    {settings.hide_header ? (
+                      <EyeOff className="w-4 h-4 text-zinc-400" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-green-600" />
+                    )}
+                    <Switch
+                      checked={!settings.hide_header}
+                      onCheckedChange={(checked) =>
+                        setSettings({ ...settings, hide_header: !checked })
+                      }
+                    />
+                    <Label className="text-xs text-zinc-500">Anzeigen</Label>
+                  </div>
+                </div>
+
+                {!settings.hide_header && (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-zinc-500">Header Component</Label>
+                    <Select
+                      value={settings.custom_header_id || 'global'}
+                      onValueChange={(value) =>
+                        setSettings({
+                          ...settings,
+                          custom_header_id: value === 'global' ? null : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="bg-zinc-50 dark:bg-zinc-800">
+                        <SelectValue placeholder="Global Header verwenden" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="global">
+                          {globalHeaderId
+                            ? `Global: ${headers.find((h) => h.id === globalHeaderId)?.name || 'Header'}`
+                            : 'Kein Global Header'}
+                        </SelectItem>
+                        {headers.map((header) => (
+                          <SelectItem key={header.id} value={header.id}>
+                            {header.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {activeHeader && (
+                      <div className="p-2 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs">
+                        <span className="text-zinc-500">Aktiv: </span>
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">{activeHeader.name}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-zinc-200 dark:border-zinc-700" />
+
+              {/* Footer Settings */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-sm text-zinc-900 dark:text-zinc-100">Footer</h3>
+                  <div className="flex items-center gap-2">
+                    {settings.hide_footer ? (
+                      <EyeOff className="w-4 h-4 text-zinc-400" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-green-600" />
+                    )}
+                    <Switch
+                      checked={!settings.hide_footer}
+                      onCheckedChange={(checked) =>
+                        setSettings({ ...settings, hide_footer: !checked })
+                      }
+                    />
+                    <Label className="text-xs text-zinc-500">Anzeigen</Label>
+                  </div>
+                </div>
+
+                {!settings.hide_footer && (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-zinc-500">Footer Component</Label>
+                    <Select
+                      value={settings.custom_footer_id || 'global'}
+                      onValueChange={(value) =>
+                        setSettings({
+                          ...settings,
+                          custom_footer_id: value === 'global' ? null : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="bg-zinc-50 dark:bg-zinc-800">
+                        <SelectValue placeholder="Global Footer verwenden" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="global">
+                          {globalFooterId
+                            ? `Global: ${footers.find((f) => f.id === globalFooterId)?.name || 'Footer'}`
+                            : 'Kein Global Footer'}
+                        </SelectItem>
+                        {footers.map((footer) => (
+                          <SelectItem key={footer.id} value={footer.id}>
+                            {footer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {activeFooter && (
+                      <div className="p-2 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs">
+                        <span className="text-zinc-500">Aktiv: </span>
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">{activeFooter.name}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Info */}
+              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-sm text-purple-700 dark:text-purple-300">
+                <p className="font-medium mb-1 text-xs">Global Components</p>
+                <p className="text-xs opacity-80">
+                  Header und Footer werden automatisch auf allen Seiten angezeigt.
+                  Du kannst sie pro Seite ausblenden oder ersetzen.
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* SEO Tab */
+            <div className="space-y-5">
+              {/* Meta Title */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Meta Title
+                </Label>
+                <Input
+                  value={seo.meta_title || ''}
+                  onChange={(e) => setSeo({ ...seo, meta_title: e.target.value })}
+                  placeholder={pageName || 'Seitentitel'}
+                  className="bg-zinc-50 dark:bg-zinc-800"
+                />
+                <p className="text-[10px] text-zinc-400">
+                  Überschreibt den Standard-Titel. Leer = Seitenname wird verwendet.
+                </p>
+              </div>
+
+              {/* Meta Description */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Meta Description
+                </Label>
+                <Textarea
+                  value={seo.meta_description || ''}
+                  onChange={(e) => setSeo({ ...seo, meta_description: e.target.value })}
+                  placeholder="Beschreibung für Suchmaschinen..."
+                  rows={3}
+                  className="bg-zinc-50 dark:bg-zinc-800 resize-none"
+                />
+                <div className="flex justify-between">
+                  <p className="text-[10px] text-zinc-400">
+                    Wichtig für SEO und Social Media Vorschauen
+                  </p>
+                  <span className={`text-[10px] ${(seo.meta_description?.length || 0) > 160 ? 'text-amber-500' : 'text-zinc-400'}`}>
+                    {seo.meta_description?.length || 0}/160
+                  </span>
                 </div>
               </div>
 
-              {!settings.hide_header && (
-                <div className="space-y-2">
-                  <Label className="text-sm text-zinc-600">Header Component</Label>
-                  <Select
-                    value={settings.custom_header_id || 'global'}
-                    onValueChange={(value) =>
-                      setSettings({
-                        ...settings,
-                        custom_header_id: value === 'global' ? null : value,
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Global Header verwenden" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="global">
-                        {globalHeaderId
-                          ? `Global: ${headers.find((h) => h.id === globalHeaderId)?.name || 'Header'}`
-                          : 'Kein Global Header'}
-                      </SelectItem>
-                      {headers.map((header) => (
-                        <SelectItem key={header.id} value={header.id}>
-                          {header.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {activeHeader && (
-                    <div className="p-2 bg-zinc-50 rounded border text-xs">
-                      <span className="text-zinc-500">Aktiv: </span>
-                      <span className="font-medium">{activeHeader.name}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Footer Settings */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium flex items-center gap-2">
-                  <LayoutTemplate className="w-4 h-4" />
-                  Footer
-                </h3>
-                <div className="flex items-center gap-2">
-                  {settings.hide_footer ? (
-                    <EyeOff className="w-4 h-4 text-zinc-400" />
-                  ) : (
-                    <Eye className="w-4 h-4 text-green-600" />
-                  )}
-                  <Switch
-                    checked={!settings.hide_footer}
-                    onCheckedChange={(checked) =>
-                      setSettings({ ...settings, hide_footer: !checked })
-                    }
-                  />
-                  <Label className="text-sm">Anzeigen</Label>
-                </div>
+              {/* OG Image */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Social Media Bild (OG Image)
+                </Label>
+                <Input
+                  value={seo.og_image || ''}
+                  onChange={(e) => setSeo({ ...seo, og_image: e.target.value })}
+                  placeholder="https://..."
+                  className="bg-zinc-50 dark:bg-zinc-800"
+                />
+                <p className="text-[10px] text-zinc-400">
+                  Bild für Facebook, Twitter, LinkedIn etc. (1200x630px empfohlen)
+                </p>
               </div>
 
-              {!settings.hide_footer && (
-                <div className="space-y-2">
-                  <Label className="text-sm text-zinc-600">Footer Component</Label>
-                  <Select
-                    value={settings.custom_footer_id || 'global'}
-                    onValueChange={(value) =>
-                      setSettings({
-                        ...settings,
-                        custom_footer_id: value === 'global' ? null : value,
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Global Footer verwenden" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="global">
-                        {globalFooterId
-                          ? `Global: ${footers.find((f) => f.id === globalFooterId)?.name || 'Footer'}`
-                          : 'Kein Global Footer'}
-                      </SelectItem>
-                      {footers.map((footer) => (
-                        <SelectItem key={footer.id} value={footer.id}>
-                          {footer.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {activeFooter && (
-                    <div className="p-2 bg-zinc-50 rounded border text-xs">
-                      <span className="text-zinc-500">Aktiv: </span>
-                      <span className="font-medium">{activeFooter.name}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* SEO Settings */}
-            <Collapsible open={seoOpen} onOpenChange={setSeoOpen}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full py-2 hover:bg-zinc-50 rounded-lg px-2 -mx-2">
-                <h3 className="font-medium flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  SEO Einstellungen
-                </h3>
-                <ChevronDown className={`w-4 h-4 transition-transform ${seoOpen ? 'rotate-180' : ''}`} />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 pt-4">
-                {/* Meta Title */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Meta Title</Label>
-                  <Input
-                    value={seo.meta_title || ''}
-                    onChange={(e) => setSeo({ ...seo, meta_title: e.target.value })}
-                    placeholder={pageName || 'Seitentitel'}
-                  />
-                  <p className="text-xs text-zinc-500">
-                    Überschreibt den Standard-Titel. Leer = Seitenname wird verwendet.
-                  </p>
-                </div>
-
-                {/* Meta Description */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Meta Description</Label>
-                  <Textarea
-                    value={seo.meta_description || ''}
-                    onChange={(e) => setSeo({ ...seo, meta_description: e.target.value })}
-                    placeholder="Beschreibung für Suchmaschinen..."
-                    rows={3}
-                  />
-                  <p className="text-xs text-zinc-500">
-                    {(seo.meta_description?.length || 0)}/160 Zeichen empfohlen
-                  </p>
-                </div>
-
-                {/* OG Image */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Social Media Bild (OG Image)</Label>
-                  <Input
-                    value={seo.og_image || ''}
-                    onChange={(e) => setSeo({ ...seo, og_image: e.target.value })}
-                    placeholder="https://..."
-                  />
-                  <p className="text-xs text-zinc-500">
-                    Bild für Facebook, Twitter, LinkedIn etc.
-                  </p>
-                </div>
-
-                {/* Robots */}
+              {/* Robots */}
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg space-y-3">
+                <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Suchmaschinen
+                </Label>
                 <div className="flex gap-6">
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={seo.robots_index}
                       onCheckedChange={(checked) => setSeo({ ...seo, robots_index: checked })}
                     />
-                    <Label className="text-sm">Indexieren</Label>
+                    <Label className="text-xs text-zinc-600 dark:text-zinc-400">Indexieren</Label>
                   </div>
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={seo.robots_follow}
                       onCheckedChange={(checked) => setSeo({ ...seo, robots_follow: checked })}
                     />
-                    <Label className="text-sm">Links folgen</Label>
+                    <Label className="text-xs text-zinc-600 dark:text-zinc-400">Links folgen</Label>
                   </div>
                 </div>
+              </div>
 
-                {/* Canonical URL */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Canonical URL (optional)</Label>
-                  <Input
-                    value={seo.canonical_url || ''}
-                    onChange={(e) => setSeo({ ...seo, canonical_url: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            <Separator />
-
-            {/* Info */}
-            <div className="p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
-              <p className="font-medium mb-1">Global Components</p>
-              <p className="text-xs">
-                Header und Footer werden automatisch auf allen Seiten angezeigt.
-                Du kannst sie pro Seite ausblenden oder durch alternative
-                Components ersetzen.
-              </p>
+              {/* Canonical URL */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Canonical URL (optional)
+                </Label>
+                <Input
+                  value={seo.canonical_url || ''}
+                  onChange={(e) => setSeo({ ...seo, canonical_url: e.target.value })}
+                  placeholder="https://..."
+                  className="bg-zinc-50 dark:bg-zinc-800"
+                />
+                <p className="text-[10px] text-zinc-400">
+                  Nur setzen wenn diese Seite eine Kopie einer anderen URL ist.
+                </p>
+              </div>
             </div>
+          )}
+        </div>
 
-            {/* Actions */}
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose} className="flex-1">
-                Abbrechen
-              </Button>
-              <Button onClick={handleSave} disabled={saving} className="flex-1">
-                {saving ? 'Speichern...' : 'Speichern'}
-              </Button>
-            </div>
-          </div>
-        )}
-      </SheetContent>
-    </Sheet>
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+          <button
+            onClick={onClose}
+            className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+            disabled={saving}
+          >
+            Abbrechen
+          </button>
+
+          <Button
+            onClick={handleSave}
+            disabled={saving || loading}
+            className="min-w-[120px]"
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : saved ? (
+              <>
+                <Check className="h-4 w-4 mr-1.5" />
+                Gespeichert
+              </>
+            ) : (
+              'Speichern'
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

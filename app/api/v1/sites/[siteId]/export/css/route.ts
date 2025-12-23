@@ -14,6 +14,8 @@ import { join } from 'path'
 import { getStoredFonts, generateExportFontFaceCSS } from '@/lib/fonts/font-storage'
 import { generateDesignTokensCSS } from '@/lib/css/design-tokens'
 import type { DesignVariables } from '@/types/cms'
+import postcss from 'postcss'
+import postcssNesting from 'postcss-nesting'
 
 interface RouteParams {
   params: Promise<{ siteId: string }>
@@ -246,6 +248,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     let keyframesCSS = ''
     try {
       tailwindCSS = await compileTailwindCSS(extractedClasses, tailwindConfig || undefined)
+
+      // Flatten CSS Nesting and @layer for browser compatibility
+      tailwindCSS = await flattenCSS(tailwindCSS)
+
       // Get keyframes separately - they need to be added AFTER Tailwind compilation
       if (tailwindConfig?.keyframes) {
         keyframesCSS = buildKeyframesCSS(tailwindConfig.keyframes)
@@ -482,6 +488,22 @@ async function compileTailwindCSS(classes: Set<string>, customConfig?: TailwindC
   } catch (error) {
     console.error('Tailwind v4 compile error:', error)
     throw error
+  }
+}
+
+/**
+ * Flatten CSS Nesting using PostCSS
+ * Transforms `&:hover` style nesting to flat `.class:hover` selectors
+ */
+async function flattenCSS(css: string): Promise<string> {
+  try {
+    const result = await postcss([postcssNesting]).process(css, { from: undefined })
+    console.log(`[CSS Export] Flattened CSS nesting: ${css.length} -> ${result.css.length} bytes`)
+    return result.css
+  } catch (error) {
+    console.error('[CSS Export] PostCSS nesting transform failed:', error)
+    // Return original CSS if transformation fails
+    return css
   }
 }
 

@@ -422,24 +422,15 @@ class Unicorn_Studio_Global_Components {
      * Output collected CSS in wp_head
      */
     public function output_collected_css() {
-        // Get header and footer HTML for arbitrary value scanning
-        $header = self::get_global_header();
-        $footer = self::get_global_footer();
-        $html_to_scan = ($header['html'] ?? '') . ($footer['html'] ?? '');
-
-        // Generate CSS for any arbitrary Tailwind values
-        $arbitrary_css = '';
-        if (!empty($html_to_scan) && class_exists('Unicorn_Studio_CSS_Manager')) {
-            $arbitrary_css = Unicorn_Studio_CSS_Manager::generate_arbitrary_css($html_to_scan);
-        }
-
-        if (empty(self::$collected_css) && empty($arbitrary_css)) {
+        // Only output component-specific CSS if it exists
+        // All Tailwind classes (including arbitrary values) are compiled by Tailwind v4
+        // and included in the main styles.css - no duplicate generation needed
+        if (empty(self::$collected_css)) {
             return;
         }
 
         echo "\n<style id=\"unicorn-global-components-css\">\n";
         echo self::$collected_css;
-        echo $arbitrary_css;
         echo "\n</style>\n";
     }
 

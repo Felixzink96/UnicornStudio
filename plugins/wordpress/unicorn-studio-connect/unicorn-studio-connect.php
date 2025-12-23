@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.35.0
+ * Version:           1.36.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.35.0');
+define('UNICORN_STUDIO_VERSION', '1.36.0');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -351,29 +351,15 @@ final class Unicorn_Studio {
 
         $css = get_post_meta($post->ID, '_unicorn_studio_css', true);
 
-        // Get page HTML content for arbitrary value scanning
-        $html_content = get_post_meta($post->ID, '_unicorn_studio_html', true);
-        if (empty($html_content)) {
-            $html_content = $post->post_content;
-        }
-
-        // Generate CSS for any arbitrary Tailwind values in page content
-        $arbitrary_css = '';
-        if (!empty($html_content) && class_exists('Unicorn_Studio_CSS_Manager')) {
-            $arbitrary_css = Unicorn_Studio_CSS_Manager::generate_arbitrary_css($html_content);
-        }
-
-        if (empty($css) && empty($arbitrary_css)) {
+        // Only output page-specific CSS if it exists
+        // All Tailwind classes (including arbitrary values) are compiled by Tailwind v4
+        // and included in the main styles.css - no duplicate generation needed
+        if (empty($css)) {
             return;
         }
 
         echo "\n<style id=\"unicorn-studio-page-css\">\n";
-        if (!empty($css)) {
-            echo $css;
-        }
-        if (!empty($arbitrary_css)) {
-            echo $arbitrary_css;
-        }
+        echo $css;
         echo "\n</style>\n";
     }
 

@@ -222,12 +222,19 @@ class Unicorn_Studio_CSS_Manager {
     /**
      * Generate CSS for arbitrary Tailwind values found in HTML
      *
-     * Handles classes like: border-[var(--color-brand-primary)], bg-[#fff], w-[100px]
+     * @deprecated 1.35.0 No longer needed - Tailwind v4 compiles all classes correctly.
+     *             This function was generating duplicate CSS that conflicted with Tailwind's output.
      *
      * @param string $html HTML content to scan
-     * @return string Generated CSS
+     * @return string Empty string (function deprecated)
      */
     public static function generate_arbitrary_css($html) {
+        // DEPRECATED: Tailwind v4 compiles all arbitrary values correctly.
+        // Generating CSS here creates duplicates that can conflict with Tailwind's
+        // native CSS Nesting output, breaking animations and transitions.
+        return '';
+
+        // Original code kept for reference but never executed:
         $css_rules = [];
 
         // Extract all classes from HTML

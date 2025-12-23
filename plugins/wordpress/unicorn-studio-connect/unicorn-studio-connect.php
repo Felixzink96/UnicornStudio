@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.40.0
+ * Version:           1.41.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.40.0');
+define('UNICORN_STUDIO_VERSION', '1.41.0');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -343,30 +343,37 @@ final class Unicorn_Studio {
      * Fix Tailwind class selectors in JavaScript
      * Tailwind classes like 'hover:bg-white' need proper CSS escaping in JS selectors
      *
+     * Problem: In JS, '.group-hover\:scale-110' has a single backslash which is
+     * interpreted as an escape character. We need '.group-hover\\:scale-110'
+     * (double backslash) so that CSS receives '.group-hover\:scale-110'.
+     *
      * @param string $js JavaScript code
      * @return string Fixed JavaScript code
      */
     private function fix_tailwind_selectors($js) {
-        // Pattern matches querySelectorAll('...') and querySelector('...')
-        // Captures the selector string inside quotes
-        $pattern = '/(querySelectorAll|querySelector)\s*\(\s*([\'"])(.+?)\2\s*\)/';
+        // Simple approach: find all querySelector/querySelectorAll calls and fix them
+        // Pattern: querySelectorAll('.something\:something')
+        // The backslash in the stored JS is literal, so we look for \: patterns
 
-        return preg_replace_callback($pattern, function($matches) {
-            $method = $matches[1];
-            $quote = $matches[2];
-            $selector = $matches[3];
+        // Replace patterns like '.class-name\:' with '.class-name\\:'
+        // This handles hover:, focus:, group-hover:, etc.
+        $js = preg_replace_callback(
+            '/(querySelector(?:All)?)\s*\(\s*([\'"])(.*?)\2\s*\)/',
+            function($matches) {
+                $method = $matches[1];
+                $quote = $matches[2];
+                $selector = $matches[3];
 
-            // Fix single backslash escapes to double backslash
-            // e.g., '.group-hover\:scale-110' -> '.group-hover\\:scale-110'
-            // But don't double-escape already escaped ones
-            $fixed_selector = preg_replace('/(?<!\\\\)\\\\:/', '\\\\:', $selector);
-            $fixed_selector = preg_replace('/(?<!\\\\)\\\\\\[/', '\\\\[', $fixed_selector);
-            $fixed_selector = preg_replace('/(?<!\\\\)\\\\\\]/', '\\\\]', $fixed_selector);
-            $fixed_selector = preg_replace('/(?<!\\\\)\\\\\\./', '\\\\.', $fixed_selector);
-            $fixed_selector = preg_replace('/(?<!\\\\)\\\\\\//', '\\\\/', $fixed_selector);
+                // Double any backslashes that are followed by : [ ] . /
+                // These are Tailwind escape patterns
+                $selector = preg_replace('/\\\\(:|\[|\]|\.|\/|%)/', '\\\\\\\\$1', $selector);
 
-            return $method . '(' . $quote . $fixed_selector . $quote . ')';
-        }, $js);
+                return $method . '(' . $quote . $selector . $quote . ')';
+            },
+            $js
+        );
+
+        return $js;
     }
 
     /**

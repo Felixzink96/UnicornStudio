@@ -3,7 +3,7 @@
  * Plugin Name:       Unicorn Studio Connect
  * Plugin URI:        https://unicorn.studio
  * Description:       Verbindet WordPress mit Unicorn Studio - AI Website Builder & CMS. Synchronisiert Content Types, Entries und Design automatisch.
- * Version:           1.37.0
+ * Version:           1.38.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Unicorn Factory
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Plugin Constants
-define('UNICORN_STUDIO_VERSION', '1.37.0');
+define('UNICORN_STUDIO_VERSION', '1.38.0');
 define('UNICORN_STUDIO_PLUGIN_FILE', __FILE__);
 define('UNICORN_STUDIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UNICORN_STUDIO_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -241,6 +241,9 @@ final class Unicorn_Studio {
         // Sitemap rewrite rule
         add_action('init', [$this, 'register_sitemap_rewrite']);
         add_action('template_redirect', [$this, 'serve_sitemap']);
+
+        // Optimize images (add srcset for Unsplash, add loading="lazy")
+        add_filter('the_content', [$this, 'optimize_images'], 999);
     }
 
     /**
@@ -325,10 +328,45 @@ final class Unicorn_Studio {
             return;
         }
 
+        // Fix Tailwind class selectors in querySelectorAll/querySelector
+        // Problem: '.group-hover\:scale-110' needs to be '.group-hover\\:scale-110' in JS
+        // Single backslash is interpreted as escape char, need double backslash for literal
+        $js = $this->fix_tailwind_selectors($js);
+
         // Output the JS
         echo "\n<script id=\"unicorn-studio-page-js\">\n";
         echo $js;
         echo "\n</script>\n";
+    }
+
+    /**
+     * Fix Tailwind class selectors in JavaScript
+     * Tailwind classes like 'hover:bg-white' need proper CSS escaping in JS selectors
+     *
+     * @param string $js JavaScript code
+     * @return string Fixed JavaScript code
+     */
+    private function fix_tailwind_selectors($js) {
+        // Pattern matches querySelectorAll('...') and querySelector('...')
+        // Captures the selector string inside quotes
+        $pattern = '/(querySelectorAll|querySelector)\s*\(\s*([\'"])(.+?)\2\s*\)/';
+
+        return preg_replace_callback($pattern, function($matches) {
+            $method = $matches[1];
+            $quote = $matches[2];
+            $selector = $matches[3];
+
+            // Fix single backslash escapes to double backslash
+            // e.g., '.group-hover\:scale-110' -> '.group-hover\\:scale-110'
+            // But don't double-escape already escaped ones
+            $fixed_selector = preg_replace('/(?<!\\\\)\\\\:/', '\\\\:', $selector);
+            $fixed_selector = preg_replace('/(?<!\\\\)\\\\\\[/', '\\\\[', $fixed_selector);
+            $fixed_selector = preg_replace('/(?<!\\\\)\\\\\\]/', '\\\\]', $fixed_selector);
+            $fixed_selector = preg_replace('/(?<!\\\\)\\\\\\./', '\\\\.', $fixed_selector);
+            $fixed_selector = preg_replace('/(?<!\\\\)\\\\\\//', '\\\\/', $fixed_selector);
+
+            return $method . '(' . $quote . $fixed_selector . $quote . ')';
+        }, $js);
     }
 
     /**
@@ -452,6 +490,117 @@ final class Unicorn_Studio {
     }
 
     /**
+     * Optimize images in content
+     * - Add srcset for Unsplash images (responsive images)
+     * - Add loading="lazy" for below-fold images
+     * - Add decoding="async" for non-blocking decode
+     *
+     * @param string $content Post content
+     * @return string Optimized content
+     */
+    public function optimize_images($content) {
+        if (empty($content)) {
+            return $content;
+        }
+
+        // Find all img tags
+        $pattern = '/<img([^>]*)>/i';
+
+        return preg_replace_callback($pattern, function($matches) {
+            $img_tag = $matches[0];
+            $attributes = $matches[1];
+
+            // Skip if already has srcset
+            if (strpos($attributes, 'srcset') !== false) {
+                return $img_tag;
+            }
+
+            // Extract src
+            if (!preg_match('/src=["\']([^"\']+)["\']/', $attributes, $src_match)) {
+                return $img_tag;
+            }
+            $src = $src_match[1];
+
+            // Check if it's an Unsplash image
+            if (strpos($src, 'images.unsplash.com') !== false) {
+                $img_tag = $this->add_unsplash_srcset($img_tag, $src, $attributes);
+            }
+
+            // Add loading="lazy" if not present and not the first image (likely LCP)
+            if (strpos($attributes, 'loading=') === false) {
+                // Check if this might be above the fold (hero section)
+                $is_hero = (
+                    strpos($attributes, 'hero') !== false ||
+                    strpos($attributes, 'id="hero') !== false ||
+                    preg_match('/class=["\'][^"\']*object-cover[^"\']*["\']/', $attributes)
+                );
+
+                if (!$is_hero) {
+                    $img_tag = str_replace('<img', '<img loading="lazy"', $img_tag);
+                }
+            }
+
+            // Add decoding="async" if not present
+            if (strpos($attributes, 'decoding=') === false) {
+                $img_tag = str_replace('<img', '<img decoding="async"', $img_tag);
+            }
+
+            return $img_tag;
+        }, $content);
+    }
+
+    /**
+     * Add srcset for Unsplash images
+     *
+     * @param string $img_tag Original img tag
+     * @param string $src Image URL
+     * @param string $attributes Image attributes
+     * @return string Modified img tag
+     */
+    private function add_unsplash_srcset($img_tag, $src, $attributes) {
+        // Parse Unsplash URL to get base and parameters
+        $url_parts = parse_url($src);
+        if (!$url_parts) {
+            return $img_tag;
+        }
+
+        $base_url = $url_parts['scheme'] . '://' . $url_parts['host'] . $url_parts['path'];
+
+        // Parse existing query params
+        $params = [];
+        if (isset($url_parts['query'])) {
+            parse_str(html_entity_decode($url_parts['query']), $params);
+        }
+
+        // Remove width param for base
+        unset($params['w']);
+
+        // Define responsive widths
+        $widths = [400, 640, 800, 1024, 1280, 1600, 2048];
+
+        // Build srcset
+        $srcset_parts = [];
+        foreach ($widths as $w) {
+            $params['w'] = $w;
+            $url = $base_url . '?' . http_build_query($params);
+            $srcset_parts[] = esc_url($url) . ' ' . $w . 'w';
+        }
+        $srcset = implode(', ', $srcset_parts);
+
+        // Default sizes attribute (can be overridden in HTML)
+        $sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw';
+
+        // Add srcset and sizes to img tag
+        $img_tag = preg_replace(
+            '/src=["\']([^"\']+)["\']/',
+            'src="$1" srcset="' . esc_attr($srcset) . '" sizes="' . esc_attr($sizes) . '"',
+            $img_tag
+        );
+
+        return $img_tag;
+    }
+
+    /**
      * Get plugin option
      */
     public static function get_option($key, $default = null) {
@@ -540,6 +689,11 @@ register_activation_hook(__FILE__, function() {
     }
     if (!file_exists($fonts_dir)) {
         wp_mkdir_p($fonts_dir);
+    }
+
+    // Activate cache headers for static assets (PageSpeed optimization)
+    if (class_exists('Unicorn_Studio_Site_Identity')) {
+        Unicorn_Studio_Site_Identity::activate_cache_headers();
     }
 
     // Flush rewrite rules

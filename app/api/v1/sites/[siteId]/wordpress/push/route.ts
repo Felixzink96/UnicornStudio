@@ -617,26 +617,46 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       result.results.global_components = { count: 0, success: false, error: msg }
     }
 
-    // 10. Push Site Identity (Logo, Favicon, Tagline, OG Image)
+    // 10. Push Site Identity (Logo, Favicon, Tagline, OG Image) + SEO Settings
     try {
       // Site already loaded above, just send identity data
-      if (site.logo_url || site.favicon_url || site.tagline || site.og_image_url) {
-        await sendWebhook(webhookUrl, headers, {
-          event: 'site_identity.updated',
-          site_id: siteId,
-          data: {
-            logo_url: site.logo_url,
-            logo_dark_url: site.logo_dark_url,
-            favicon_url: site.favicon_url,
-            tagline: site.tagline,
-            og_image_url: site.og_image_url,
-            site_name: site.name,
-          },
-        })
-        result.results.site_identity = { success: true }
-      } else {
-        result.results.site_identity = { success: true }
-      }
+      // Include seo_settings for meta description, analytics, security headers, etc.
+      const seoSettings = site.seo_settings as Record<string, unknown> | null
+
+      await sendWebhook(webhookUrl, headers, {
+        event: 'site_identity.updated',
+        site_id: siteId,
+        data: {
+          logo_url: site.logo_url,
+          logo_dark_url: site.logo_dark_url,
+          favicon_url: site.favicon_url,
+          tagline: site.tagline,
+          og_image_url: site.og_image_url,
+          site_name: site.name,
+          // Include full SEO settings for PageSpeed optimization
+          seo_settings: seoSettings ? {
+            site_name: seoSettings.site_name || site.name,
+            title_separator: seoSettings.title_separator || ' | ',
+            title_format: seoSettings.title_format || '{{page_title}}{{separator}}{{site_name}}',
+            default_meta_description: seoSettings.default_meta_description || site.tagline || '',
+            default_og_image: seoSettings.default_og_image || site.og_image_url,
+            favicon: seoSettings.favicon || site.favicon_url,
+            apple_touch_icon: seoSettings.apple_touch_icon,
+            google_verification: seoSettings.google_verification,
+            bing_verification: seoSettings.bing_verification,
+            google_analytics_id: seoSettings.google_analytics_id,
+            google_tag_manager_id: seoSettings.google_tag_manager_id,
+            facebook_pixel_id: seoSettings.facebook_pixel_id,
+            custom_scripts_head: seoSettings.custom_scripts_head || '',
+            custom_scripts_body: seoSettings.custom_scripts_body || '',
+            robots_txt: seoSettings.robots_txt,
+            sitemap_enabled: seoSettings.sitemap_enabled ?? true,
+            social_profiles: seoSettings.social_profiles,
+            local_business: seoSettings.local_business,
+          } : null,
+        },
+      })
+      result.results.site_identity = { success: true }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Site Identity sync failed'
       result.errors.push(msg)

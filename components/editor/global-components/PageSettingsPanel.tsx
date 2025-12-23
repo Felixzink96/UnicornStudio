@@ -9,6 +9,8 @@ import {
 } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -18,9 +20,26 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Settings, LayoutTemplate, Eye, EyeOff } from 'lucide-react'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import { Settings, LayoutTemplate, Eye, EyeOff, Search, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GlobalComponent, PageComponentSettings } from '@/types/global-components'
+
+interface PageSEO {
+  meta_title?: string
+  meta_description?: string
+  og_title?: string
+  og_description?: string
+  og_image?: string
+  robots_index?: boolean
+  robots_follow?: boolean
+  canonical_url?: string
+  [key: string]: string | boolean | undefined // Index signature for Json compatibility
+}
 
 interface PageSettingsPanelProps {
   open: boolean
@@ -49,6 +68,18 @@ export function PageSettingsPanel({
   })
   const [globalHeaderId, setGlobalHeaderId] = useState<string | null>(null)
   const [globalFooterId, setGlobalFooterId] = useState<string | null>(null)
+  const [pageName, setPageName] = useState('')
+  const [seo, setSeo] = useState<PageSEO>({
+    meta_title: '',
+    meta_description: '',
+    og_title: '',
+    og_description: '',
+    og_image: '',
+    robots_index: true,
+    robots_follow: true,
+    canonical_url: '',
+  })
+  const [seoOpen, setSeoOpen] = useState(false)
 
   useEffect(() => {
     if (open && siteId && pageId) {
@@ -86,19 +117,32 @@ export function PageSettingsPanel({
         setGlobalFooterId(site.global_footer_id)
       }
 
-      // Load page settings
+      // Load page settings including SEO
       const { data: page } = await supabase
         .from('pages')
-        .select('hide_header, hide_footer, custom_header_id, custom_footer_id')
+        .select('name, hide_header, hide_footer, custom_header_id, custom_footer_id, seo')
         .eq('id', pageId)
         .single()
 
       if (page) {
+        setPageName(page.name || '')
         setSettings({
           hide_header: page.hide_header || false,
           hide_footer: page.hide_footer || false,
           custom_header_id: page.custom_header_id || null,
           custom_footer_id: page.custom_footer_id || null,
+        })
+        // Load SEO settings
+        const pageSeo = (page.seo as PageSEO) || {}
+        setSeo({
+          meta_title: pageSeo.meta_title || '',
+          meta_description: pageSeo.meta_description || '',
+          og_title: pageSeo.og_title || '',
+          og_description: pageSeo.og_description || '',
+          og_image: pageSeo.og_image || '',
+          robots_index: pageSeo.robots_index ?? true,
+          robots_follow: pageSeo.robots_follow ?? true,
+          canonical_url: pageSeo.canonical_url || '',
         })
       }
     } catch (err) {
@@ -113,6 +157,17 @@ export function PageSettingsPanel({
     try {
       const supabase = createClient()
 
+      // Clean SEO object - remove empty strings
+      const cleanSeo: PageSEO = {}
+      if (seo.meta_title) cleanSeo.meta_title = seo.meta_title
+      if (seo.meta_description) cleanSeo.meta_description = seo.meta_description
+      if (seo.og_title) cleanSeo.og_title = seo.og_title
+      if (seo.og_description) cleanSeo.og_description = seo.og_description
+      if (seo.og_image) cleanSeo.og_image = seo.og_image
+      if (seo.canonical_url) cleanSeo.canonical_url = seo.canonical_url
+      cleanSeo.robots_index = seo.robots_index
+      cleanSeo.robots_follow = seo.robots_follow
+
       const { error } = await supabase
         .from('pages')
         .update({
@@ -120,6 +175,7 @@ export function PageSettingsPanel({
           hide_footer: settings.hide_footer,
           custom_header_id: settings.custom_header_id,
           custom_footer_id: settings.custom_footer_id,
+          seo: cleanSeo,
         })
         .eq('id', pageId)
 
@@ -280,6 +336,88 @@ export function PageSettingsPanel({
                 </div>
               )}
             </div>
+
+            <Separator />
+
+            {/* SEO Settings */}
+            <Collapsible open={seoOpen} onOpenChange={setSeoOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full py-2 hover:bg-zinc-50 rounded-lg px-2 -mx-2">
+                <h3 className="font-medium flex items-center gap-2">
+                  <Search className="w-4 h-4" />
+                  SEO Einstellungen
+                </h3>
+                <ChevronDown className={`w-4 h-4 transition-transform ${seoOpen ? 'rotate-180' : ''}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-4">
+                {/* Meta Title */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Meta Title</Label>
+                  <Input
+                    value={seo.meta_title || ''}
+                    onChange={(e) => setSeo({ ...seo, meta_title: e.target.value })}
+                    placeholder={pageName || 'Seitentitel'}
+                  />
+                  <p className="text-xs text-zinc-500">
+                    Überschreibt den Standard-Titel. Leer = Seitenname wird verwendet.
+                  </p>
+                </div>
+
+                {/* Meta Description */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Meta Description</Label>
+                  <Textarea
+                    value={seo.meta_description || ''}
+                    onChange={(e) => setSeo({ ...seo, meta_description: e.target.value })}
+                    placeholder="Beschreibung für Suchmaschinen..."
+                    rows={3}
+                  />
+                  <p className="text-xs text-zinc-500">
+                    {(seo.meta_description?.length || 0)}/160 Zeichen empfohlen
+                  </p>
+                </div>
+
+                {/* OG Image */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Social Media Bild (OG Image)</Label>
+                  <Input
+                    value={seo.og_image || ''}
+                    onChange={(e) => setSeo({ ...seo, og_image: e.target.value })}
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-zinc-500">
+                    Bild für Facebook, Twitter, LinkedIn etc.
+                  </p>
+                </div>
+
+                {/* Robots */}
+                <div className="flex gap-6">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={seo.robots_index}
+                      onCheckedChange={(checked) => setSeo({ ...seo, robots_index: checked })}
+                    />
+                    <Label className="text-sm">Indexieren</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={seo.robots_follow}
+                      onCheckedChange={(checked) => setSeo({ ...seo, robots_follow: checked })}
+                    />
+                    <Label className="text-sm">Links folgen</Label>
+                  </div>
+                </div>
+
+                {/* Canonical URL */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Canonical URL (optional)</Label>
+                  <Input
+                    value={seo.canonical_url || ''}
+                    onChange={(e) => setSeo({ ...seo, canonical_url: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             <Separator />
 

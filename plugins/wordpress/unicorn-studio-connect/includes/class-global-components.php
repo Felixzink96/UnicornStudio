@@ -221,6 +221,9 @@ class Unicorn_Studio_Global_Components {
         // Auto-fix: Add x-data if header has Alpine directives but missing x-data
         $html = self::ensure_alpine_xdata($html, 'header');
 
+        // Optimize images (srcset, lazy loading)
+        $html = self::optimize_component_images($html);
+
         if ($echo) {
             echo $html;
             return null;
@@ -334,12 +337,113 @@ class Unicorn_Studio_Global_Components {
         // Replace menu placeholders
         $html = self::replace_menu_placeholders($html);
 
+        // Optimize images (srcset, lazy loading)
+        $html = self::optimize_component_images($html);
+
         if ($echo) {
             echo $html;
             return null;
         }
 
         return $html;
+    }
+
+    /**
+     * Optimize images in component HTML
+     * Adds srcset for Unsplash images, lazy loading, and async decoding
+     *
+     * @param string $html HTML content
+     * @return string Optimized HTML
+     */
+    private static function optimize_component_images(string $html): string {
+        if (empty($html)) {
+            return $html;
+        }
+
+        // Find all img tags
+        $pattern = '/<img([^>]*)>/i';
+
+        return preg_replace_callback($pattern, function($matches) {
+            $img_tag = $matches[0];
+            $attributes = $matches[1];
+
+            // Skip if already has srcset
+            if (strpos($attributes, 'srcset') !== false) {
+                return $img_tag;
+            }
+
+            // Extract src
+            if (!preg_match('/src=["\']([^"\']+)["\']/', $attributes, $src_match)) {
+                return $img_tag;
+            }
+            $src = $src_match[1];
+
+            // Check if it's an Unsplash image
+            if (strpos($src, 'images.unsplash.com') !== false) {
+                $img_tag = self::add_unsplash_srcset($img_tag, $src);
+            }
+
+            // Add loading="lazy" if not present (components are usually below fold)
+            if (strpos($attributes, 'loading=') === false) {
+                $img_tag = str_replace('<img', '<img loading="lazy"', $img_tag);
+            }
+
+            // Add decoding="async" if not present
+            if (strpos($attributes, 'decoding=') === false) {
+                $img_tag = str_replace('<img', '<img decoding="async"', $img_tag);
+            }
+
+            return $img_tag;
+        }, $html);
+    }
+
+    /**
+     * Add srcset for Unsplash images
+     *
+     * @param string $img_tag Original img tag
+     * @param string $src Image URL
+     * @return string Modified img tag
+     */
+    private static function add_unsplash_srcset(string $img_tag, string $src): string {
+        $url_parts = parse_url($src);
+        if (!$url_parts) {
+            return $img_tag;
+        }
+
+        $base_url = $url_parts['scheme'] . '://' . $url_parts['host'] . $url_parts['path'];
+
+        // Parse existing query params
+        $params = [];
+        if (isset($url_parts['query'])) {
+            parse_str(html_entity_decode($url_parts['query']), $params);
+        }
+
+        // Remove width param for base
+        unset($params['w']);
+
+        // Define responsive widths
+        $widths = [400, 640, 800, 1024, 1280, 1600];
+
+        // Build srcset
+        $srcset_parts = [];
+        foreach ($widths as $w) {
+            $params['w'] = $w;
+            $url = $base_url . '?' . http_build_query($params);
+            $srcset_parts[] = esc_url($url) . ' ' . $w . 'w';
+        }
+        $srcset = implode(', ', $srcset_parts);
+
+        // Default sizes
+        $sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw';
+
+        // Add srcset and sizes to img tag
+        $img_tag = preg_replace(
+            '/src=["\']([^"\']+)["\']/',
+            'src="$1" srcset="' . esc_attr($srcset) . '" sizes="' . esc_attr($sizes) . '"',
+            $img_tag
+        );
+
+        return $img_tag;
     }
 
     /**

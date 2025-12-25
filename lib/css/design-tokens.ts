@@ -250,6 +250,24 @@ ${gradients?.primary?.enabled ? `
 .via-primary\\/50 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.5), var(--tw-gradient-to); }
 .via-primary\\/40 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.4), var(--tw-gradient-to); }
 
+/* Gradient to-* with Opacity */
+.to-primary\\/90 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.9); }
+.to-primary\\/80 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.8); }
+.to-primary\\/70 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.7); }
+.to-primary\\/60 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.6); }
+.to-primary\\/50 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.5); }
+.to-primary\\/40 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.4); }
+
+.to-background\\/90 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.9); }
+.to-background\\/80 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.8); }
+.to-background\\/70 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.7); }
+.to-background\\/60 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.6); }
+.to-background\\/50 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.5); }
+
+.to-accent\\/90 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.9); }
+.to-accent\\/80 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.8); }
+.to-accent\\/50 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.5); }
+
 /* Text Colors */
 .text-primary { color: var(--color-brand-primary); }
 .text-secondary { color: var(--color-brand-secondary); }

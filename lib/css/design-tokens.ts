@@ -83,6 +83,18 @@ a {
   text-decoration: inherit;
 }
 
+/* Reset heading styles - prevent browser bold defaults */
+h1, h2, h3, h4, h5, h6 {
+  font-size: inherit;
+  font-weight: inherit;
+  margin: 0;
+}
+
+/* Reset paragraph and list margins */
+p, ul, ol, dl, blockquote, figure, pre {
+  margin: 0;
+}
+
 button, input, optgroup, select, textarea {
   font-family: inherit;
   font-size: 100%;

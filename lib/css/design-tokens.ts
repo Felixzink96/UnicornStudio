@@ -90,6 +90,23 @@ a {
   text-decoration: inherit;
 }
 
+/* Reset heading and text styles - match Unicorn Studio appearance */
+h1, h2, h3, h4, h5, h6 {
+  font-size: inherit;
+  font-weight: inherit;
+  margin: 0;
+}
+
+p, blockquote, figure, pre {
+  margin: 0;
+}
+
+ul, ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 button, input, optgroup, select, textarea {
   font-family: inherit;
   font-size: 100%;
@@ -235,38 +252,78 @@ ${gradients?.primary?.enabled ? `
 .to-background { --tw-gradient-to: var(--color-neutral-background); }
 .to-transparent { --tw-gradient-to: transparent; }
 
-/* Gradient with Opacity */
-.from-primary\\/90 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.9); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-.from-primary\\/80 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.8); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-.from-primary\\/70 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.7); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-.from-primary\\/60 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.6); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-.from-primary\\/50 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.5); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+/* Gradient from-* with Opacity (10-90) */
+.from-primary\\/10 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.1); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-primary\\/20 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.2); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-primary\\/30 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.3); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
 .from-primary\\/40 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.4); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-primary\\/50 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.5); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-primary\\/60 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.6); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-primary\\/70 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.7); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-primary\\/80 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.8); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-primary\\/90 { --tw-gradient-from: rgba(${hexToRgb(brandPrimary)}, 0.9); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
 
-.via-primary\\/90 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.9), var(--tw-gradient-to); }
-.via-primary\\/80 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.8), var(--tw-gradient-to); }
-.via-primary\\/70 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.7), var(--tw-gradient-to); }
-.via-primary\\/60 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.6), var(--tw-gradient-to); }
-.via-primary\\/50 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.5), var(--tw-gradient-to); }
+.from-accent\\/10 { --tw-gradient-from: rgba(${hexToRgb(brandAccent)}, 0.1); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-accent\\/20 { --tw-gradient-from: rgba(${hexToRgb(brandAccent)}, 0.2); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-accent\\/30 { --tw-gradient-from: rgba(${hexToRgb(brandAccent)}, 0.3); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-accent\\/40 { --tw-gradient-from: rgba(${hexToRgb(brandAccent)}, 0.4); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-accent\\/50 { --tw-gradient-from: rgba(${hexToRgb(brandAccent)}, 0.5); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-accent\\/60 { --tw-gradient-from: rgba(${hexToRgb(brandAccent)}, 0.6); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-accent\\/70 { --tw-gradient-from: rgba(${hexToRgb(brandAccent)}, 0.7); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-accent\\/80 { --tw-gradient-from: rgba(${hexToRgb(brandAccent)}, 0.8); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-accent\\/90 { --tw-gradient-from: rgba(${hexToRgb(brandAccent)}, 0.9); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+
+.from-background\\/10 { --tw-gradient-from: rgba(${hexToRgb(neutralBackground)}, 0.1); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-background\\/20 { --tw-gradient-from: rgba(${hexToRgb(neutralBackground)}, 0.2); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-background\\/30 { --tw-gradient-from: rgba(${hexToRgb(neutralBackground)}, 0.3); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-background\\/40 { --tw-gradient-from: rgba(${hexToRgb(neutralBackground)}, 0.4); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-background\\/50 { --tw-gradient-from: rgba(${hexToRgb(neutralBackground)}, 0.5); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-background\\/60 { --tw-gradient-from: rgba(${hexToRgb(neutralBackground)}, 0.6); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-background\\/70 { --tw-gradient-from: rgba(${hexToRgb(neutralBackground)}, 0.7); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-background\\/80 { --tw-gradient-from: rgba(${hexToRgb(neutralBackground)}, 0.8); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.from-background\\/90 { --tw-gradient-from: rgba(${hexToRgb(neutralBackground)}, 0.9); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+
+/* Gradient via-* with Opacity (10-90) */
+.via-primary\\/10 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.1), var(--tw-gradient-to); }
+.via-primary\\/20 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.2), var(--tw-gradient-to); }
+.via-primary\\/30 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.3), var(--tw-gradient-to); }
 .via-primary\\/40 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.4), var(--tw-gradient-to); }
+.via-primary\\/50 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.5), var(--tw-gradient-to); }
+.via-primary\\/60 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.6), var(--tw-gradient-to); }
+.via-primary\\/70 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.7), var(--tw-gradient-to); }
+.via-primary\\/80 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.8), var(--tw-gradient-to); }
+.via-primary\\/90 { --tw-gradient-stops: var(--tw-gradient-from), rgba(${hexToRgb(brandPrimary)}, 0.9), var(--tw-gradient-to); }
 
-/* Gradient to-* with Opacity */
-.to-primary\\/90 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.9); }
-.to-primary\\/80 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.8); }
-.to-primary\\/70 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.7); }
-.to-primary\\/60 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.6); }
-.to-primary\\/50 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.5); }
+/* Gradient to-* with Opacity (10-90) */
+.to-primary\\/10 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.1); }
+.to-primary\\/20 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.2); }
+.to-primary\\/30 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.3); }
 .to-primary\\/40 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.4); }
+.to-primary\\/50 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.5); }
+.to-primary\\/60 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.6); }
+.to-primary\\/70 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.7); }
+.to-primary\\/80 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.8); }
+.to-primary\\/90 { --tw-gradient-to: rgba(${hexToRgb(brandPrimary)}, 0.9); }
 
-.to-background\\/90 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.9); }
-.to-background\\/80 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.8); }
-.to-background\\/70 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.7); }
-.to-background\\/60 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.6); }
-.to-background\\/50 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.5); }
-
-.to-accent\\/90 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.9); }
-.to-accent\\/80 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.8); }
+.to-accent\\/10 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.1); }
+.to-accent\\/20 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.2); }
+.to-accent\\/30 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.3); }
+.to-accent\\/40 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.4); }
 .to-accent\\/50 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.5); }
+.to-accent\\/60 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.6); }
+.to-accent\\/70 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.7); }
+.to-accent\\/80 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.8); }
+.to-accent\\/90 { --tw-gradient-to: rgba(${hexToRgb(brandAccent)}, 0.9); }
+
+.to-background\\/10 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.1); }
+.to-background\\/20 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.2); }
+.to-background\\/30 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.3); }
+.to-background\\/40 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.4); }
+.to-background\\/50 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.5); }
+.to-background\\/60 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.6); }
+.to-background\\/70 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.7); }
+.to-background\\/80 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.8); }
+.to-background\\/90 { --tw-gradient-to: rgba(${hexToRgb(neutralBackground)}, 0.9); }
 
 /* Text Colors */
 .text-primary { color: var(--color-brand-primary); }
@@ -293,20 +350,35 @@ ${gradients?.primary?.enabled ? `
 .text-primary\\/80 { color: rgba(${hexToRgb(brandPrimary)}, 0.8); }
 .text-primary\\/90 { color: rgba(${hexToRgb(brandPrimary)}, 0.9); }
 
+.text-accent\\/10 { color: rgba(${hexToRgb(brandAccent)}, 0.1); }
 .text-accent\\/20 { color: rgba(${hexToRgb(brandAccent)}, 0.2); }
+.text-accent\\/30 { color: rgba(${hexToRgb(brandAccent)}, 0.3); }
 .text-accent\\/40 { color: rgba(${hexToRgb(brandAccent)}, 0.4); }
+.text-accent\\/50 { color: rgba(${hexToRgb(brandAccent)}, 0.5); }
 .text-accent\\/60 { color: rgba(${hexToRgb(brandAccent)}, 0.6); }
+.text-accent\\/70 { color: rgba(${hexToRgb(brandAccent)}, 0.7); }
 .text-accent\\/80 { color: rgba(${hexToRgb(brandAccent)}, 0.8); }
+.text-accent\\/90 { color: rgba(${hexToRgb(brandAccent)}, 0.9); }
 
-.text-foreground\\/90 { color: rgba(${hexToRgb(neutralForeground)}, 0.9); }
-.text-foreground\\/80 { color: rgba(${hexToRgb(neutralForeground)}, 0.8); }
-.text-foreground\\/70 { color: rgba(${hexToRgb(neutralForeground)}, 0.7); }
-.text-foreground\\/60 { color: rgba(${hexToRgb(neutralForeground)}, 0.6); }
-.text-foreground\\/50 { color: rgba(${hexToRgb(neutralForeground)}, 0.5); }
+.text-foreground\\/10 { color: rgba(${hexToRgb(neutralForeground)}, 0.1); }
+.text-foreground\\/20 { color: rgba(${hexToRgb(neutralForeground)}, 0.2); }
+.text-foreground\\/30 { color: rgba(${hexToRgb(neutralForeground)}, 0.3); }
 .text-foreground\\/40 { color: rgba(${hexToRgb(neutralForeground)}, 0.4); }
+.text-foreground\\/50 { color: rgba(${hexToRgb(neutralForeground)}, 0.5); }
+.text-foreground\\/60 { color: rgba(${hexToRgb(neutralForeground)}, 0.6); }
+.text-foreground\\/70 { color: rgba(${hexToRgb(neutralForeground)}, 0.7); }
+.text-foreground\\/80 { color: rgba(${hexToRgb(neutralForeground)}, 0.8); }
+.text-foreground\\/90 { color: rgba(${hexToRgb(neutralForeground)}, 0.9); }
 
-.text-muted\\/80 { color: rgba(${hexToRgb(neutralMuted)}, 0.8); }
+.text-muted\\/10 { color: rgba(${hexToRgb(neutralMuted)}, 0.1); }
+.text-muted\\/20 { color: rgba(${hexToRgb(neutralMuted)}, 0.2); }
+.text-muted\\/30 { color: rgba(${hexToRgb(neutralMuted)}, 0.3); }
+.text-muted\\/40 { color: rgba(${hexToRgb(neutralMuted)}, 0.4); }
+.text-muted\\/50 { color: rgba(${hexToRgb(neutralMuted)}, 0.5); }
 .text-muted\\/60 { color: rgba(${hexToRgb(neutralMuted)}, 0.6); }
+.text-muted\\/70 { color: rgba(${hexToRgb(neutralMuted)}, 0.7); }
+.text-muted\\/80 { color: rgba(${hexToRgb(neutralMuted)}, 0.8); }
+.text-muted\\/90 { color: rgba(${hexToRgb(neutralMuted)}, 0.9); }
 
 /* Background Standard Colors */
 .bg-white { background-color: #ffffff; }

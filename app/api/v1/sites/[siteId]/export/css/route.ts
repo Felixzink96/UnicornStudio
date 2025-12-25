@@ -454,53 +454,18 @@ async function compileTailwindCSS(classes: Set<string>, customConfig?: TailwindC
     const classArray = Array.from(classes)
     console.log(`[CSS Export] Compiling ${classArray.length} classes with Tailwind v4`)
 
-    // Compile using Tailwind v4 API - SKIP PREFLIGHT (reset) to avoid specificity issues
-    // We only import theme and utilities, not preflight which sets border: 0 solid (currentColor)
-    const cssInput = `
-@layer theme, base, components, utilities;
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities);
-
-${themeCSS}`
+    // Compile using Tailwind v4 API WITH PREFLIGHT (full reset)
+    const cssInput = `@import "tailwindcss";\n\n${themeCSS}`
 
     const compiler = await compile(cssInput, {
       loadStylesheet: async (id: string, base: string) => {
-        // Handle the new modular imports
-        const pathMap: Record<string, string> = {
-          'tailwindcss': 'index.css',
-          'tailwindcss/theme.css': 'theme.css',
-          'tailwindcss/utilities.css': 'utilities.css',
-          'tailwindcss/preflight.css': 'preflight.css',
-        }
-
-        const fileName = pathMap[id]
-        if (fileName) {
-          // Try to load the specific file from node_modules
-          const possiblePaths = [
-            join(process.cwd(), 'node_modules', 'tailwindcss', fileName),
-            `/var/task/node_modules/tailwindcss/${fileName}`, // Vercel path
-          ]
-
-          for (const filePath of possiblePaths) {
-            try {
-              const content = readFileSync(filePath, 'utf-8')
-              console.log(`[CSS Export] Loaded ${id} from ${filePath}`)
-              return { path: filePath, base, content }
-            } catch (e) {
-              // Try next path
-            }
-          }
-
-          // Fallback: if it's the main import, use cached content
-          if (id === 'tailwindcss') {
-            return {
-              path: 'node_modules/tailwindcss/index.css',
-              base,
-              content: tailwindSource,
-            }
+        if (id === 'tailwindcss') {
+          return {
+            path: 'node_modules/tailwindcss/index.css',
+            base,
+            content: tailwindSource,
           }
         }
-
         throw new Error(`Cannot load stylesheet: ${id}`)
       },
     })

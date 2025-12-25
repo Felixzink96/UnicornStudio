@@ -254,9 +254,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       // Flatten CSS Nesting and @layer for browser compatibility
       tailwindCSS = await flattenCSS(tailwindCSS)
 
-      // NOTE: We keep Tailwind preflight for proper base styles
-      // Border colors use !important in design-tokens.ts to override preflight's border: 0 solid
-
       // Get keyframes separately - they need to be added AFTER Tailwind compilation
       if (tailwindConfig?.keyframes) {
         keyframesCSS = buildKeyframesCSS(tailwindConfig.keyframes)

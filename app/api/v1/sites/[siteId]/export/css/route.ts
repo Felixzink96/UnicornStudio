@@ -512,31 +512,18 @@ async function flattenCSS(css: string): Promise<string> {
 }
 
 /**
- * Strip Tailwind v4's problematic reset rules that use :not(#\#) specificity hacks
- * These rules set `border: 0 solid` which uses currentColor and overrides our border colors
+ * Fix Tailwind v4's problematic reset that sets border: 0 solid (uses currentColor)
+ * We change it to border: 0 solid transparent so it doesn't inherit text color
  */
 function stripTailwindResets(css: string): string {
-  // Remove the entire :not(#\#) reset block that sets border: 0 solid
-  // This regex matches rules like:
-  // :not(#\#):not(#\#), :not(#\#):not(#\#)::after, ... { border: 0px solid; ... }
-
-  // First, remove complete rule blocks with :not(#\#) that contain border resets
-  let result = css.replace(
-    /:not\(#\\#\)[^{]*\{[^}]*border:\s*0[^;]*solid[^}]*\}/g,
-    ''
+  // Replace "border: 0 solid" or "border: 0px solid" with "border: 0 solid transparent"
+  // This prevents borders from inheriting currentColor (text color)
+  const result = css.replace(
+    /border:\s*0(px)?\s+solid\s*;/g,
+    'border: 0 solid transparent;'
   )
 
-  // Also remove any standalone :not(#\#) rules that might interfere
-  // Keep only the ones that don't set colors or borders
-  result = result.replace(
-    /:not\(#\\#\)[^{]*:not\(#\\#\)[^{]*\{[^}]*(border-color|color)[^}]*\}/g,
-    ''
-  )
-
-  // Remove empty lines left behind
-  result = result.replace(/\n\s*\n\s*\n/g, '\n\n')
-
-  console.log(`[CSS Export] Stripped Tailwind resets: ${css.length} -> ${result.length} bytes`)
+  console.log(`[CSS Export] Fixed Tailwind border reset`)
   return result
 }
 

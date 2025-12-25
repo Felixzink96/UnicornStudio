@@ -74,6 +74,13 @@ export function generateDesignTokensCSS(designVars: DesignVariables | null): str
   --tw-inset-ring-shadow: 0 0 #0000;
 }
 
+/* Body reset - remove browser default margin */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
 button, [role="button"] {
   cursor: pointer;
 }

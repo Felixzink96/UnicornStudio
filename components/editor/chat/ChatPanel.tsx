@@ -25,6 +25,8 @@ import { GlobalComponentsDialog } from '@/components/design/GlobalComponentsDial
 import { SiteSetupModal, type SiteSetupData } from '@/components/design/SiteSetupModal'
 import { createPagesOnly, createHeaderMenu, createFooterMenu, createPagesFromSuggestions } from '@/lib/menus/setup-menus'
 import { getDesignVariables, updateDesignVariables } from '@/lib/supabase/queries/design-variables'
+import { upsertDesignSystem } from '@/lib/supabase/queries/design-system'
+import { generateDesignSystem } from '@/lib/ai/design-system-generator'
 import { extractGlobalComponents, removeHeaderFooterFromHtml, sanitizeHtmlForGlobalComponents } from '@/lib/ai/html-operations'
 import type { DetectedComponent } from '@/types/global-components'
 import { ReferenceDropdown, ReferenceBadge } from './ReferenceDropdown'
@@ -328,11 +330,6 @@ export function ChatPanel() {
     const headerMenuItems = setupData.headerSettings.menuItems.map(m => m.name).join(', ')
     const footerMenuItems = setupData.footerSettings.menuItems.map(m => m.name).join(', ')
 
-    const headerStyleDesc = setupData.headerSettings.style === 'simple'
-      ? 'Standard Layout (Logo links, Navigation rechts)'
-      : setupData.headerSettings.style === 'centered'
-        ? 'Zentriertes Layout (Logo und Navigation mittig übereinander)'
-        : 'Mega Menu Layout (mit Dropdown-Panels für Unterseiten)'
 
     // Archetyp-spezifische Beschreibungen
     const archetypeDescriptions: Record<string, string> = {
@@ -420,7 +417,7 @@ ${setupData.effects.borderStyle !== 'none' ? `- Border-Stil: ${setupData.effects
 HEADER ANFORDERUNGEN
 ═══════════════════════════════════════════════════════════════════════════
 
-- Stil: ${headerStyleDesc}
+- DESIGN FREI WÄHLEN! Wähle einen kreativen Header-Stil passend zum ${setupData.archetype.toUpperCase()}-Archetyp
 - Navigation-Links: ${headerMenuItems}
 - Links müssen zu den echten Seiten verlinken (siehe oben)
 ${setupData.headerSettings.showCta ? `- CTA-Button: "${setupData.headerSettings.ctaText}" verlinkt zu "/${setupData.headerSettings.ctaPage}"` : '- Kein CTA-Button'}
@@ -2407,6 +2404,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Update store with new design variables
             useEditorStore.setState({ designVariables: savedDesignVars })
+
+            // 1c. Design System generieren und speichern
+            const designSystemStyles = generateDesignSystem({
+              archetyp: data.archetype,
+              radii: data.radii,
+              motion: data.motion,
+              layout: data.layout,
+            })
+
+            await upsertDesignSystem(siteId, designSystemStyles)
+            console.log('Design System generated and saved:', designSystemStyles.archetyp)
 
             // 1b. Logo und Tagline speichern (Site Identity)
             const supabase = createClient()

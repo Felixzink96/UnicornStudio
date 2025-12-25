@@ -4,5 +4,13 @@
       "path": "/api/cron/publish-scheduled",
       "schedule": "*/5 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/v1/sites/[siteId]/export/css/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/ai/**/*.ts": {
+      "maxDuration": 120
+    }
+  }
 }

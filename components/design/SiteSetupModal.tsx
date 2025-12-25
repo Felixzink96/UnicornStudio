@@ -93,7 +93,6 @@ export interface SiteSetupData {
     borderStyle: 'none' | 'subtle' | 'prominent' | 'thick'
   }
   headerSettings: {
-    style: 'simple' | 'centered' | 'mega'
     menuItems: { name: string; slug: string }[]
     sticky: boolean
     showCta: boolean
@@ -306,7 +305,6 @@ export function SiteSetupModal({
     setEffects(defaults.effects)
   }
 
-  const [headerStyle, setHeaderStyle] = React.useState<'simple' | 'centered' | 'mega'>('simple')
   const [headerSticky, setHeaderSticky] = React.useState(true)
   const [headerCta, setHeaderCta] = React.useState(true)
   const [headerCtaText, setHeaderCtaText] = React.useState('Kontakt')
@@ -401,10 +399,6 @@ export function SiteSetupModal({
       }
 
       if (data.headerSettings) {
-        const style = data.headerSettings.style
-        if (style === 'simple' || style === 'centered' || style === 'split') {
-          setHeaderStyle(style === 'split' ? 'mega' : style)
-        }
         if (typeof data.headerSettings.sticky === 'boolean') {
           setHeaderSticky(data.headerSettings.sticky)
         }
@@ -486,7 +480,6 @@ export function SiteSetupModal({
         layout,
         effects,
         headerSettings: {
-          style: headerStyle,
           menuItems: headerItems,
           sticky: headerSticky,
           showCta: headerCta,
@@ -1068,63 +1061,11 @@ export function SiteSetupModal({
           {/* STEP: Navigation */}
           {step === 'nav' && (
             <div className="space-y-6">
-              {/* Header Style */}
-              <div>
-                <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-3 block">Header Layout</label>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { value: 'simple', label: 'Standard' },
-                    { value: 'centered', label: 'Zentriert' },
-                    { value: 'mega', label: 'Mega Menu' },
-                  ].map(({ value, label }) => (
-                    <button
-                      key={value}
-                      onClick={() => setHeaderStyle(value as typeof headerStyle)}
-                      className={`p-4 rounded-xl border-2 transition-all ${
-                        headerStyle === value
-                          ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-zinc-800'
-                          : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
-                      }`}
-                    >
-                      {/* Preview */}
-                      <div className="h-10 bg-zinc-100 dark:bg-zinc-700 rounded-lg flex items-center px-2 gap-1.5 mb-2">
-                        {value === 'simple' && (
-                          <>
-                            <div className="w-6 h-3 bg-zinc-400 dark:bg-zinc-500 rounded" />
-                            <div className="flex-1" />
-                            <div className="flex gap-1">
-                              <div className="w-4 h-1.5 bg-zinc-300 dark:bg-zinc-600 rounded" />
-                              <div className="w-4 h-1.5 bg-zinc-300 dark:bg-zinc-600 rounded" />
-                            </div>
-                            <div className="w-6 h-3 bg-zinc-900 dark:bg-zinc-100 rounded" />
-                          </>
-                        )}
-                        {value === 'centered' && (
-                          <div className="w-full flex flex-col items-center gap-1">
-                            <div className="w-8 h-3 bg-zinc-400 dark:bg-zinc-500 rounded" />
-                            <div className="flex gap-1">
-                              <div className="w-3 h-1.5 bg-zinc-300 dark:bg-zinc-600 rounded" />
-                              <div className="w-3 h-1.5 bg-zinc-300 dark:bg-zinc-600 rounded" />
-                            </div>
-                          </div>
-                        )}
-                        {value === 'mega' && (
-                          <div className="w-full">
-                            <div className="flex items-center px-1 mb-1">
-                              <div className="w-5 h-2 bg-zinc-400 dark:bg-zinc-500 rounded" />
-                              <div className="flex-1" />
-                              <div className="flex gap-0.5">
-                                <div className="w-3 h-1.5 bg-zinc-300 dark:bg-zinc-600 rounded" />
-                                <div className="w-3 h-1.5 bg-zinc-300 dark:bg-zinc-600 rounded" />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
-                    </button>
-                  ))}
-                </div>
+              {/* Info Box */}
+              <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">Header-Design:</span> Die AI wählt automatisch einen passenden Header-Stil basierend auf dem gewählten Design-Archetyp ({archetype}).
+                </p>
               </div>
 
               {/* Menu Preview */}

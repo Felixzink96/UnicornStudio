@@ -11,6 +11,8 @@ import {
   Globe,
   ExternalLink,
   Puzzle,
+  Layers,
+  Palette,
 } from 'lucide-react'
 import { PagesList } from './PagesList'
 import { getSiteById, getPagesBySite } from '@/lib/supabase/cached-queries'
@@ -132,6 +134,50 @@ export default async function SitePage({ params }: SitePageProps) {
             </p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <Link
+          href={`/dashboard/sites/${siteId}/design-system`}
+          className="flex items-center gap-3 p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-purple-500/50 transition-colors group"
+        >
+          <Layers className="h-5 w-5 text-purple-500" />
+          <div>
+            <p className="font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-purple-500 transition-colors">Design System</p>
+            <p className="text-xs text-zinc-500">Komponenten-Styles</p>
+          </div>
+        </Link>
+        <Link
+          href={`/dashboard/sites/${siteId}/variables`}
+          className="flex items-center gap-3 p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-purple-500/50 transition-colors group"
+        >
+          <Palette className="h-5 w-5 text-purple-500" />
+          <div>
+            <p className="font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-purple-500 transition-colors">Design Tokens</p>
+            <p className="text-xs text-zinc-500">Farben, Fonts, Spacing</p>
+          </div>
+        </Link>
+        <Link
+          href={`/dashboard/sites/${siteId}/components`}
+          className="flex items-center gap-3 p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-purple-500/50 transition-colors group"
+        >
+          <Puzzle className="h-5 w-5 text-purple-500" />
+          <div>
+            <p className="font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-purple-500 transition-colors">Komponenten</p>
+            <p className="text-xs text-zinc-500">Header, Footer, etc.</p>
+          </div>
+        </Link>
+        <Link
+          href={`/dashboard/sites/${siteId}/menus`}
+          className="flex items-center gap-3 p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-purple-500/50 transition-colors group"
+        >
+          <FileText className="h-5 w-5 text-purple-500" />
+          <div>
+            <p className="font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-purple-500 transition-colors">Menüs</p>
+            <p className="text-xs text-zinc-500">Navigation bearbeiten</p>
+          </div>
+        </Link>
       </div>
 
       {/* Pages Section */}

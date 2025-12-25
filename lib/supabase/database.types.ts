@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       activity_log: {
@@ -213,11 +238,15 @@ export type Database = {
           id: string
           mime_type: string | null
           name: string
+          original_filename: string | null
           site_id: string
           size_bytes: number | null
           tags: string[] | null
+          updated_at: string | null
           uploaded_by: string | null
           width: number | null
+          wp_attachment_id: number | null
+          wp_url: string | null
         }
         Insert: {
           alt_text?: string | null
@@ -230,11 +259,15 @@ export type Database = {
           id?: string
           mime_type?: string | null
           name: string
+          original_filename?: string | null
           site_id: string
           size_bytes?: number | null
           tags?: string[] | null
+          updated_at?: string | null
           uploaded_by?: string | null
           width?: number | null
+          wp_attachment_id?: number | null
+          wp_url?: string | null
         }
         Update: {
           alt_text?: string | null
@@ -247,11 +280,15 @@ export type Database = {
           id?: string
           mime_type?: string | null
           name?: string
+          original_filename?: string | null
           site_id?: string
           size_bytes?: number | null
           tags?: string[] | null
+          updated_at?: string | null
           uploaded_by?: string | null
           width?: number | null
+          wp_attachment_id?: number | null
+          wp_url?: string | null
         }
         Relationships: [
           {
@@ -276,6 +313,7 @@ export type Database = {
           created_at: string | null
           generated_html: string | null
           id: string
+          is_applied: boolean | null
           model: string | null
           page_id: string | null
           role: string
@@ -287,6 +325,7 @@ export type Database = {
           created_at?: string | null
           generated_html?: string | null
           id?: string
+          is_applied?: boolean | null
           model?: string | null
           page_id?: string | null
           role: string
@@ -298,6 +337,7 @@ export type Database = {
           created_at?: string | null
           generated_html?: string | null
           id?: string
+          is_applied?: boolean | null
           model?: string | null
           page_id?: string | null
           role?: string
@@ -404,39 +444,102 @@ export type Database = {
           },
         ]
       }
+      component_usage: {
+        Row: {
+          component_id: string
+          created_at: string | null
+          id: string
+          page_id: string
+          position_index: number | null
+        }
+        Insert: {
+          component_id: string
+          created_at?: string | null
+          id?: string
+          page_id: string
+          position_index?: number | null
+        }
+        Update: {
+          component_id?: string
+          created_at?: string | null
+          id?: string
+          page_id?: string
+          position_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_usage_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "component_usage_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       components: {
         Row: {
+          auto_include: boolean | null
           category: string | null
           content: Json
           created_at: string | null
+          css: string | null
           description: string | null
+          form_config: Json | null
+          html: string | null
           id: string
+          is_global: boolean | null
+          js: string | null
           name: string
+          position: string | null
           site_id: string
           thumbnail_url: string | null
           updated_at: string | null
+          usage_count: number | null
         }
         Insert: {
+          auto_include?: boolean | null
           category?: string | null
           content: Json
           created_at?: string | null
+          css?: string | null
           description?: string | null
+          form_config?: Json | null
+          html?: string | null
           id?: string
+          is_global?: boolean | null
+          js?: string | null
           name: string
+          position?: string | null
           site_id: string
           thumbnail_url?: string | null
           updated_at?: string | null
+          usage_count?: number | null
         }
         Update: {
+          auto_include?: boolean | null
           category?: string | null
           content?: Json
           created_at?: string | null
+          css?: string | null
           description?: string | null
+          form_config?: Json | null
+          html?: string | null
           id?: string
+          is_global?: boolean | null
+          js?: string | null
           name?: string
+          position?: string | null
           site_id?: string
           thumbnail_url?: string | null
           updated_at?: string | null
+          usage_count?: number | null
         }
         Relationships: [
           {
@@ -545,10 +648,16 @@ export type Database = {
       }
       design_variables: {
         Row: {
+          archetype: string | null
           borders: Json | null
           colors: Json | null
           created_at: string | null
+          customColors: Json | null
+          effects: Json | null
+          gradients: Json | null
           id: string
+          layout: Json | null
+          motion: Json | null
           shadows: Json | null
           site_id: string
           spacing: Json | null
@@ -556,10 +665,16 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          archetype?: string | null
           borders?: Json | null
           colors?: Json | null
           created_at?: string | null
+          customColors?: Json | null
+          effects?: Json | null
+          gradients?: Json | null
           id?: string
+          layout?: Json | null
+          motion?: Json | null
           shadows?: Json | null
           site_id: string
           spacing?: Json | null
@@ -567,10 +682,16 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          archetype?: string | null
           borders?: Json | null
           colors?: Json | null
           created_at?: string | null
+          customColors?: Json | null
+          effects?: Json | null
+          gradients?: Json | null
           id?: string
+          layout?: Json | null
+          motion?: Json | null
           shadows?: Json | null
           site_id?: string
           spacing?: Json | null
@@ -782,40 +903,50 @@ export type Database = {
         Row: {
           created_at: string | null
           data: Json
-          form_name: string | null
+          form_id: string
           id: string
-          ip_address: unknown
+          is_read: boolean | null
+          is_spam: boolean | null
+          metadata: Json | null
           page_id: string | null
-          referrer: string | null
           site_id: string
-          status: string | null
-          user_agent: string | null
+          wp_synced: boolean | null
+          wp_synced_at: string | null
         }
         Insert: {
           created_at?: string | null
           data: Json
-          form_name?: string | null
+          form_id: string
           id?: string
-          ip_address?: unknown
+          is_read?: boolean | null
+          is_spam?: boolean | null
+          metadata?: Json | null
           page_id?: string | null
-          referrer?: string | null
           site_id: string
-          status?: string | null
-          user_agent?: string | null
+          wp_synced?: boolean | null
+          wp_synced_at?: string | null
         }
         Update: {
           created_at?: string | null
           data?: Json
-          form_name?: string | null
+          form_id?: string
           id?: string
-          ip_address?: unknown
+          is_read?: boolean | null
+          is_spam?: boolean | null
+          metadata?: Json | null
           page_id?: string | null
-          referrer?: string | null
           site_id?: string
-          status?: string | null
-          user_agent?: string | null
+          wp_synced?: boolean | null
+          wp_synced_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "form_submissions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "form_submissions_page_id_fkey"
             columns: ["page_id"]
@@ -825,6 +956,152 @@ export type Database = {
           },
           {
             foreignKeyName: "form_submissions_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menu_items: {
+        Row: {
+          anchor: string | null
+          content_type_slug: string | null
+          created_at: string | null
+          css_classes: string | null
+          description: string | null
+          entry_id: string | null
+          external_url: string | null
+          icon: string | null
+          id: string
+          image_url: string | null
+          label: string
+          link_type: string
+          menu_id: string
+          page_id: string | null
+          parent_id: string | null
+          position: number | null
+          target: string | null
+          term_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          anchor?: string | null
+          content_type_slug?: string | null
+          created_at?: string | null
+          css_classes?: string | null
+          description?: string | null
+          entry_id?: string | null
+          external_url?: string | null
+          icon?: string | null
+          id?: string
+          image_url?: string | null
+          label: string
+          link_type?: string
+          menu_id: string
+          page_id?: string | null
+          parent_id?: string | null
+          position?: number | null
+          target?: string | null
+          term_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          anchor?: string | null
+          content_type_slug?: string | null
+          created_at?: string | null
+          css_classes?: string | null
+          description?: string | null
+          entry_id?: string | null
+          external_url?: string | null
+          icon?: string | null
+          id?: string
+          image_url?: string | null
+          label?: string
+          link_type?: string
+          menu_id?: string
+          page_id?: string | null
+          parent_id?: string | null
+          position?: number | null
+          target?: string | null
+          term_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_items_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_menu_id_fkey"
+            columns: ["menu_id"]
+            isOneToOne: false
+            referencedRelation: "menus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_term_id_fkey"
+            columns: ["term_id"]
+            isOneToOne: false
+            referencedRelation: "terms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menus: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          position: string | null
+          settings: Json | null
+          site_id: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          position?: string | null
+          settings?: Json | null
+          site_id: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          position?: string | null
+          settings?: Json | null
+          site_id?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menus_site_id_fkey"
             columns: ["site_id"]
             isOneToOne: false
             referencedRelation: "sites"
@@ -869,6 +1146,11 @@ export type Database = {
         Row: {
           content: Json
           created_at: string | null
+          custom_css: string | null
+          custom_footer_id: string | null
+          custom_header_id: string | null
+          hide_footer: boolean | null
+          hide_header: boolean | null
           html_content: string | null
           id: string
           is_home: boolean | null
@@ -885,6 +1167,11 @@ export type Database = {
         Insert: {
           content?: Json
           created_at?: string | null
+          custom_css?: string | null
+          custom_footer_id?: string | null
+          custom_header_id?: string | null
+          hide_footer?: boolean | null
+          hide_header?: boolean | null
           html_content?: string | null
           id?: string
           is_home?: boolean | null
@@ -901,6 +1188,11 @@ export type Database = {
         Update: {
           content?: Json
           created_at?: string | null
+          custom_css?: string | null
+          custom_footer_id?: string | null
+          custom_header_id?: string | null
+          hide_footer?: boolean | null
+          hide_header?: boolean | null
           html_content?: string | null
           id?: string
           is_home?: boolean | null
@@ -915,6 +1207,20 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pages_custom_footer_id_fkey"
+            columns: ["custom_footer_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pages_custom_header_id_fkey"
+            columns: ["custom_header_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pages_site_id_fkey"
             columns: ["site_id"]
@@ -1021,6 +1327,311 @@ export type Database = {
           },
         ]
       }
+      share_comments: {
+        Row: {
+          author_email: string | null
+          author_name: string
+          content: string
+          created_at: string | null
+          element_selector: string | null
+          id: string
+          offset_x: number | null
+          offset_y: number | null
+          page_id: string | null
+          position_x: number
+          position_y: number
+          share_link_id: string
+          status: string | null
+        }
+        Insert: {
+          author_email?: string | null
+          author_name: string
+          content: string
+          created_at?: string | null
+          element_selector?: string | null
+          id?: string
+          offset_x?: number | null
+          offset_y?: number | null
+          page_id?: string | null
+          position_x: number
+          position_y: number
+          share_link_id: string
+          status?: string | null
+        }
+        Update: {
+          author_email?: string | null
+          author_name?: string
+          content?: string
+          created_at?: string | null
+          element_selector?: string | null
+          id?: string
+          offset_x?: number | null
+          offset_y?: number | null
+          page_id?: string | null
+          position_x?: number
+          position_y?: number
+          share_link_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_comments_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_comments_share_link_id_fkey"
+            columns: ["share_link_id"]
+            isOneToOne: false
+            referencedRelation: "share_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      share_links: {
+        Row: {
+          allow_comments: boolean | null
+          created_at: string | null
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          page_id: string | null
+          password_hash: string | null
+          site_id: string
+          token: string
+          view_count: number | null
+        }
+        Insert: {
+          allow_comments?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          page_id?: string | null
+          password_hash?: string | null
+          site_id: string
+          token: string
+          view_count?: number | null
+        }
+        Update: {
+          allow_comments?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          page_id?: string | null
+          password_hash?: string | null
+          site_id?: string
+          token?: string
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_links_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_links_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_design_system: {
+        Row: {
+          archetyp: string | null
+          badge: string
+          body_text: string
+          button_cta: string
+          button_ghost: string
+          button_link: string
+          button_primary: string
+          button_secondary: string
+          card: string
+          card_hover: string
+          checkbox: string
+          container: string
+          created_at: string | null
+          divider: string
+          generated_at: string | null
+          heading_1: string
+          heading_2: string
+          heading_3: string
+          heading_4: string
+          icon_wrapper: string
+          id: string
+          image_wrapper: string
+          input: string
+          label: string
+          link_style: string
+          overlay: string
+          section_padding: string
+          select_field: string
+          site_id: string
+          small_text: string
+          textarea: string
+          updated_at: string | null
+        }
+        Insert: {
+          archetyp?: string | null
+          badge?: string
+          body_text?: string
+          button_cta?: string
+          button_ghost?: string
+          button_link?: string
+          button_primary?: string
+          button_secondary?: string
+          card?: string
+          card_hover?: string
+          checkbox?: string
+          container?: string
+          created_at?: string | null
+          divider?: string
+          generated_at?: string | null
+          heading_1?: string
+          heading_2?: string
+          heading_3?: string
+          heading_4?: string
+          icon_wrapper?: string
+          id?: string
+          image_wrapper?: string
+          input?: string
+          label?: string
+          link_style?: string
+          overlay?: string
+          section_padding?: string
+          select_field?: string
+          site_id: string
+          small_text?: string
+          textarea?: string
+          updated_at?: string | null
+        }
+        Update: {
+          archetyp?: string | null
+          badge?: string
+          body_text?: string
+          button_cta?: string
+          button_ghost?: string
+          button_link?: string
+          button_primary?: string
+          button_secondary?: string
+          card?: string
+          card_hover?: string
+          checkbox?: string
+          container?: string
+          created_at?: string | null
+          divider?: string
+          generated_at?: string | null
+          heading_1?: string
+          heading_2?: string
+          heading_3?: string
+          heading_4?: string
+          icon_wrapper?: string
+          id?: string
+          image_wrapper?: string
+          input?: string
+          label?: string
+          link_style?: string
+          overlay?: string
+          section_padding?: string
+          select_field?: string
+          site_id?: string
+          small_text?: string
+          textarea?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_design_system_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: true
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_images: {
+        Row: {
+          alt_text: string | null
+          created_at: string | null
+          file_size: number | null
+          filename: string
+          folder: string | null
+          height: number | null
+          id: string
+          mime_type: string | null
+          original_filename: string | null
+          public_url: string
+          site_id: string
+          storage_path: string
+          tags: string[] | null
+          updated_at: string | null
+          width: number | null
+          wp_attachment_id: number | null
+          wp_url: string | null
+        }
+        Insert: {
+          alt_text?: string | null
+          created_at?: string | null
+          file_size?: number | null
+          filename: string
+          folder?: string | null
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          public_url: string
+          site_id: string
+          storage_path: string
+          tags?: string[] | null
+          updated_at?: string | null
+          width?: number | null
+          wp_attachment_id?: number | null
+          wp_url?: string | null
+        }
+        Update: {
+          alt_text?: string | null
+          created_at?: string | null
+          file_size?: number | null
+          filename?: string
+          folder?: string | null
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          public_url?: string
+          site_id?: string
+          storage_path?: string
+          tags?: string[] | null
+          updated_at?: string | null
+          width?: number | null
+          wp_attachment_id?: number | null
+          wp_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_images_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sites: {
         Row: {
           created_at: string | null
@@ -1038,7 +1649,6 @@ export type Database = {
           og_image_url: string | null
           organization_id: string
           published_at: string | null
-          robots_txt: string | null
           seo: Json | null
           seo_settings: Json | null
           settings: Json | null
@@ -1065,7 +1675,6 @@ export type Database = {
           og_image_url?: string | null
           organization_id: string
           published_at?: string | null
-          robots_txt?: string | null
           seo?: Json | null
           seo_settings?: Json | null
           settings?: Json | null
@@ -1092,7 +1701,6 @@ export type Database = {
           og_image_url?: string | null
           organization_id?: string
           published_at?: string | null
-          robots_txt?: string | null
           seo?: Json | null
           seo_settings?: Json | null
           settings?: Json | null
@@ -1174,8 +1782,50 @@ export type Database = {
           },
         ]
       }
+      template_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          site_id: string | null
+          slug: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          site_id?: string | null
+          slug: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          site_id?: string | null
+          slug?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_categories_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       templates: {
         Row: {
+          category: string | null
           conditions: Json | null
           created_at: string | null
           description: string | null
@@ -1185,10 +1835,13 @@ export type Database = {
           name: string
           priority: number | null
           site_id: string
+          tags: string[] | null
+          thumbnail_url: string | null
           type: string
           updated_at: string | null
         }
         Insert: {
+          category?: string | null
           conditions?: Json | null
           created_at?: string | null
           description?: string | null
@@ -1198,10 +1851,13 @@ export type Database = {
           name: string
           priority?: number | null
           site_id: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
           type: string
           updated_at?: string | null
         }
         Update: {
+          category?: string | null
           conditions?: Json | null
           created_at?: string | null
           description?: string | null
@@ -1211,6 +1867,8 @@ export type Database = {
           name?: string
           priority?: number | null
           site_id?: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
           type?: string
           updated_at?: string | null
         }
@@ -1411,6 +2069,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_menu_item: {
+        Args: {
+          p_anchor?: string
+          p_content_type_slug?: string
+          p_description?: string
+          p_external_url?: string
+          p_icon?: string
+          p_label: string
+          p_link_type?: string
+          p_menu_id: string
+          p_page_id?: string
+          p_parent_id?: string
+          p_position?: number
+          p_target?: string
+        }
+        Returns: string
+      }
       check_api_rate_limit: {
         Args: { target_api_key_id: string }
         Returns: boolean
@@ -1424,6 +2099,30 @@ export type Database = {
         Args: { target_site_id: string }
         Returns: string
       }
+      create_global_component: {
+        Args: {
+          p_category?: string
+          p_css?: string
+          p_description?: string
+          p_html: string
+          p_js?: string
+          p_name: string
+          p_position?: string
+          p_set_as_site_default?: boolean
+          p_site_id: string
+        }
+        Returns: string
+      }
+      create_menu: {
+        Args: {
+          p_description?: string
+          p_name: string
+          p_position?: string
+          p_site_id: string
+          p_slug: string
+        }
+        Returns: string
+      }
       delete_site_cascade: {
         Args: { target_site_id: string }
         Returns: undefined
@@ -1434,6 +2133,10 @@ export type Database = {
           new_slug: string
           source_content_type_id: string
         }
+        Returns: string
+      }
+      duplicate_menu: {
+        Args: { p_menu_id: string; p_new_name: string; p_new_slug: string }
         Returns: string
       }
       duplicate_page: {
@@ -1471,6 +2174,29 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_component_library: {
+        Args: { p_site_id: string }
+        Returns: {
+          auto_include: boolean
+          category: string
+          component_position: string
+          created_at: string
+          css: string
+          description: string
+          html: string
+          id: string
+          is_global: boolean
+          js: string
+          name: string
+          thumbnail_url: string
+          updated_at: string
+          usage_count: number
+        }[]
+      }
+      get_component_usage_count: {
+        Args: { p_component_id: string }
+        Returns: number
+      }
       get_content_type_fields: {
         Args: { target_content_type_id: string }
         Returns: {
@@ -1503,6 +2229,30 @@ export type Database = {
         Args: { target_content_type_id: string }
         Returns: number
       }
+      get_form_stats: { Args: { p_form_id: string }; Returns: Json }
+      get_menu_with_items: { Args: { p_menu_id: string }; Returns: Json }
+      get_page_with_globals: {
+        Args: { p_page_id: string }
+        Returns: {
+          footer_css: string
+          footer_html: string
+          footer_id: string
+          footer_js: string
+          header_css: string
+          header_html: string
+          header_id: string
+          header_js: string
+          hide_footer: boolean
+          hide_header: boolean
+          page_custom_css: string
+          page_html: string
+          page_id: string
+          page_name: string
+          page_seo: Json
+          page_settings: Json
+          page_slug: string
+        }[]
+      }
       get_recent_activity: {
         Args: { limit_count?: number; target_site_id: string }
         Returns: {
@@ -1514,7 +2264,26 @@ export type Database = {
           user_name: string
         }[]
       }
+      get_site_menus: {
+        Args: { p_site_id: string }
+        Returns: {
+          created_at: string
+          description: string
+          id: string
+          item_count: number
+          menu_position: string
+          name: string
+          settings: Json
+          slug: string
+          updated_at: string
+        }[]
+      }
       get_site_stats: { Args: { target_site_id: string }; Returns: Json }
+      increment_component_usage: {
+        Args: { component_id: string }
+        Returns: undefined
+      }
+      increment_share_view: { Args: { p_token: string }; Returns: undefined }
       log_activity: {
         Args: {
           p_action: string
@@ -1530,11 +2299,27 @@ export type Database = {
         Args: { submission_ids: string[] }
         Returns: undefined
       }
+      move_menu_item: {
+        Args: {
+          p_item_id: string
+          p_new_parent_id: string
+          p_new_position: number
+        }
+        Returns: undefined
+      }
       publish_entry: { Args: { target_entry_id: string }; Returns: undefined }
       publish_page: { Args: { target_page_id: string }; Returns: undefined }
       publish_site: { Args: { target_site_id: string }; Returns: undefined }
+      render_page_with_components: {
+        Args: { p_page_id: string }
+        Returns: string
+      }
       reorder_fields: {
         Args: { field_order: string[]; target_content_type_id: string }
+        Returns: undefined
+      }
+      reorder_menu_items: {
+        Args: { p_item_order: string[]; p_menu_id: string }
         Returns: undefined
       }
       reorder_pages: {
@@ -1543,6 +2328,14 @@ export type Database = {
       }
       set_home_page: {
         Args: { target_page_id: string; target_site_id: string }
+        Returns: undefined
+      }
+      set_site_global_footer: {
+        Args: { p_component_id: string; p_site_id: string }
+        Returns: undefined
+      }
+      set_site_global_header: {
+        Args: { p_component_id: string; p_site_id: string }
         Returns: undefined
       }
       unpublish_entry: { Args: { target_entry_id: string }; Returns: undefined }
@@ -1688,6 +2481,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

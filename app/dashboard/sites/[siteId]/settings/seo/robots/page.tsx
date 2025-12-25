@@ -40,13 +40,14 @@ export default function RobotsTxtPage() {
 
       const { data: site } = await supabase
         .from('sites')
-        .select('name, robots_txt, integrations')
+        .select('name, seo_settings, integrations')
         .eq('id', siteId)
         .single()
 
       if (site) {
         setSiteName(site.name)
-        setRobotsTxt(site.robots_txt || DEFAULT_ROBOTS_TXT)
+        const seoSettings = site.seo_settings as { robots_txt?: string } | null
+        setRobotsTxt(seoSettings?.robots_txt || DEFAULT_ROBOTS_TXT)
 
         // Get WordPress domain for sitemap URL
         const integrations = site.integrations as { wordpress?: { domain?: string } } | null
@@ -68,9 +69,17 @@ export default function RobotsTxtPage() {
 
     try {
       const supabase = createClient()
+      // Get current seo_settings and merge with new robots_txt
+      const { data: site } = await supabase
+        .from('sites')
+        .select('seo_settings')
+        .eq('id', siteId)
+        .single()
+
+      const currentSettings = (site?.seo_settings || {}) as Record<string, unknown>
       await supabase
         .from('sites')
-        .update({ robots_txt: robotsTxt })
+        .update({ seo_settings: { ...currentSettings, robots_txt: robotsTxt } })
         .eq('id', siteId)
 
       setHasChanges(false)

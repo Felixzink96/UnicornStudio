@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
-import { buildSystemPrompt, type DesignTokensForAI, type GlobalComponentsForAI, type SiteIdentityForAI } from '@/lib/ai/system-prompt'
+import { buildSystemPrompt, type DesignTokensForAI, type GlobalComponentsForAI, type SiteIdentityForAI, type DesignSystemForAI } from '@/lib/ai/system-prompt'
 import { createClient } from '@/lib/supabase/server'
 import { darkenHex } from '@/lib/design/style-extractor'
 // Note: Explicit caching disabled because it's incompatible with tools (Function Calling)
@@ -228,6 +228,8 @@ export async function POST(request: Request) {
 
     // Site Identity for Logo in Header
     let siteIdentity: SiteIdentityForAI | undefined
+    // Design System for consistent styling
+    let designSystem: DesignSystemForAI | undefined
 
     if (siteId) {
       try {
@@ -264,6 +266,48 @@ export async function POST(request: Request) {
         console.log('Could not load global components info:', error)
         // globalComponents stays with defaults (false, false)
       }
+
+      // Load Design System for consistent styling across pages
+      try {
+        const { data: ds } = await supabase
+          .from('site_design_system')
+          .select('*')
+          .eq('site_id', siteId)
+          .single()
+
+        if (ds) {
+          designSystem = {
+            button_primary: ds.button_primary,
+            button_secondary: ds.button_secondary,
+            button_cta: ds.button_cta,
+            button_ghost: ds.button_ghost,
+            button_link: ds.button_link,
+            input: ds.input,
+            textarea: ds.textarea,
+            select_field: ds.select_field,
+            label: ds.label,
+            card: ds.card,
+            card_hover: ds.card_hover,
+            section_padding: ds.section_padding,
+            container: ds.container,
+            heading_1: ds.heading_1,
+            heading_2: ds.heading_2,
+            heading_3: ds.heading_3,
+            heading_4: ds.heading_4,
+            body_text: ds.body_text,
+            small_text: ds.small_text,
+            link_style: ds.link_style,
+            badge: ds.badge,
+            icon_wrapper: ds.icon_wrapper,
+            image_wrapper: ds.image_wrapper,
+            archetyp: ds.archetyp,
+          }
+          console.log('Design System loaded for AI:', ds.archetyp)
+        }
+      } catch (error) {
+        console.log('No Design System found for site:', siteId)
+        // designSystem stays undefined - AI will use default classes
+      }
     }
 
     // Build the system prompt with context and design tokens
@@ -274,6 +318,7 @@ export async function POST(request: Request) {
       designTokens,
       globalComponents,
       siteIdentity,
+      designSystem,
     })
 
     // Determine if page has content

@@ -116,7 +116,8 @@ export async function updateFormConfig(
   const { data, error } = await supabase
     .from('components')
     .update({
-      form_config: formConfig,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      form_config: formConfig as any,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)

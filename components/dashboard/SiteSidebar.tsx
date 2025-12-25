@@ -17,6 +17,7 @@ import {
   Menu,
   Mail,
   Image,
+  SwatchBook,
 } from 'lucide-react'
 import type { ContentType } from '@/types/cms'
 
@@ -45,6 +46,7 @@ export function SiteSidebar({ siteId, siteName, contentTypes }: SiteSidebarProps
   ]
 
   const designNavigation = [
+    { name: 'Design System', href: `/dashboard/sites/${siteId}/design-system`, icon: SwatchBook },
     { name: 'Design-Variablen', href: `/dashboard/sites/${siteId}/variables`, icon: Palette },
     { name: 'SEO-Einstellungen', href: `/dashboard/sites/${siteId}/settings/seo`, icon: Search },
     { name: 'Einstellungen', href: `/dashboard/sites/${siteId}/settings`, icon: Settings },

@@ -328,74 +328,98 @@ Wenn <article> eine Hintergrundfarbe hat, werden sie trotzdem verdeckt.
 <div class="fixed inset-0 pointer-events-none z-[100] opacity-[0.07] bg-noise"></div>
 
 <!-- Artikel: KEINE Hintergrundfarbe! -->
-<article class="relative text-[var(--color-neutral-foreground)]">
+<article class="relative text-foreground">
 \`\`\`
+
+### PFLICHT CSS FÜR CUSTOM KLASSEN (im css-Feld!):
+
+**⚠️ REGEL: KEINE externen URLs! NUR inline data:image/svg+xml verwenden!**
+
+\`\`\`css
+/* Noise Texture Overlay */
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Aurora/Gradient Animation */
+@keyframes aurora {
+  0%, 100% { opacity: 0.3; transform: translateY(0) scale(1); }
+  50% { opacity: 0.5; transform: translateY(-20px) scale(1.05); }
+}
+.animate-aurora {
+  animation: aurora 8s ease-in-out infinite;
+}
+
+/* Glass Panel Effect */
+.glass-panel {
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* Scan Beam Effect */
+@keyframes scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+.scan-beam {
+  animation: scan 3s linear infinite;
+}
+\`\`\`
+
+⚠️ WICHTIG: Diese EXAKTEN Definitionen verwenden! Keine externen URLs!
 
 ### FALSCH:
 \`\`\`html
 <!-- ❌ Hintergrund verdeckt Effekte -->
-<article class="bg-[var(--color-neutral-background)] ...">
+<article class="bg-background ...">
 \`\`\`
 
-## CSS-VARIABLEN - ABSOLUT PFLICHT!
+## FARBEN = TAILWIND THEME-KLASSEN (GOLDENE REGEL!)
 
-⛔ VERBOTEN: text-gray-*, bg-gray-*, border-gray-*, text-slate-*, bg-slate-*, etc.
-⛔ KEINE hardcoded Tailwind-Grautöne!
-✅ NUR diese CSS-Variablen verwenden:
+**⛔ NIEMALS arbitrary values für Farben!**
+**⛔ NIEMALS \`[var(...)]\` oder \`[rgb(...)]\` in Klassen!**
 
-### BRAND-FARBEN:
-- var(--color-brand-primary) - Primärfarbe (Buttons, Links, Akzente)
-- var(--color-brand-primary-hover) - Primär Hover
-- var(--color-brand-secondary) - Sekundärfarbe
-- var(--color-brand-accent) - Akzentfarbe
-- var(--color-brand-primary-rgb) - Für Opacity: rgba(var(--color-brand-primary-rgb), 0.5)
+### UTILITY-KLASSEN (PFLICHT!):
 
-### NEUTRALE FARBEN:
-- var(--color-neutral-background) - Seiten-Hintergrund
-- var(--color-neutral-foreground) - Haupttext (statt text-gray-800/900)
-- var(--color-neutral-muted) - Gedämpfter Hintergrund (statt bg-gray-50/100/200)
-- var(--color-neutral-border) - Rahmen (statt border-gray-200/300)
-- var(--color-neutral-foreground-rgb) - Für Opacity: rgba(var(--color-neutral-foreground-rgb), 0.6)
+| Farbe | Klassen | Mit Opacity |
+|-------|---------|-------------|
+| Primär | \`bg-primary\`, \`text-primary\`, \`border-primary\` | \`bg-primary/50\`, \`text-primary/80\` |
+| Primär Hover | \`hover:bg-primary-hover\` | |
+| Sekundär | \`bg-secondary\`, \`text-secondary\` | \`bg-secondary/50\` |
+| Akzent | \`bg-accent\`, \`text-accent\`, \`border-accent\` | \`text-accent/90\` |
+| Hintergrund | \`bg-background\` | |
+| Vordergrund | \`text-foreground\`, \`bg-foreground\` | \`text-foreground/60\` |
+| Gedämpft | \`bg-muted\`, \`text-muted\` | \`bg-muted/50\` |
+| Rahmen | \`border-border\` | \`border-border/50\` |
 
-### SEMANTISCHE FARBEN:
-- var(--color-semantic-success) - Erfolg/Grün
-- var(--color-semantic-warning) - Warnung/Orange
-- var(--color-semantic-error) - Fehler/Rot
-- var(--color-semantic-info) - Info/Blau
+### GRADIENT-KLASSEN:
+\`\`\`html
+<div class="bg-gradient-to-r from-primary/90 via-primary/40 to-transparent">Overlay</div>
+<div class="bg-gradient-to-b from-black/80 to-transparent">Dark Overlay</div>
+\`\`\`
 
 ### TYPOGRAFIE:
-- var(--font-heading) - Überschriften
-- var(--font-body) - Fließtext
-- var(--font-mono) - Code/Monospace
-
-### ABSTÄNDE & RADIEN:
-- var(--radius-sm), var(--radius-default), var(--radius-lg), var(--radius-xl), var(--radius-2xl), var(--radius-full)
-- var(--spacing-section) - Abschnitt-Abstand
-- var(--spacing-container) - Container-Breite
-
-### SCHATTEN:
-- var(--shadow-sm), var(--shadow-md), var(--shadow-lg), var(--shadow-xl)
-
-### TRANSITIONS:
-- var(--transition-fast), var(--transition-normal), var(--transition-slow)
-
-### UTILITY-KLASSEN (ohne var()):
-- bg-primary, bg-secondary, bg-accent, bg-background, bg-muted
-- text-primary, text-secondary, text-accent, text-foreground
-- border-primary, border-secondary, border-border
-- font-heading, font-body, font-mono
+- \`font-heading\` - Überschriften
+- \`font-body\` - Fließtext
+- \`font-mono\` - Code/Monospace
 
 ### BEISPIELE:
-❌ FALSCH: class="text-gray-800 bg-gray-50 border-gray-300"
-✅ RICHTIG: class="text-[var(--color-neutral-foreground)] bg-[var(--color-neutral-muted)] border-[var(--color-neutral-border)]"
 
-❌ FALSCH: class="text-gray-500"
-✅ RICHTIG: class="text-[var(--color-neutral-foreground)]/60" oder class="opacity-60 text-[var(--color-neutral-foreground)]"
+❌ FALSCH: \`class="text-gray-800 bg-gray-50"\`
+✅ RICHTIG: \`class="text-foreground bg-muted"\`
 
-❌ FALSCH: class="bg-gray-900 text-gray-100"
-✅ RICHTIG: class="bg-[var(--color-neutral-foreground)] text-[var(--color-neutral-background)]"
+❌ FALSCH: \`class="text-gray-500"\`
+✅ RICHTIG: \`class="text-foreground/60"\`
 
-**Einzige Ausnahme:** text-white/text-black NUR für Kontrast auf farbigen var()-Hintergründen.
+❌ FALSCH: \`class="bg-[var(--color-brand-primary)]"\`
+✅ RICHTIG: \`class="bg-primary"\`
+
+❌ FALSCH: \`class="from-[var(--color-brand-primary)]/90"\`
+✅ RICHTIG: \`class="from-primary/90"\`
+
+**Ausnahme:** \`text-white\`/\`text-black\` für Kontrast auf farbigen Hintergründen erlaubt.
 
 ${designTokens ? `Site-Farben: Primary ${designTokens.primaryColor}, Secondary ${designTokens.secondaryColor}, Fonts: ${designTokens.fontHeading}/${designTokens.fontBody}` : ''}
 

@@ -254,6 +254,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       // Flatten CSS Nesting and @layer for browser compatibility
       tailwindCSS = await flattenCSS(tailwindCSS)
 
+      // REMOVE the problematic :not(#\#) reset rules that override our colors
+      // These set border: 0 solid which uses currentColor and breaks our border-border
+      // Also remove any rules that reset colors to currentColor or inherit
+      tailwindCSS = stripTailwindResets(tailwindCSS)
+
       // Get keyframes separately - they need to be added AFTER Tailwind compilation
       if (tailwindConfig?.keyframes) {
         keyframesCSS = buildKeyframesCSS(tailwindConfig.keyframes)
@@ -504,6 +509,35 @@ async function flattenCSS(css: string): Promise<string> {
     // Return original CSS if transformation fails
     return css
   }
+}
+
+/**
+ * Strip Tailwind v4's problematic reset rules that use :not(#\#) specificity hacks
+ * These rules set `border: 0 solid` which uses currentColor and overrides our border colors
+ */
+function stripTailwindResets(css: string): string {
+  // Remove the entire :not(#\#) reset block that sets border: 0 solid
+  // This regex matches rules like:
+  // :not(#\#):not(#\#), :not(#\#):not(#\#)::after, ... { border: 0px solid; ... }
+
+  // First, remove complete rule blocks with :not(#\#) that contain border resets
+  let result = css.replace(
+    /:not\(#\\#\)[^{]*\{[^}]*border:\s*0[^;]*solid[^}]*\}/g,
+    ''
+  )
+
+  // Also remove any standalone :not(#\#) rules that might interfere
+  // Keep only the ones that don't set colors or borders
+  result = result.replace(
+    /:not\(#\\#\)[^{]*:not\(#\\#\)[^{]*\{[^}]*(border-color|color)[^}]*\}/g,
+    ''
+  )
+
+  // Remove empty lines left behind
+  result = result.replace(/\n\s*\n\s*\n/g, '\n\n')
+
+  console.log(`[CSS Export] Stripped Tailwind resets: ${css.length} -> ${result.length} bytes`)
+  return result
 }
 
 /**

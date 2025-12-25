@@ -290,31 +290,31 @@ ${gradients?.primary?.enabled ? `
 .bg-current { background-color: currentColor; }
 .bg-inherit { background-color: inherit; }
 
-/* Border Colors */
-.border-primary { border-color: var(--color-brand-primary); }
-.border-secondary { border-color: var(--color-brand-secondary); }
-.border-accent { border-color: var(--color-brand-accent); }
-.border-border { border-color: var(--color-neutral-border); }
-.border-foreground { border-color: var(--color-neutral-foreground); }
-.border-muted { border-color: var(--color-neutral-muted); }
-.border-white { border-color: #ffffff; }
-.border-black { border-color: #000000; }
-.border-transparent { border-color: transparent; }
-.border-current { border-color: currentColor; }
+/* Border Colors - !important needed to override Tailwind reset's implicit currentColor */
+.border-primary { border-color: var(--color-brand-primary) !important; }
+.border-secondary { border-color: var(--color-brand-secondary) !important; }
+.border-accent { border-color: var(--color-brand-accent) !important; }
+.border-border { border-color: var(--color-neutral-border) !important; }
+.border-foreground { border-color: var(--color-neutral-foreground) !important; }
+.border-muted { border-color: var(--color-neutral-muted) !important; }
+.border-white { border-color: #ffffff !important; }
+.border-black { border-color: #000000 !important; }
+.border-transparent { border-color: transparent !important; }
+.border-current { border-color: currentColor !important; }
 
-/* Border with Opacity */
-.border-primary\\/50 { border-color: rgba(${hexToRgb(brandPrimary)}, 0.5); }
-.border-primary\\/30 { border-color: rgba(${hexToRgb(brandPrimary)}, 0.3); }
-.border-primary\\/20 { border-color: rgba(${hexToRgb(brandPrimary)}, 0.2); }
+/* Border with Opacity - !important needed to override Tailwind reset */
+.border-primary\\/50 { border-color: rgba(${hexToRgb(brandPrimary)}, 0.5) !important; }
+.border-primary\\/30 { border-color: rgba(${hexToRgb(brandPrimary)}, 0.3) !important; }
+.border-primary\\/20 { border-color: rgba(${hexToRgb(brandPrimary)}, 0.2) !important; }
 
-.border-accent\\/50 { border-color: rgba(${hexToRgb(brandAccent)}, 0.5); }
-.border-accent\\/30 { border-color: rgba(${hexToRgb(brandAccent)}, 0.3); }
+.border-accent\\/50 { border-color: rgba(${hexToRgb(brandAccent)}, 0.5) !important; }
+.border-accent\\/30 { border-color: rgba(${hexToRgb(brandAccent)}, 0.3) !important; }
 
-.border-border\\/50 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.5); }
-.border-border\\/30 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.3); }
+.border-border\\/50 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.5) !important; }
+.border-border\\/30 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.3) !important; }
 
-.border-foreground\\/20 { border-color: rgba(${hexToRgb(neutralForeground)}, 0.2); }
-.border-foreground\\/10 { border-color: rgba(${hexToRgb(neutralForeground)}, 0.1); }
+.border-foreground\\/20 { border-color: rgba(${hexToRgb(neutralForeground)}, 0.2) !important; }
+.border-foreground\\/10 { border-color: rgba(${hexToRgb(neutralForeground)}, 0.1) !important; }
 
 /* Font Families */
 .font-heading { font-family: var(--font-heading); }
@@ -438,19 +438,19 @@ ${gradients?.primary?.enabled ? `
 .hover\\:bg-black:hover { background-color: #000000; }
 .hover\\:bg-transparent:hover { background-color: transparent; }
 
-/* Hover Text */
-.hover\\:text-primary:hover { color: var(--color-brand-primary); }
-.hover\\:text-secondary:hover { color: var(--color-brand-secondary); }
-.hover\\:text-accent:hover { color: var(--color-brand-accent); }
-.hover\\:text-foreground:hover { color: var(--color-neutral-foreground); }
-.hover\\:text-muted:hover { color: var(--color-neutral-muted); }
-.hover\\:text-white:hover { color: #ffffff; }
-.hover\\:text-black:hover { color: #000000; }
+/* Hover Text - !important to override Tailwind specificity */
+.hover\\:text-primary:hover { color: var(--color-brand-primary) !important; }
+.hover\\:text-secondary:hover { color: var(--color-brand-secondary) !important; }
+.hover\\:text-accent:hover { color: var(--color-brand-accent) !important; }
+.hover\\:text-foreground:hover { color: var(--color-neutral-foreground) !important; }
+.hover\\:text-muted:hover { color: var(--color-neutral-muted) !important; }
+.hover\\:text-white:hover { color: #ffffff !important; }
+.hover\\:text-black:hover { color: #000000 !important; }
 
-/* Hover Border */
-.hover\\:border-primary:hover { border-color: var(--color-brand-primary); }
-.hover\\:border-secondary:hover { border-color: var(--color-brand-secondary); }
-.hover\\:border-accent:hover { border-color: var(--color-brand-accent); }
+/* Hover Border - !important to override Tailwind specificity */
+.hover\\:border-primary:hover { border-color: var(--color-brand-primary) !important; }
+.hover\\:border-secondary:hover { border-color: var(--color-brand-secondary) !important; }
+.hover\\:border-accent:hover { border-color: var(--color-brand-accent) !important; }
 
 /* Hover Shadow */
 .hover\\:shadow-sm:hover { box-shadow: var(--shadow-sm); }

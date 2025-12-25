@@ -83,18 +83,6 @@ a {
   text-decoration: inherit;
 }
 
-/* Reset heading styles - prevent browser bold defaults */
-h1, h2, h3, h4, h5, h6 {
-  font-size: inherit;
-  font-weight: inherit;
-  margin: 0;
-}
-
-/* Reset paragraph and list margins */
-p, ul, ol, dl, blockquote, figure, pre {
-  margin: 0;
-}
-
 button, input, optgroup, select, textarea {
   font-family: inherit;
   font-size: 100%;
@@ -322,8 +310,14 @@ ${gradients?.primary?.enabled ? `
 .border-accent\\/50 { border-color: rgba(${hexToRgb(brandAccent)}, 0.5) !important; }
 .border-accent\\/30 { border-color: rgba(${hexToRgb(brandAccent)}, 0.3) !important; }
 
-.border-border\\/50 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.5) !important; }
+.border-border\\/10 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.1) !important; }
+.border-border\\/20 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.2) !important; }
 .border-border\\/30 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.3) !important; }
+.border-border\\/40 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.4) !important; }
+.border-border\\/50 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.5) !important; }
+.border-border\\/60 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.6) !important; }
+.border-border\\/70 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.7) !important; }
+.border-border\\/80 { border-color: rgba(${hexToRgb(neutralBorder)}, 0.8) !important; }
 
 .border-foreground\\/20 { border-color: rgba(${hexToRgb(neutralForeground)}, 0.2) !important; }
 .border-foreground\\/10 { border-color: rgba(${hexToRgb(neutralForeground)}, 0.1) !important; }

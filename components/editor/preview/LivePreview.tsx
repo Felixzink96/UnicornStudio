@@ -252,6 +252,73 @@ export function LivePreview() {
       }
     }
 
+    // Auto-inject GSAP init script if GSAP is present but no init script exists
+    const hasGsapInit = htmlWithComponents.includes('gsap.registerPlugin') ||
+                        htmlWithComponents.includes('ScrollTrigger.create') ||
+                        htmlWithComponents.includes('gsap.fromTo') ||
+                        htmlWithComponents.includes('gsap.to(')
+    const hasRevealElements = htmlWithComponents.includes('data-reveal') ||
+                              htmlWithComponents.includes('opacity-0') ||
+                              htmlWithComponents.includes('translate-y-')
+
+    if (!hasGsapInit && hasRevealElements) {
+      const gsapInitScript = `
+  <script>
+    // Auto-injected GSAP Init Script
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof gsap !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
+        gsap.registerPlugin(ScrollTrigger);
+
+        // Animate elements with data-reveal attribute
+        document.querySelectorAll('[data-reveal]').forEach(function(el) {
+          var direction = el.getAttribute('data-reveal') || 'up';
+          var fromVars = { opacity: 0, duration: 0.8, ease: 'power2.out' };
+
+          if (direction === 'up') fromVars.y = 40;
+          else if (direction === 'down') fromVars.y = -40;
+          else if (direction === 'left') fromVars.x = 40;
+          else if (direction === 'right') fromVars.x = -40;
+
+          gsap.from(el, {
+            ...fromVars,
+            scrollTrigger: {
+              trigger: el,
+              start: 'top 85%',
+              toggleActions: 'play none none none'
+            }
+          });
+        });
+
+        // Animate elements with opacity-0 class (reveal on scroll)
+        document.querySelectorAll('.opacity-0:not([x-cloak])').forEach(function(el, index) {
+          // Skip if inside Alpine.js controlled element
+          if (el.closest('[x-data]') && !el.hasAttribute('data-reveal')) return;
+
+          gsap.to(el, {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            delay: index * 0.1,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: el,
+              start: 'top 90%',
+              toggleActions: 'play none none none'
+            }
+          });
+        });
+      }
+    });
+  </script>`
+
+      if (htmlWithComponents.includes('</body>')) {
+        htmlWithComponents = htmlWithComponents.replace(
+          '</body>',
+          `${gsapInitScript}\n</body>`
+        )
+      }
+    }
+
     // Then replace {{menu:slug}} placeholders with actual menu HTML
     if (menus && menus.length > 0) {
       return injectMenusIntoHtml(htmlWithComponents, menus, {

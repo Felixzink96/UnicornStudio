@@ -283,6 +283,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // The fallback was causing selector bugs (space before :hover) and duplicate CSS.
 
     // 12. Combine everything
+    // IMPORTANT: Design Tokens CSS must come AFTER Tailwind CSS!
+    // Tailwind v4 uses @layer utilities, and CSS outside @layer always wins.
+    // This allows our hover:bg-primary etc. to override Tailwind's .bg-white
     const fullCSS = `
 /* ==================================================================
    UNICORN STUDIO - Generated CSS
@@ -302,13 +305,9 @@ ${fontFaceCSS ? `/* ------------------------------------------------------------
 ${fontFaceCSS}
 ` : ''}
 /* ----------------------------------------------------------------
-   CSS VARIABLES (Design Tokens)
-   ---------------------------------------------------------------- */
-${cssVariables}
-
-/* ----------------------------------------------------------------
    TAILWIND UTILITIES (includes custom @theme colors/fonts)
    Compiled from ${extractedClasses.size} classes found in your content
+   Note: These are in @layer utilities, so Design Tokens below will override
    ---------------------------------------------------------------- */
 ${tailwindCSS}
 
@@ -330,9 +329,15 @@ ${cmsComponentsCSS}
 /* ----------------------------------------------------------------
    PAGE CUSTOM CSS (extracted from AI-generated pages)
    Includes: @keyframes, custom utility classes, page-specific styles
-   Design tokens are NOT duplicated here (managed via CSS Variables above)
    ---------------------------------------------------------------- */
 ${pagesCustomCSS}
+
+/* ----------------------------------------------------------------
+   DESIGN TOKENS (CSS Variables + Utility Classes)
+   IMPORTANT: This comes LAST and is NOT in @layer, so it always wins
+   over Tailwind's layered utilities (hover states, colors, etc.)
+   ---------------------------------------------------------------- */
+${cssVariables}
 `.trim()
 
     // 9. Return CSS with proper headers

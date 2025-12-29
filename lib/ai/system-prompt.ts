@@ -164,6 +164,28 @@ STYLING: Tailwind CSS mit Theme-Klassen
 LOGIC: Alpine.js für Interaktionen (x-data, @click, x-show)
 MOTION: GSAP + ScrollTrigger für Animationen
 
+FARBEN - WICHTIG:
+Verwende NUR diese vordefinierten Farbklassen. NIEMALS eigene .bg-primary etc. im <style> definieren!
+
+Hintergründe: bg-primary, bg-secondary, bg-accent, bg-background, bg-foreground, bg-muted
+Text: text-primary, text-secondary, text-accent, text-foreground, text-background, text-muted
+Border: border-primary, border-secondary, border-accent, border-border, border-muted
+Hover: hover:bg-primary, hover:bg-secondary, hover:bg-accent, hover:bg-foreground, hover:bg-muted, hover:bg-white, hover:bg-black
+Hover Text: hover:text-primary, hover:text-white, hover:text-foreground, hover:text-background
+Opacity: bg-primary/10, bg-primary/20, bg-black/50, text-foreground/70, etc.
+
+Die Farben werden über CSS Variables (--color-brand-primary etc.) gesteuert, die automatisch geladen werden.
+Du musst sie NICHT selbst definieren! Unicorn Studio stellt sie bereit.
+
+FALSCH (NIEMALS machen):
+<style>
+  .bg-primary { background-color: #0D9488; }  /* NEIN! */
+  .text-primary { color: #0D9488; }  /* NEIN! */
+</style>
+
+RICHTIG:
+Einfach die Klassen verwenden: class="bg-primary hover:bg-primary-hover text-white"
+
 CDN-Links:
 - Tailwind: https://cdn.tailwindcss.com
 - Alpine.js: https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js

@@ -474,6 +474,22 @@ Neuen Header erstellen:
 - Mobile Menu mit Alpine.js
 - {{menu:header-menu}} Placeholder
 - Nach HTML: COMPONENT_TYPE: header, COMPONENT_NAME: [Name]
+
+WICHTIG - Notification Banners:
+Wenn ein Notification/Announcement Banner gewünscht ist (z.B. "Grippe-Impfung verfügbar"):
+- Banner MUSS INNERHALB des <header> Elements sein (als erstes Kind)
+- NIEMALS außerhalb/vor dem Header platzieren!
+- Bei fixed Header wird alles außerhalb vom Header überdeckt
+
+Richtig:
+<header id="header" class="fixed top-0 ...">
+  <div class="bg-primary text-white py-2 text-center">Banner</div>
+  <nav>...</nav>
+</header>
+
+Falsch:
+<div class="bg-primary ...">Banner</div>  <!-- WIRD VOM HEADER ÜBERDECKT! -->
+<header id="header" class="fixed top-0 ...">...</header>
 </global-components>
 
 <export-system>

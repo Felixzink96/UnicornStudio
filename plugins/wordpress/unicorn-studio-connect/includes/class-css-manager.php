@@ -167,8 +167,9 @@ HTACCESS;
         // Remove comments
         $css = preg_replace('!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $css);
 
-        // Remove single-line comments (// style) that may exist
-        $css = preg_replace('/\/\/.*$/m', '', $css);
+        // REMOVED: Single-line comment removal was breaking URLs like http://
+        // CSS doesn't actually support // comments, so this was unnecessary
+        // and was breaking data-URLs containing http://
 
         // Remove whitespace around special characters
         $css = preg_replace('/\s*([{}:;,>+~])\s*/', '$1', $css);

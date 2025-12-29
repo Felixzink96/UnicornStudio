@@ -59,11 +59,16 @@ class Unicorn_Studio_Font_Manager {
             return;
         }
 
-        // Generate and output @font-face CSS
+        // Generate @font-face CSS
         $font_face_css = $this->generate_font_face_css($fonts);
 
         if (!empty($font_face_css)) {
-            wp_add_inline_style('unicorn-studio-styles', $font_face_css);
+            // Output directly in <head> as inline style
+            // Note: wp_add_inline_style() doesn't work here because the main
+            // stylesheet uses preload for performance (not wp_enqueue_style)
+            add_action('wp_head', function() use ($font_face_css) {
+                echo "<style id=\"unicorn-studio-fonts\">\n" . $font_face_css . "</style>\n";
+            }, 4); // Priority 4 = before the main CSS preload (priority 5)
         }
     }
 

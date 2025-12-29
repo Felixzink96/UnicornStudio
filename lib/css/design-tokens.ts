@@ -531,15 +531,15 @@ ${gradients?.primary?.enabled ? `
    HOVER STATES
    ============================================ */
 
-/* Hover Background */
-.hover\\:bg-primary:hover { background-color: var(--color-brand-primary); }
-.hover\\:bg-primary-hover:hover { background-color: var(--color-brand-primary-hover); }
-.hover\\:bg-secondary:hover { background-color: var(--color-brand-secondary); }
-.hover\\:bg-accent:hover { background-color: var(--color-brand-accent); }
-.hover\\:bg-muted:hover { background-color: var(--color-neutral-muted); }
-.hover\\:bg-white:hover { background-color: #ffffff; }
-.hover\\:bg-black:hover { background-color: #000000; }
-.hover\\:bg-transparent:hover { background-color: transparent; }
+/* Hover Background - !important to override Tailwind specificity */
+.hover\\:bg-primary:hover { background-color: var(--color-brand-primary) !important; }
+.hover\\:bg-primary-hover:hover { background-color: var(--color-brand-primary-hover) !important; }
+.hover\\:bg-secondary:hover { background-color: var(--color-brand-secondary) !important; }
+.hover\\:bg-accent:hover { background-color: var(--color-brand-accent) !important; }
+.hover\\:bg-muted:hover { background-color: var(--color-neutral-muted) !important; }
+.hover\\:bg-white:hover { background-color: #ffffff !important; }
+.hover\\:bg-black:hover { background-color: #000000 !important; }
+.hover\\:bg-transparent:hover { background-color: transparent !important; }
 
 /* Hover Text - !important to override Tailwind specificity */
 .hover\\:text-primary:hover { color: var(--color-brand-primary) !important; }
@@ -571,8 +571,8 @@ ${gradients?.primary?.enabled ? `
 .group:hover .group-hover\\:text-accent { color: var(--color-brand-accent); }
 .group:hover .group-hover\\:text-foreground { color: var(--color-neutral-foreground); }
 .group:hover .group-hover\\:text-white { color: #ffffff; }
-.group:hover .group-hover\\:bg-primary { background-color: var(--color-brand-primary); }
-.group:hover .group-hover\\:bg-accent { background-color: var(--color-brand-accent); }
+.group:hover .group-hover\\:bg-primary { background-color: var(--color-brand-primary) !important; }
+.group:hover .group-hover\\:bg-accent { background-color: var(--color-brand-accent) !important; }
 .group:hover .group-hover\\:opacity-100 { opacity: 1; }
 .group:hover .group-hover\\:opacity-0 { opacity: 0; }
 .group:hover .group-hover\\:visible { visibility: visible; }
@@ -590,9 +590,9 @@ ${gradients?.primary?.enabled ? `
 .focus-visible\\:outline-none:focus-visible { outline: 2px solid transparent; outline-offset: 2px; }
 .focus-visible\\:ring-2:focus-visible { box-shadow: 0 0 0 2px var(--color-brand-primary); }
 
-/* Focus Background */
-.focus\\:bg-primary:focus { background-color: var(--color-brand-primary); }
-.focus\\:bg-muted:focus { background-color: var(--color-neutral-muted); }
+/* Focus Background - !important to override Tailwind specificity */
+.focus\\:bg-primary:focus { background-color: var(--color-brand-primary) !important; }
+.focus\\:bg-muted:focus { background-color: var(--color-neutral-muted) !important; }
 
 /* Focus Border */
 .focus\\:border-primary:focus { border-color: var(--color-brand-primary); }

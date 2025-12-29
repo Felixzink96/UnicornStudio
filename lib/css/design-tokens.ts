@@ -2153,65 +2153,7 @@ ${gradients?.primary?.enabled ? `
   clip: auto;
   white-space: normal;
 }
-`
-
-  // Add !important to all utility class properties to override Tailwind v4's high specificity
-  return addImportantToUtilities(css.trim())
-}
-
-/**
- * Adds !important to all utility class properties
- * This is necessary because Tailwind v4 uses extremely high specificity selectors
- * and our Design Token classes need to override them
- */
-function addImportantToUtilities(css: string): string {
-  // Match property declarations inside class rules and add !important
-  // But skip :root, *, html, body, @keyframes, and already !important rules
-
-  let inKeyframes = false
-  let inRoot = false
-
-  const lines = css.split('\n')
-  const result = lines.map(line => {
-    // Track @keyframes blocks
-    if (line.includes('@keyframes')) {
-      inKeyframes = true
-      return line
-    }
-    if (inKeyframes && line.trim() === '}' && !line.startsWith(' ')) {
-      inKeyframes = false
-      return line
-    }
-
-    // Track :root, *, html, body blocks
-    if (line.match(/^(:root|^\*|\*,|html|body|html,|button)/)) {
-      inRoot = true
-      return line
-    }
-    if (inRoot && line.trim() === '}') {
-      inRoot = false
-      return line
-    }
-
-    // Skip if in keyframes or root-level selectors
-    if (inKeyframes || inRoot) {
-      return line
-    }
-
-    // Skip if already has !important or is a selector/comment
-    if (line.includes('!important') || line.trim().startsWith('.') || line.trim().startsWith('/') || line.trim().startsWith('@') || line.trim() === '}' || line.trim() === '{') {
-      return line
-    }
-
-    // Add !important to property declarations (lines with : and ;)
-    if (line.includes(':') && line.includes(';')) {
-      return line.replace(/;/g, ' !important;')
-    }
-
-    return line
-  })
-
-  return result.join('\n')
+`.trim()
 }
 
 /**

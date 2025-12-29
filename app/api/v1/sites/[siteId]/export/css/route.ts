@@ -516,12 +516,17 @@ async function flattenCSS(css: string): Promise<string> {
 }
 
 /**
- * Don't modify Tailwind CSS - it causes too many issues.
- * Instead, we'll boost our design tokens' specificity to match Tailwind's.
+ * Remove Tailwind v4's specificity hack :not(#\#) from all selectors.
+ * This reduces specificity so our Design Tokens (which come after Tailwind)
+ * can override using normal CSS cascade rules.
  */
 function stripTailwindResets(css: string): string {
-  // No modifications - return as-is
-  return css
+  // Remove the :not(#\#) specificity hack pattern
+  // Tailwind v4 uses :not(#\#):not(#\#):not(#\#):not(#\#) for high specificity
+  const result = css.replace(/:not\(#\\#\)/g, '')
+
+  console.log(`[CSS Export] Removed specificity hacks: ${css.length} -> ${result.length} bytes`)
+  return result
 }
 
 /**

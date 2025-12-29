@@ -2155,47 +2155,63 @@ ${gradients?.primary?.enabled ? `
 }
 `
 
-  // Add Tailwind v4 specificity hack to all utility classes
-  // This ensures our Design Token classes override Tailwind's @layer utilities
-  return addSpecificityHack(css.trim())
+  // Add !important to all utility class properties to override Tailwind v4's high specificity
+  return addImportantToUtilities(css.trim())
 }
 
 /**
- * Adds Tailwind v4's specificity hack :not(#\#) to all utility class selectors
- * This is necessary because Tailwind v4 uses :not(#\#):not(#\#):not(#\#):not(#\#)
- * for extremely high specificity, and our Design Token classes need to match or exceed it
+ * Adds !important to all utility class properties
+ * This is necessary because Tailwind v4 uses extremely high specificity selectors
+ * and our Design Token classes need to override them
  */
-function addSpecificityHack(css: string): string {
-  const specificityHack = ':not(#\\#):not(#\\#):not(#\\#):not(#\\#):not(#\\#)'
+function addImportantToUtilities(css: string): string {
+  // Match property declarations inside class rules and add !important
+  // But skip :root, *, html, body, @keyframes, and already !important rules
 
-  // Split CSS into rules (handling nested structures like @media, @keyframes)
-  const result = css.replace(
-    // Match class selectors that aren't already hacked and not in special contexts
-    // This regex matches: .classname { ... } or .classname:pseudo { ... }
-    /^(\.[a-zA-Z0-9_\-\\/:.\[\]]+)(\s*\{)/gm,
-    (match, selector, brace) => {
-      // Skip if already has specificity hack
-      if (selector.includes(':not(#')) {
-        return match
-      }
-      // Skip :root and other special selectors
-      if (selector === ':root' || selector.startsWith('*') || selector.startsWith('html') || selector.startsWith('body')) {
-        return match
-      }
+  let inKeyframes = false
+  let inRoot = false
 
-      // For pseudo-class selectors like .hover\:bg-primary:hover
-      // Insert the hack before the pseudo-class
-      const pseudoMatch = selector.match(/^(\.[\w\-\\/:.\[\]]+)(:(hover|focus|active|disabled|first-child|last-child|focus-within|focus-visible))$/)
-      if (pseudoMatch) {
-        return `${pseudoMatch[1]}${specificityHack}${pseudoMatch[2]}${brace}`
-      }
-
-      // For regular class selectors
-      return `${selector}${specificityHack}${brace}`
+  const lines = css.split('\n')
+  const result = lines.map(line => {
+    // Track @keyframes blocks
+    if (line.includes('@keyframes')) {
+      inKeyframes = true
+      return line
     }
-  )
+    if (inKeyframes && line.trim() === '}' && !line.startsWith(' ')) {
+      inKeyframes = false
+      return line
+    }
 
-  return result
+    // Track :root, *, html, body blocks
+    if (line.match(/^(:root|^\*|\*,|html|body|html,|button)/)) {
+      inRoot = true
+      return line
+    }
+    if (inRoot && line.trim() === '}') {
+      inRoot = false
+      return line
+    }
+
+    // Skip if in keyframes or root-level selectors
+    if (inKeyframes || inRoot) {
+      return line
+    }
+
+    // Skip if already has !important or is a selector/comment
+    if (line.includes('!important') || line.trim().startsWith('.') || line.trim().startsWith('/') || line.trim().startsWith('@') || line.trim() === '}' || line.trim() === '{') {
+      return line
+    }
+
+    // Add !important to property declarations (lines with : and ;)
+    if (line.includes(':') && line.includes(';')) {
+      return line.replace(/;/g, ' !important;')
+    }
+
+    return line
+  })
+
+  return result.join('\n')
 }
 
 /**

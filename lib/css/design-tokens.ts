@@ -661,6 +661,8 @@ ${gradients?.primary?.enabled ? `
 .hover\\:bg-primary-hover:hover { background-color: var(--color-brand-primary-hover) !important; }
 .hover\\:bg-secondary:hover { background-color: var(--color-brand-secondary) !important; }
 .hover\\:bg-accent:hover { background-color: var(--color-brand-accent) !important; }
+.hover\\:bg-foreground:hover { background-color: var(--color-neutral-foreground) !important; }
+.hover\\:bg-background:hover { background-color: var(--color-neutral-background) !important; }
 .hover\\:bg-muted:hover { background-color: var(--color-neutral-muted) !important; }
 .hover\\:bg-white:hover { background-color: #ffffff !important; }
 .hover\\:bg-black:hover { background-color: #000000 !important; }
@@ -671,6 +673,7 @@ ${gradients?.primary?.enabled ? `
 .hover\\:text-secondary:hover { color: var(--color-brand-secondary) !important; }
 .hover\\:text-accent:hover { color: var(--color-brand-accent) !important; }
 .hover\\:text-foreground:hover { color: var(--color-neutral-foreground) !important; }
+.hover\\:text-background:hover { color: var(--color-neutral-background) !important; }
 .hover\\:text-muted:hover { color: var(--color-neutral-muted) !important; }
 .hover\\:text-white:hover { color: #ffffff !important; }
 .hover\\:text-black:hover { color: #000000 !important; }
@@ -679,6 +682,12 @@ ${gradients?.primary?.enabled ? `
 .hover\\:border-primary:hover { border-color: var(--color-brand-primary) !important; }
 .hover\\:border-secondary:hover { border-color: var(--color-brand-secondary) !important; }
 .hover\\:border-accent:hover { border-color: var(--color-brand-accent) !important; }
+.hover\\:border-foreground:hover { border-color: var(--color-neutral-foreground) !important; }
+.hover\\:border-background:hover { border-color: var(--color-neutral-background) !important; }
+.hover\\:border-muted:hover { border-color: var(--color-neutral-muted) !important; }
+.hover\\:border-white:hover { border-color: #ffffff !important; }
+.hover\\:border-black:hover { border-color: #000000 !important; }
+.hover\\:border-transparent:hover { border-color: transparent !important; }
 
 /* Hover Shadow */
 .hover\\:shadow-sm:hover { box-shadow: var(--shadow-sm); }

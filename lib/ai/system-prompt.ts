@@ -197,13 +197,31 @@ Definiere IMMER die Farben in tailwind.config, damit Tailwind alle Varianten gen
 
 Dann funktionieren automatisch: bg-primary, hover:bg-primary, text-primary, hover:text-primary, border-primary, etc.
 
-WICHTIG - NUR DIESE FARBNAMEN VERWENDEN:
+STANDARD-FARBEN (immer verfügbar):
 - primary, secondary, accent, background, foreground, muted, border
-- NIEMALS eigene Farbnamen erfinden (z.B. warmNeutral, darkGray, etc.)!
-- Für zusätzliche Farbtöne: Opacity nutzen (bg-primary/10, bg-muted/50, etc.)
 
-NIEMALS Farb-Utility-Klassen (.bg-primary, .text-primary) manuell im <style> definieren!
-Nur CSS Variables (:root) und spezielle Effekte (Gradienten, Animationen) im <style>.
+CUSTOM-FARBEN (optional):
+Du darfst zusätzliche Farben definieren (z.B. warmNeutral, darkGray, highlight).
+Diese müssen in tailwind.config definiert werden für Unicorn Studio:
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          primary: '#...',
+          warmNeutral: '#F9F8F6',  // Custom Farbe
+        }
+      }
+    }
+  }
+</script>
+
+Für WordPress: Custom-Farben werden automatisch aus den Site-Setup Design Variables exportiert.
+Der Benutzer sollte Custom-Farben im Site Setup unter "Weitere Farben" hinzufügen.
+
+WICHTIG: KEINE Utility-Klassen (.bg-primary, .text-warmNeutral) im <style> definieren!
+Die werden automatisch von Unicorn Studio generiert.
 
 MOBILE MENU - WICHTIG:
 - KEIN x-teleport verwenden! Das funktioniert nicht in WordPress.

@@ -6,6 +6,41 @@
 import type { DesignVariables } from '@/types/cms'
 
 /**
+ * Generiert CSS für Custom-Farben aus den Design Variables
+ */
+function generateCustomColorsCSS(customColors: Record<string, string>): string {
+  if (!customColors || Object.keys(customColors).length === 0) {
+    return ''
+  }
+
+  let css = ''
+
+  // CSS Variables
+  css += ':root {\n'
+  for (const [name, value] of Object.entries(customColors)) {
+    css += `  --color-custom-${name}: ${value};\n`
+  }
+  css += '}\n\n'
+
+  // Utility Classes for each custom color
+  for (const [name, value] of Object.entries(customColors)) {
+    const escapedName = name.replace(/([A-Z])/g, '-$1').toLowerCase() // camelCase to kebab-case
+    css += `/* Custom Color: ${name} */\n`
+    css += `.bg-${name} { background-color: var(--color-custom-${name}) !important; }\n`
+    css += `.text-${name} { color: var(--color-custom-${name}) !important; }\n`
+    css += `.border-${name} { border-color: var(--color-custom-${name}) !important; }\n`
+    css += `.hover\\:bg-${name}:hover { background-color: var(--color-custom-${name}) !important; }\n`
+    css += `.hover\\:text-${name}:hover { color: var(--color-custom-${name}) !important; }\n`
+    css += `.hover\\:border-${name}:hover { border-color: var(--color-custom-${name}) !important; }\n`
+    css += `.focus\\:bg-${name}:focus { background-color: var(--color-custom-${name}) !important; }\n`
+    css += `.focus\\:border-${name}:focus { border-color: var(--color-custom-${name}) !important; }\n`
+    css += `\n`
+  }
+
+  return css
+}
+
+/**
  * Generiert das CSS für alle Design-Variablen
  * Wird im Editor und beim Export verwendet
  */
@@ -15,6 +50,7 @@ export function generateDesignTokensCSS(designVars: DesignVariables | null): str
   const spacing = designVars?.spacing
   const borders = designVars?.borders
   const gradients = designVars?.gradients
+  const customColors = designVars?.customColors || {}
 
   // Default values
   const brandPrimary = colors?.brand?.primary || '#3b82f6'
@@ -2361,6 +2397,11 @@ ${gradients?.primary?.enabled ? `
   clip: auto;
   white-space: normal;
 }
+
+/* ============================================
+   CUSTOM COLORS (from Site Setup)
+   ============================================ */
+${generateCustomColorsCSS(customColors)}
 `.trim()
 }
 

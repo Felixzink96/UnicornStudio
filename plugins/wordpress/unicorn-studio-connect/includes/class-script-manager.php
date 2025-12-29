@@ -215,22 +215,8 @@ class Unicorn_Studio_Script_Manager {
                     );
                 });
 
-                // Parallax effects - optimized with scrub smoothing
-                document.querySelectorAll('[data-parallax]').forEach(function(el) {
-                    var speed = parseFloat(el.getAttribute('data-parallax')) || 0.3;
-
-                    gsap.to(el, {
-                        yPercent: speed * 20,
-                        ease: 'none',
-                        force3D: true,
-                        scrollTrigger: {
-                            trigger: el.parentElement || el,
-                            start: 'top bottom',
-                            end: 'bottom top',
-                            scrub: 0.5
-                        }
-                    });
-                });
+                // Parallax effects removed - if AI wants parallax, it should generate the JS itself
+                // This prevents unwanted transforms on hero images
 
                 // Horizontal scroll sections
                 document.querySelectorAll('[data-horizontal-scroll]').forEach(function(section) {

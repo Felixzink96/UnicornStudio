@@ -52,6 +52,11 @@ export function generateDesignTokensCSS(designVars: DesignVariables | null): str
    BASE RESET (Tailwind Preflight)
    ============================================ */
 
+/* Alpine.js x-cloak - hide elements until Alpine initializes */
+[x-cloak] {
+  display: none !important;
+}
+
 *, ::before, ::after {
   box-sizing: border-box;
   border-width: 0;
@@ -177,6 +182,7 @@ img, video {
   --radius-full: 9999px;
 
   /* Spacing */
+  --spacing: 0.25rem;  /* Tailwind v4 base spacing unit */
   --spacing-section: ${spacing?.scale?.section || '5rem'};
   --spacing-container: ${spacing?.containerWidths?.xl || '1280px'};
 
@@ -589,29 +595,29 @@ ${gradients?.primary?.enabled ? `
    HOVER STATES
    ============================================ */
 
-/* Hover Background - Design Tokens come after Tailwind, no !important needed */
-.hover\\:bg-primary:hover { background-color: var(--color-brand-primary); }
-.hover\\:bg-primary-hover:hover { background-color: var(--color-brand-primary-hover); }
-.hover\\:bg-secondary:hover { background-color: var(--color-brand-secondary); }
-.hover\\:bg-accent:hover { background-color: var(--color-brand-accent); }
-.hover\\:bg-muted:hover { background-color: var(--color-neutral-muted); }
-.hover\\:bg-white:hover { background-color: #ffffff; }
-.hover\\:bg-black:hover { background-color: #000000; }
-.hover\\:bg-transparent:hover { background-color: transparent; }
+/* Hover Background */
+.hover\\:bg-primary:hover { background-color: var(--color-brand-primary) !important; }
+.hover\\:bg-primary-hover:hover { background-color: var(--color-brand-primary-hover) !important; }
+.hover\\:bg-secondary:hover { background-color: var(--color-brand-secondary) !important; }
+.hover\\:bg-accent:hover { background-color: var(--color-brand-accent) !important; }
+.hover\\:bg-muted:hover { background-color: var(--color-neutral-muted) !important; }
+.hover\\:bg-white:hover { background-color: #ffffff !important; }
+.hover\\:bg-black:hover { background-color: #000000 !important; }
+.hover\\:bg-transparent:hover { background-color: transparent !important; }
 
-/* Hover Text - Design Tokens come after Tailwind, no !important needed */
-.hover\\:text-primary:hover { color: var(--color-brand-primary); }
-.hover\\:text-secondary:hover { color: var(--color-brand-secondary); }
-.hover\\:text-accent:hover { color: var(--color-brand-accent); }
-.hover\\:text-foreground:hover { color: var(--color-neutral-foreground); }
-.hover\\:text-muted:hover { color: var(--color-neutral-muted); }
-.hover\\:text-white:hover { color: #ffffff; }
-.hover\\:text-black:hover { color: #000000; }
+/* Hover Text */
+.hover\\:text-primary:hover { color: var(--color-brand-primary) !important; }
+.hover\\:text-secondary:hover { color: var(--color-brand-secondary) !important; }
+.hover\\:text-accent:hover { color: var(--color-brand-accent) !important; }
+.hover\\:text-foreground:hover { color: var(--color-neutral-foreground) !important; }
+.hover\\:text-muted:hover { color: var(--color-neutral-muted) !important; }
+.hover\\:text-white:hover { color: #ffffff !important; }
+.hover\\:text-black:hover { color: #000000 !important; }
 
 /* Hover Border */
-.hover\\:border-primary:hover { border-color: var(--color-brand-primary); }
-.hover\\:border-secondary:hover { border-color: var(--color-brand-secondary); }
-.hover\\:border-accent:hover { border-color: var(--color-brand-accent); }
+.hover\\:border-primary:hover { border-color: var(--color-brand-primary) !important; }
+.hover\\:border-secondary:hover { border-color: var(--color-brand-secondary) !important; }
+.hover\\:border-accent:hover { border-color: var(--color-brand-accent) !important; }
 
 /* Hover Shadow */
 .hover\\:shadow-sm:hover { box-shadow: var(--shadow-sm); }

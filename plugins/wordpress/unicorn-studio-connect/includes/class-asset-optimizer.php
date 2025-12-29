@@ -98,6 +98,7 @@ class Unicorn_Studio_Asset_Optimizer {
      */
     private $keep_styles = [
         'unicorn-studio-*',
+        'unicorn-*',
         'admin-bar',
         'dashicons',
     ];
@@ -107,6 +108,7 @@ class Unicorn_Studio_Asset_Optimizer {
      */
     private $keep_scripts = [
         'unicorn-studio-*',
+        'unicorn-*',
         'admin-bar',
     ];
 

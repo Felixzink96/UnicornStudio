@@ -939,10 +939,17 @@ function extractMobileMenu(html: string): { mobileMenuHtml: string; headerWithou
  * Fix mobile menu classes to ensure proper positioning
  */
 function fixMobileMenuClasses(menuHtml: string): string {
+  // First, add x-cloak attribute to prevent FOUC (Flash of Unstyled Content)
+  // This ensures menu is hidden until Alpine.js initializes
+  let result = menuHtml.replace(
+    /(<div[^>]*x-show=["']mobileOpen["'])([^>]*>)/i,
+    '$1 x-cloak$2'
+  )
+
   // Match the opening div tag with class attribute
   const classRegex = /(<div[^>]*x-show=["']mobileOpen["'][^>]*)(class=["'])([^"']*)(["'][^>]*>)/i
 
-  return menuHtml.replace(classRegex, (match, beforeClass, classAttr, classes, afterClass) => {
+  return result.replace(classRegex, (match, beforeClass, classAttr, classes, afterClass) => {
     // Remove problematic positioning classes
     let newClasses = classes
       .replace(/\b(relative|absolute)\b/g, '')

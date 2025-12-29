@@ -291,7 +291,7 @@ ${prompt}
       ],
       config: {
         systemInstruction: systemPrompt,
-        temperature: 0.7,
+        temperature: 1.0,
         maxOutputTokens: 8192,
         thinkingConfig: {
           thinkingBudget: 8192,

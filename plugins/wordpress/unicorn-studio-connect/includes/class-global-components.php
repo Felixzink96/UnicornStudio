@@ -221,6 +221,9 @@ class Unicorn_Studio_Global_Components {
         // Auto-fix: Add x-data if header has Alpine directives but missing x-data
         $html = self::ensure_alpine_xdata($html, 'header');
 
+        // Auto-fix: Add x-cloak to mobile menu to prevent FOUC (Flash of Unstyled Content)
+        $html = self::ensure_mobile_menu_cloak($html);
+
         // Optimize images (srcset, lazy loading)
         $html = self::optimize_component_images($html);
 
@@ -263,14 +266,15 @@ class Unicorn_Studio_Global_Components {
             // If x-data is missing, add it
             if (strpos($tag_content, 'x-data') === false) {
                 // Determine what x-data to add based on directives found
-                $xdata = '{ mobileMenuOpen: false }';
+                // Use 'mobileOpen' to match AI-generated code
+                $xdata = '{ mobileOpen: false }';
 
                 // Check for other common patterns
                 if (strpos($html, 'dropdownOpen') !== false) {
-                    $xdata = '{ mobileMenuOpen: false, dropdownOpen: false }';
+                    $xdata = '{ mobileOpen: false, dropdownOpen: false }';
                 }
                 if (strpos($html, 'searchOpen') !== false) {
-                    $xdata = '{ mobileMenuOpen: false, searchOpen: false }';
+                    $xdata = '{ mobileOpen: false, searchOpen: false }';
                 }
 
                 $html = preg_replace(
@@ -282,6 +286,36 @@ class Unicorn_Studio_Global_Components {
 
                 if (defined('WP_DEBUG') && WP_DEBUG) {
                     error_log('[Unicorn] Auto-added x-data to ' . $tag);
+                }
+            }
+        }
+
+        return $html;
+    }
+
+    /**
+     * Ensure mobile menu has x-cloak to prevent Flash of Unstyled Content
+     *
+     * x-cloak hides elements until Alpine.js initializes and removes the attribute.
+     * This prevents the mobile menu from briefly appearing on page load.
+     *
+     * @param string $html The HTML content
+     * @return string Fixed HTML
+     */
+    private static function ensure_mobile_menu_cloak(string $html): string {
+        // Find x-show="mobileOpen" divs that don't have x-cloak
+        if (strpos($html, 'x-show="mobileOpen"') !== false || strpos($html, "x-show='mobileOpen'") !== false) {
+            // Add x-cloak if not present
+            if (strpos($html, 'x-cloak') === false) {
+                // Add x-cloak to the mobile menu div
+                $html = preg_replace(
+                    '/(<div[^>]*x-show=["\']mobileOpen["\'])([^>]*>)/i',
+                    '$1 x-cloak$2',
+                    $html
+                );
+
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('[Unicorn] Auto-added x-cloak to mobile menu');
                 }
             }
         }
@@ -526,15 +560,16 @@ class Unicorn_Studio_Global_Components {
      * Output collected CSS in wp_head
      */
     public function output_collected_css() {
-        // Only output component-specific CSS if it exists
-        // All Tailwind classes (including arbitrary values) are compiled by Tailwind v4
-        // and included in the main styles.css - no duplicate generation needed
-        if (empty(self::$collected_css)) {
-            return;
-        }
+        // Always output x-cloak CSS to prevent FOUC with Alpine.js
+        // This must be present before Alpine initializes
+        $base_css = "/* Alpine.js x-cloak - prevent FOUC */\n[x-cloak] { display: none !important; }\n";
 
         echo "\n<style id=\"unicorn-global-components-css\">\n";
-        echo self::$collected_css;
+        echo $base_css;
+        // Also output component-specific CSS if it exists
+        if (!empty(self::$collected_css)) {
+            echo self::$collected_css;
+        }
         echo "\n</style>\n";
     }
 

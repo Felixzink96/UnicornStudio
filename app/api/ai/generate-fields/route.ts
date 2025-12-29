@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       ],
       config: {
         systemInstruction: FIELD_GENERATION_SYSTEM_PROMPT,
-        temperature: 0.7,
+        temperature: 1.0,
         maxOutputTokens: 4096,
         thinkingConfig: {
           thinkingBudget: 4096,

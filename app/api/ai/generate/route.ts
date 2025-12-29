@@ -598,7 +598,7 @@ Verwende OPERATION: modify mit dem passenden SELECTOR.`
 
     // Build generation config
     const config: Record<string, unknown> = {
-      temperature: 1.8,       // Kreativ aber noch konsistent
+      temperature: 1.2,       // Kreativ aber konsistent
       topP: 0.92,             // Etwas fokussierter für bessere Konsistenz
       topK: 64,               // Größere Token-Auswahl für Kreativität
       maxOutputTokens: 65536, // Maximum für große Seiten

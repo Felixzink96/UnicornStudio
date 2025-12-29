@@ -924,6 +924,61 @@ export function SiteSetupModal({
                 </div>
               </div>
 
+              {/* Custom Colors */}
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Weitere Farben</label>
+                  <button
+                    onClick={() => {
+                      const name = prompt('Farbname (z.B. warmNeutral, darkGray):')
+                      if (name && name.trim()) {
+                        setCustomColors(prev => ({ ...prev, [name.trim()]: '#f5f5f0' }))
+                      }
+                    }}
+                    className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Hinzufügen
+                  </button>
+                </div>
+                {Object.keys(customColors).length > 0 ? (
+                  <div className="grid grid-cols-4 gap-3">
+                    {Object.entries(customColors).map(([name, color], i) => (
+                      <div key={name} className="relative group">
+                        <div
+                          className="h-12 rounded-lg border-2 border-zinc-200 dark:border-zinc-700 cursor-pointer relative overflow-hidden hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors"
+                          style={{ backgroundColor: color }}
+                        >
+                          <input
+                            type="color"
+                            value={color}
+                            onChange={(e) => setCustomColors(prev => ({ ...prev, [name]: e.target.value }))}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newColors = { ...customColors }
+                            delete newColors[name]
+                            setCustomColors(newColors)
+                          }}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                        <span className="text-[10px] text-zinc-400 mt-1.5 block text-center truncate">{name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500 italic">
+                    Keine weiteren Farben definiert. Klicke auf "Hinzufügen" um Custom Colors zu erstellen.
+                  </p>
+                )}
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2">
+                  Nutzung: bg-[name], text-[name], hover:bg-[name]
+                </p>
+              </div>
+
               {/* Gradient */}
               <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700">
                 <div className="flex items-center justify-between mb-3">

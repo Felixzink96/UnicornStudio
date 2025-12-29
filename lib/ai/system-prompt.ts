@@ -201,24 +201,17 @@ STANDARD-FARBEN (immer verfügbar):
 - primary, secondary, accent, background, foreground, muted, border
 
 CUSTOM-FARBEN (optional):
-Du darfst zusätzliche Farben definieren (z.B. warmNeutral, darkGray, highlight).
-Diese müssen in tailwind.config definiert werden für Unicorn Studio:
+Wenn du zusätzliche Farben brauchst (z.B. warmNeutral, darkGray, highlight), kannst du diese vorschlagen.
+Der Benutzer kann sie dann im Site Setup unter "Weitere Farben" hinzufügen.
 
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          primary: '#...',
-          warmNeutral: '#F9F8F6',  // Custom Farbe
-        }
-      }
-    }
-  }
-</script>
+Wenn Custom Colors im Site Setup definiert sind, stehen automatisch diese Klassen zur Verfügung:
+- bg-[name], text-[name], border-[name]
+- hover:bg-[name], hover:text-[name], hover:border-[name]
 
-Für WordPress: Custom-Farben werden automatisch aus den Site-Setup Design Variables exportiert.
-Der Benutzer sollte Custom-Farben im Site Setup unter "Weitere Farben" hinzufügen.
+Beispiel: Wenn "warmNeutral" im Site Setup definiert ist, kannst du bg-warmNeutral, text-warmNeutral etc. verwenden.
+
+Falls du Custom Colors brauchst, erwähne das in deiner Antwort:
+"Tipp: Für dieses Design empfehle ich die Custom Color 'warmNeutral' (#F9F8F6) im Site Setup hinzuzufügen."
 
 WICHTIG: KEINE Utility-Klassen (.bg-primary, .text-warmNeutral) im <style> definieren!
 Die werden automatisch von Unicorn Studio generiert.

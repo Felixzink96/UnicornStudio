@@ -800,6 +800,242 @@ export function sanitizeHtmlForGlobalComponents(
 }
 
 /**
+ * Fix mobile menu in header HTML to ensure it's robust
+ * Called when saving a header as a global component
+ *
+ * Key transformation: Extract mobile menu from header and make it a SIBLING
+ * This prevents CSS stacking context issues where fixed positioning doesn't work
+ * properly when the element is inside a header with certain CSS properties.
+ *
+ * Before:
+ * <header x-data="{ mobileOpen: false }">
+ *   <nav>...</nav>
+ *   <div x-show="mobileOpen">...</div>
+ * </header>
+ *
+ * After:
+ * <div x-data="{ mobileOpen: false }">
+ *   <header>
+ *     <nav>...</nav>
+ *   </header>
+ *   <div x-show="mobileOpen" class="fixed inset-0 z-50 md:hidden">...</div>
+ * </div>
+ */
+export function fixMobileMenuInHeader(headerHtml: string): string {
+  // Check if there's a mobile menu to extract
+  if (!headerHtml.includes('x-show="mobileOpen"') && !headerHtml.includes("x-show='mobileOpen'")) {
+    console.log('[fixMobileMenu] No mobile menu found, returning original')
+    return headerHtml
+  }
+
+  // Check if header has x-data with mobileOpen
+  const xDataMatch = headerHtml.match(/<header[^>]*x-data=["'](\{[^"']*mobileOpen[^"']*\})["']/i)
+  if (!xDataMatch) {
+    console.log('[fixMobileMenu] Header does not have x-data with mobileOpen, applying simple fix')
+    return applySimpleMobileMenuFix(headerHtml)
+  }
+
+  const xDataValue = xDataMatch[1]
+  console.log('[fixMobileMenu] Found x-data:', xDataValue)
+
+  // Extract the mobile menu element
+  const mobileMenuResult = extractMobileMenu(headerHtml)
+  if (!mobileMenuResult) {
+    console.log('[fixMobileMenu] Could not extract mobile menu, applying simple fix')
+    return applySimpleMobileMenuFix(headerHtml)
+  }
+
+  const { mobileMenuHtml, headerWithoutMenu } = mobileMenuResult
+
+  // Remove x-data from header tag
+  let cleanHeader = headerWithoutMenu.replace(
+    /(<header[^>]*)\s*x-data=["'][^"']*["']([^>]*>)/i,
+    '$1$2'
+  )
+
+  // Clean up any double spaces in the tag
+  cleanHeader = cleanHeader.replace(/(<header)\s+/i, '$1 ').replace(/\s+>/g, '>')
+
+  // Fix the mobile menu classes
+  const fixedMobileMenu = fixMobileMenuClasses(mobileMenuHtml)
+
+  // Add scroll lock handlers
+  const mobileMenuWithScrollLock = addScrollLockHandlers(fixedMobileMenu)
+
+  // Wrap everything in a div with x-data
+  const result = `<div x-data="${xDataValue}">
+  ${cleanHeader}
+  ${mobileMenuWithScrollLock}
+</div>`
+
+  console.log('[fixMobileMenu] Successfully extracted mobile menu as sibling')
+  return result
+}
+
+/**
+ * Extract mobile menu element from header HTML
+ * Returns the mobile menu HTML and the header without the menu
+ */
+function extractMobileMenu(html: string): { mobileMenuHtml: string; headerWithoutMenu: string } | null {
+  // Find the start of mobile menu div
+  const menuStartRegex = /<div[^>]*x-show=["']mobileOpen["'][^>]*>/gi
+  const match = menuStartRegex.exec(html)
+
+  if (!match) {
+    return null
+  }
+
+  const startIndex = match.index
+  const openingTag = match[0]
+
+  // Count div tags to find the matching closing tag
+  let depth = 1
+  let currentIndex = startIndex + openingTag.length
+  const htmlLength = html.length
+
+  while (depth > 0 && currentIndex < htmlLength) {
+    // Look for next div opening or closing tag
+    const nextOpen = html.indexOf('<div', currentIndex)
+    const nextClose = html.indexOf('</div>', currentIndex)
+
+    if (nextClose === -1) {
+      // No closing tag found, malformed HTML
+      return null
+    }
+
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      // Found an opening tag before closing tag
+      depth++
+      currentIndex = nextOpen + 4 // Move past '<div'
+    } else {
+      // Found a closing tag
+      depth--
+      currentIndex = nextClose + 6 // Move past '</div>'
+    }
+  }
+
+  if (depth !== 0) {
+    return null
+  }
+
+  const endIndex = currentIndex
+  const mobileMenuHtml = html.substring(startIndex, endIndex)
+
+  // Remove the mobile menu from header
+  const headerWithoutMenu = html.substring(0, startIndex) + html.substring(endIndex)
+
+  // Clean up any empty lines or extra whitespace
+  const cleanedHeader = headerWithoutMenu
+    .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .replace(/>\s+</g, '>\n<')
+
+  return {
+    mobileMenuHtml,
+    headerWithoutMenu: cleanedHeader
+  }
+}
+
+/**
+ * Fix mobile menu classes to ensure proper positioning
+ */
+function fixMobileMenuClasses(menuHtml: string): string {
+  // Match the opening div tag with class attribute
+  const classRegex = /(<div[^>]*x-show=["']mobileOpen["'][^>]*)(class=["'])([^"']*)(["'][^>]*>)/i
+
+  return menuHtml.replace(classRegex, (match, beforeClass, classAttr, classes, afterClass) => {
+    // Remove problematic positioning classes
+    let newClasses = classes
+      .replace(/\b(relative|absolute)\b/g, '')
+      .replace(/\b(top-\d+|bottom-\d+|left-\d+|right-\d+|top-\[.*?\]|bottom-\[.*?\]|left-\[.*?\]|right-\[.*?\])\b/g, '')
+      .replace(/\b(inset-\d+|inset-x-\d+|inset-y-\d+)\b/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    // Add robust positioning classes if not already present
+    if (!newClasses.includes('fixed')) {
+      newClasses = 'fixed ' + newClasses
+    }
+    if (!newClasses.includes('inset-0')) {
+      newClasses = newClasses.replace('fixed', 'fixed inset-0')
+    }
+    if (!newClasses.includes('z-50') && !newClasses.includes('z-[')) {
+      newClasses = newClasses + ' z-50'
+    }
+    if (!newClasses.includes('md:hidden')) {
+      newClasses = newClasses + ' md:hidden'
+    }
+
+    newClasses = newClasses.replace(/\s+/g, ' ').trim()
+
+    console.log('[fixMobileMenu] Fixed classes:', { old: classes, new: newClasses })
+    return `${beforeClass}${classAttr}${newClasses}${afterClass}`
+  })
+}
+
+/**
+ * Add scroll lock handlers to mobile menu toggle buttons
+ */
+function addScrollLockHandlers(html: string): string {
+  let result = html
+
+  // Fix: @click="mobileOpen = true" should also set overflow hidden
+  result = result.replace(
+    /@click=["']mobileOpen\s*=\s*true["']/gi,
+    '@click="mobileOpen = true; document.body.style.overflow = \'hidden\'"'
+  )
+
+  // Fix: @click="mobileOpen = false" should reset overflow
+  result = result.replace(
+    /@click=["']mobileOpen\s*=\s*false["']/gi,
+    '@click="mobileOpen = false; document.body.style.overflow = \'\'"'
+  )
+
+  // Also handle toggle syntax
+  result = result.replace(
+    /@click=["']mobileOpen\s*=\s*!mobileOpen["']/gi,
+    '@click="mobileOpen = !mobileOpen; document.body.style.overflow = mobileOpen ? \'hidden\' : \'\'"'
+  )
+
+  return result
+}
+
+/**
+ * Apply simple fixes without extraction (fallback)
+ * Used when we can't safely extract the mobile menu
+ */
+function applySimpleMobileMenuFix(headerHtml: string): string {
+  let result = headerHtml
+
+  // Fix mobile menu classes
+  const mobileMenuRegex = /(<div[^>]*x-show=["']mobileOpen["'][^>]*)(class=["'])([^"']*)(["'][^>]*>)/gi
+
+  result = result.replace(mobileMenuRegex, (match, beforeClass, classAttr, classes, afterClass) => {
+    if (classes.includes('fixed') && classes.includes('inset-0')) {
+      return match
+    }
+
+    let newClasses = classes
+      .replace(/\b(relative|absolute)\b/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    const robustClasses = 'fixed inset-0 z-50'
+    newClasses = `${robustClasses} ${newClasses}`.replace(/\s+/g, ' ').trim()
+
+    if (!newClasses.includes('md:hidden')) {
+      newClasses += ' md:hidden'
+    }
+
+    return `${beforeClass}${classAttr}${newClasses}${afterClass}`
+  })
+
+  // Add scroll lock handlers
+  result = addScrollLockHandlers(result)
+
+  return result
+}
+
+/**
  * Insert global header and footer into page HTML
  * Used in editor preview to show complete page
  */

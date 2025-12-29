@@ -81,13 +81,13 @@ class Unicorn_Studio_CSS_Manager {
                 $version
             );
 
-            // Add preload link for non-blocking CSS loading
+            // Load CSS with preload hint for faster loading
             add_action('wp_head', function() use ($version) {
                 $css_url = $this->css_url . 'styles.css?ver=' . $version;
-                // Preload the CSS for faster loading
-                echo '<link rel="preload" href="' . esc_url($css_url) . '" as="style" onload="this.onload=null;this.rel=\'stylesheet\'">' . "\n";
-                // Fallback for browsers without JS
-                echo '<noscript><link rel="stylesheet" href="' . esc_url($css_url) . '"></noscript>' . "\n";
+                // Preload hint for early fetch (optional optimization)
+                echo '<link rel="preload" href="' . esc_url($css_url) . '" as="style">' . "\n";
+                // Actually load the stylesheet (reliable method)
+                echo '<link rel="stylesheet" href="' . esc_url($css_url) . '" id="unicorn-studio-styles">' . "\n";
             }, 5);
 
             if ($debug) {

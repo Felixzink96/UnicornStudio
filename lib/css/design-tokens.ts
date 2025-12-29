@@ -47,7 +47,7 @@ export function generateDesignTokensCSS(designVars: DesignVariables | null): str
       : '59, 130, 246'
   }
 
-  return `
+  const css = `
 /* ============================================
    BASE RESET (Tailwind Preflight)
    ============================================ */
@@ -2153,7 +2153,49 @@ ${gradients?.primary?.enabled ? `
   clip: auto;
   white-space: normal;
 }
-`.trim()
+`
+
+  // Add Tailwind v4 specificity hack to all utility classes
+  // This ensures our Design Token classes override Tailwind's @layer utilities
+  return addSpecificityHack(css.trim())
+}
+
+/**
+ * Adds Tailwind v4's specificity hack :not(#\#) to all utility class selectors
+ * This is necessary because Tailwind v4 uses :not(#\#):not(#\#):not(#\#):not(#\#)
+ * for extremely high specificity, and our Design Token classes need to match or exceed it
+ */
+function addSpecificityHack(css: string): string {
+  const specificityHack = ':not(#\\#):not(#\\#):not(#\\#):not(#\\#):not(#\\#)'
+
+  // Split CSS into rules (handling nested structures like @media, @keyframes)
+  const result = css.replace(
+    // Match class selectors that aren't already hacked and not in special contexts
+    // This regex matches: .classname { ... } or .classname:pseudo { ... }
+    /^(\.[a-zA-Z0-9_\-\\/:.\[\]]+)(\s*\{)/gm,
+    (match, selector, brace) => {
+      // Skip if already has specificity hack
+      if (selector.includes(':not(#')) {
+        return match
+      }
+      // Skip :root and other special selectors
+      if (selector === ':root' || selector.startsWith('*') || selector.startsWith('html') || selector.startsWith('body')) {
+        return match
+      }
+
+      // For pseudo-class selectors like .hover\:bg-primary:hover
+      // Insert the hack before the pseudo-class
+      const pseudoMatch = selector.match(/^(\.[\w\-\\/:.\[\]]+)(:(hover|focus|active|disabled|first-child|last-child|focus-within|focus-visible))$/)
+      if (pseudoMatch) {
+        return `${pseudoMatch[1]}${specificityHack}${pseudoMatch[2]}${brace}`
+      }
+
+      // For regular class selectors
+      return `${selector}${specificityHack}${brace}`
+    }
+  )
+
+  return result
 }
 
 /**

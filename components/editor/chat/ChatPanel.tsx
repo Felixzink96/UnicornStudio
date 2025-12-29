@@ -27,7 +27,7 @@ import { createPagesOnly, createHeaderMenu, createFooterMenu, createPagesFromSug
 import { getDesignVariables, updateDesignVariables } from '@/lib/supabase/queries/design-variables'
 import { upsertDesignSystem } from '@/lib/supabase/queries/design-system'
 import { generateDesignSystem } from '@/lib/ai/design-system-generator'
-import { extractGlobalComponents, removeHeaderFooterFromHtml, sanitizeHtmlForGlobalComponents } from '@/lib/ai/html-operations'
+import { extractGlobalComponents, removeHeaderFooterFromHtml, sanitizeHtmlForGlobalComponents, fixMobileMenuInHeader } from '@/lib/ai/html-operations'
 import type { DetectedComponent } from '@/types/global-components'
 import { ReferenceDropdown, ReferenceBadge } from './ReferenceDropdown'
 import type { Reference, ReferenceGroup, SelectedReference, ReferenceDataForAI } from '@/lib/references/reference-types'
@@ -2227,11 +2227,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
           // Save header as global component - use HTML passed directly from dialog
           if (headerName && headerHtml) {
-            console.log('[GlobalComponents] Saving header...', headerHtml.substring(0, 100))
+            // Fix mobile menu: extract from header and make it a sibling
+            // This prevents CSS stacking context issues
+            const fixedHeaderHtml = fixMobileMenuInHeader(headerHtml)
+            console.log('[GlobalComponents] Saving header (mobile menu fixed)...', fixedHeaderHtml.substring(0, 100))
             const result = await saveGlobalComponent({
               siteId,
               name: headerName,
-              html: headerHtml,
+              html: fixedHeaderHtml,
               position: 'header',
               setAsDefault: true,
             })

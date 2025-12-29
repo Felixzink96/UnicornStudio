@@ -227,22 +227,83 @@ ${gradients?.primary?.enabled ? `
 /* Background with Opacity */
 .bg-primary\\/5 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.05); }
 .bg-primary\\/10 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.1); }
+.bg-primary\\/15 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.15); }
 .bg-primary\\/20 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.2); }
+.bg-primary\\/25 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.25); }
 .bg-primary\\/30 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.3); }
+.bg-primary\\/35 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.35); }
 .bg-primary\\/40 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.4); }
+.bg-primary\\/45 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.45); }
 .bg-primary\\/50 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.5); }
+.bg-primary\\/55 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.55); }
 .bg-primary\\/60 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.6); }
+.bg-primary\\/65 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.65); }
 .bg-primary\\/70 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.7); }
+.bg-primary\\/75 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.75); }
 .bg-primary\\/80 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.8); }
+.bg-primary\\/85 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.85); }
 .bg-primary\\/90 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.9); }
+.bg-primary\\/95 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.95); }
 
+.bg-accent\\/5 { background-color: rgba(${hexToRgb(brandAccent)}, 0.05); }
 .bg-accent\\/10 { background-color: rgba(${hexToRgb(brandAccent)}, 0.1); }
+.bg-accent\\/15 { background-color: rgba(${hexToRgb(brandAccent)}, 0.15); }
 .bg-accent\\/20 { background-color: rgba(${hexToRgb(brandAccent)}, 0.2); }
+.bg-accent\\/25 { background-color: rgba(${hexToRgb(brandAccent)}, 0.25); }
+.bg-accent\\/30 { background-color: rgba(${hexToRgb(brandAccent)}, 0.3); }
+.bg-accent\\/35 { background-color: rgba(${hexToRgb(brandAccent)}, 0.35); }
+.bg-accent\\/40 { background-color: rgba(${hexToRgb(brandAccent)}, 0.4); }
+.bg-accent\\/45 { background-color: rgba(${hexToRgb(brandAccent)}, 0.45); }
 .bg-accent\\/50 { background-color: rgba(${hexToRgb(brandAccent)}, 0.5); }
+.bg-accent\\/55 { background-color: rgba(${hexToRgb(brandAccent)}, 0.55); }
+.bg-accent\\/60 { background-color: rgba(${hexToRgb(brandAccent)}, 0.6); }
+.bg-accent\\/65 { background-color: rgba(${hexToRgb(brandAccent)}, 0.65); }
+.bg-accent\\/70 { background-color: rgba(${hexToRgb(brandAccent)}, 0.7); }
+.bg-accent\\/75 { background-color: rgba(${hexToRgb(brandAccent)}, 0.75); }
+.bg-accent\\/80 { background-color: rgba(${hexToRgb(brandAccent)}, 0.8); }
+.bg-accent\\/85 { background-color: rgba(${hexToRgb(brandAccent)}, 0.85); }
+.bg-accent\\/90 { background-color: rgba(${hexToRgb(brandAccent)}, 0.9); }
+.bg-accent\\/95 { background-color: rgba(${hexToRgb(brandAccent)}, 0.95); }
 
 .bg-foreground\\/5 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.05); }
 .bg-foreground\\/10 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.1); }
+.bg-foreground\\/15 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.15); }
 .bg-foreground\\/20 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.2); }
+.bg-foreground\\/25 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.25); }
+.bg-foreground\\/30 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.3); }
+.bg-foreground\\/35 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.35); }
+.bg-foreground\\/40 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.4); }
+.bg-foreground\\/45 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.45); }
+.bg-foreground\\/50 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.5); }
+.bg-foreground\\/55 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.55); }
+.bg-foreground\\/60 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.6); }
+.bg-foreground\\/65 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.65); }
+.bg-foreground\\/70 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.7); }
+.bg-foreground\\/75 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.75); }
+.bg-foreground\\/80 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.8); }
+.bg-foreground\\/85 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.85); }
+.bg-foreground\\/90 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.9); }
+.bg-foreground\\/95 { background-color: rgba(${hexToRgb(neutralForeground)}, 0.95); }
+
+.bg-background\\/5 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.05); }
+.bg-background\\/10 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.1); }
+.bg-background\\/15 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.15); }
+.bg-background\\/20 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.2); }
+.bg-background\\/25 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.25); }
+.bg-background\\/30 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.3); }
+.bg-background\\/35 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.35); }
+.bg-background\\/40 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.4); }
+.bg-background\\/45 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.45); }
+.bg-background\\/50 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.5); }
+.bg-background\\/55 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.55); }
+.bg-background\\/60 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.6); }
+.bg-background\\/65 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.65); }
+.bg-background\\/70 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.7); }
+.bg-background\\/75 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.75); }
+.bg-background\\/80 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.8); }
+.bg-background\\/85 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.85); }
+.bg-background\\/90 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.9); }
+.bg-background\\/95 { background-color: rgba(${hexToRgb(neutralBackground)}, 0.95); }
 
 /* Gradient Colors (from-*, via-*, to-*) */
 .from-primary { --tw-gradient-from: var(--color-brand-primary); --tw-gradient-to: transparent; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }

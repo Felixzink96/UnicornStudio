@@ -251,31 +251,77 @@ class Unicorn_Studio_Global_Components {
             strpos($html, '@click') !== false ||
             strpos($html, 'x-show') !== false ||
             strpos($html, 'x-transition') !== false ||
-            strpos($html, ':class') !== false
+            strpos($html, ':class') !== false ||
+            strpos($html, '@scroll') !== false
         );
 
         if (!$has_alpine_directives) {
             return $html;
         }
 
-        // Check if x-data already exists on the root element
+        // Check if HTML starts with a wrapper div (from fixMobileMenuInHeader)
+        // If so, we need to ensure the wrapper has all needed variables
+        if (preg_match('/^(\s*<div)([^>]*x-data=["\'])(\{[^"\']*\})(["\'][^>]*>)/i', $html, $wrapperMatch)) {
+            $existingXdata = $wrapperMatch[3];
+            $needsScrolled = strpos($html, 'scrolled') !== false && strpos($existingXdata, 'scrolled') === false;
+            $needsMobileOpen = strpos($html, 'mobileOpen') !== false && strpos($existingXdata, 'mobileOpen') === false;
+
+            if ($needsScrolled || $needsMobileOpen) {
+                // Parse existing x-data and add missing vars
+                $newVars = [];
+                if ($needsScrolled) $newVars[] = 'scrolled: false';
+                if ($needsMobileOpen) $newVars[] = 'mobileOpen: false';
+
+                // Insert new vars into existing x-data object
+                $newXdata = preg_replace('/\}\s*$/', ', ' . implode(', ', $newVars) . ' }', $existingXdata);
+                $html = preg_replace(
+                    '/^(\s*<div)([^>]*x-data=["\'])\{[^"\']*\}(["\'][^>]*>)/i',
+                    '$1$2' . $newXdata . '$3',
+                    $html,
+                    1
+                );
+
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('[Unicorn] Added missing vars to wrapper x-data: ' . implode(', ', $newVars));
+                }
+            }
+            return $html;
+        }
+
+        // Check if x-data already exists on the root element (original logic)
         $pattern = '/^(\s*<' . $tag . ')([^>]*)(>)/i';
         if (preg_match($pattern, $html, $matches)) {
             $tag_content = $matches[2];
 
             // If x-data is missing, add it
             if (strpos($tag_content, 'x-data') === false) {
-                // Determine what x-data to add based on directives found
-                // Use 'mobileOpen' to match AI-generated code
-                $xdata = '{ mobileOpen: false }';
+                // Build x-data based on directives found in HTML
+                $vars = [];
+
+                // Check for mobileOpen (mobile menu)
+                if (strpos($html, 'mobileOpen') !== false) {
+                    $vars[] = 'mobileOpen: false';
+                }
+
+                // Check for scrolled (scroll-based header changes)
+                if (strpos($html, 'scrolled') !== false) {
+                    $vars[] = 'scrolled: false';
+                }
 
                 // Check for other common patterns
                 if (strpos($html, 'dropdownOpen') !== false) {
-                    $xdata = '{ mobileOpen: false, dropdownOpen: false }';
+                    $vars[] = 'dropdownOpen: false';
                 }
                 if (strpos($html, 'searchOpen') !== false) {
-                    $xdata = '{ mobileOpen: false, searchOpen: false }';
+                    $vars[] = 'searchOpen: false';
                 }
+
+                // Default to mobileOpen if no patterns found
+                if (empty($vars)) {
+                    $vars[] = 'mobileOpen: false';
+                }
+
+                $xdata = '{ ' . implode(', ', $vars) . ' }';
 
                 $html = preg_replace(
                     $pattern,

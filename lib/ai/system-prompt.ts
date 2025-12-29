@@ -166,9 +166,9 @@ MOTION: GSAP + ScrollTrigger für Animationen
 
 CDN-Links:
 - Tailwind: https://cdn.tailwindcss.com
-- Alpine.js: https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js
-- GSAP: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js
-- ScrollTrigger: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js
+- Alpine.js: https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js
+- GSAP: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js
+- ScrollTrigger: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js
 
 GSAP Init-Script:
 gsap.registerPlugin(ScrollTrigger);
@@ -561,6 +561,13 @@ Horizontal Scroll:
 - Sections mit data-reveal="left" oder "right" haben overflow-x-hidden?
 </self-check>
 
+PFLICHT-SCRIPTS (IMMER einbinden - NIEMALS weglassen!):
+1. Tailwind CSS: <script src="https://cdn.tailwindcss.com"></script>
+2. Alpine.js: <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js"></script>
+3. GSAP + ScrollTrigger (vor </body>):
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js"></script>
+
 <output-format>
 <!DOCTYPE html>
 <html lang="de" class="antialiased">
@@ -570,14 +577,14 @@ Horizontal Scroll:
   <title>{{siteName}}</title>
   <meta name="description" content="{{metaDescription}}">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js"></script>
 </head>
 <body class="bg-background text-foreground" data-barba="wrapper">
   <main data-barba="container">
     <!-- SECTIONS -->
   </main>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js"></script>
   <script>
     // INIT CODE
   </script>

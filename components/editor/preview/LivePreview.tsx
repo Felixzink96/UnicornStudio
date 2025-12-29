@@ -193,6 +193,35 @@ export function LivePreview() {
       }
     }
 
+    // Auto-inject GSAP if the HTML uses GSAP features but doesn't include the library
+    const needsGsap = (
+      htmlWithComponents.includes('data-reveal') ||
+      htmlWithComponents.includes('data-parallax') ||
+      htmlWithComponents.includes('gsap.') ||
+      htmlWithComponents.includes('ScrollTrigger')
+    )
+    const hasGsap = htmlWithComponents.includes('gsap.min.js')
+
+    if (needsGsap && !hasGsap) {
+      // Inject in <head> so GSAP is available before any scripts run
+      const gsapScripts = `
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js"></script>`
+
+      if (htmlWithComponents.includes('</head>')) {
+        htmlWithComponents = htmlWithComponents.replace(
+          '</head>',
+          `${gsapScripts}\n</head>`
+        )
+      } else if (htmlWithComponents.includes('<body')) {
+        // No head, inject before body
+        htmlWithComponents = htmlWithComponents.replace(
+          '<body',
+          `${gsapScripts}\n<body`
+        )
+      }
+    }
+
     // Then replace {{menu:slug}} placeholders with actual menu HTML
     if (menus && menus.length > 0) {
       return injectMenusIntoHtml(htmlWithComponents, menus, {

@@ -516,17 +516,12 @@ async function flattenCSS(css: string): Promise<string> {
 }
 
 /**
- * Remove Tailwind v4's specificity hack :not(#\#) from all selectors.
- * This reduces specificity so our Design Tokens (which come after Tailwind)
- * can override using normal CSS cascade rules.
+ * Keep Tailwind CSS as-is - don't modify specificity hacks.
+ * Our Design Tokens use !important for hover/focus states where needed.
  */
 function stripTailwindResets(css: string): string {
-  // Remove the :not(#\#) specificity hack pattern
-  // Tailwind v4 uses :not(#\#):not(#\#):not(#\#):not(#\#) for high specificity
-  const result = css.replace(/:not\(#\\#\)/g, '')
-
-  console.log(`[CSS Export] Removed specificity hacks: ${css.length} -> ${result.length} bytes`)
-  return result
+  // No modifications - return as-is
+  return css
 }
 
 /**

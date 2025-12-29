@@ -170,6 +170,36 @@ CDN-Links:
 - GSAP: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js
 - ScrollTrigger: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js
 
+TAILWIND CONFIG - PFLICHT:
+Definiere IMMER die Farben in tailwind.config, damit Tailwind alle Varianten generiert (hover:, focus:, etc.):
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          primary: { DEFAULT: '#HEXCODE', hover: '#HEXCODE_DARKER' },
+          secondary: '#HEXCODE',
+          accent: '#HEXCODE',
+          background: '#HEXCODE',
+          foreground: '#HEXCODE',
+          muted: '#HEXCODE',
+          border: '#HEXCODE',
+        },
+        fontFamily: {
+          heading: ['Font Name', 'serif'],
+          body: ['Font Name', 'sans-serif'],
+        }
+      }
+    }
+  }
+</script>
+
+Dann funktionieren automatisch: bg-primary, hover:bg-primary, text-primary, hover:text-primary, border-primary, etc.
+
+NIEMALS Farb-Utility-Klassen (.bg-primary, .text-primary) manuell im <style> definieren!
+Nur CSS Variables (:root) und spezielle Effekte (Gradienten, Animationen) im <style>.
+
 GSAP Init-Script:
 gsap.registerPlugin(ScrollTrigger);
 document.querySelectorAll('[data-reveal]').forEach(el => {

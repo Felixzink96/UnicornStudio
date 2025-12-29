@@ -47,7 +47,7 @@ export function generateDesignTokensCSS(designVars: DesignVariables | null): str
       : '59, 130, 246'
   }
 
-  const css = `
+  return `
 /* ============================================
    BASE RESET (Tailwind Preflight)
    ============================================ */

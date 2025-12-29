@@ -15,6 +15,8 @@ import {
     Paintbrush,
     Save,
     Loader2,
+    Plus,
+    X,
 } from 'lucide-react'
 import { ImageManager } from '@/components/editor/assets/ImageManager'
 import { useEditorStore } from '@/stores/editor-store'
@@ -58,6 +60,10 @@ export function DesignSettingsDropdown({ siteId }: DesignSettingsDropdownProps) 
         border: designVariables?.colors?.neutral?.border || '#e2e8f0',
     })
 
+    const [customColors, setCustomColors] = useState<Record<string, string>>(
+        designVariables?.customColors || {}
+    )
+
     const [fonts, setFonts] = useState({
         heading: designVariables?.typography?.fontHeading || 'Inter',
         body: designVariables?.typography?.fontBody || 'Inter',
@@ -82,6 +88,7 @@ export function DesignSettingsDropdown({ siteId }: DesignSettingsDropdownProps) 
                 heading: designVariables.typography?.fontHeading || 'Inter',
                 body: designVariables.typography?.fontBody || 'Inter',
             })
+            setCustomColors(designVariables.customColors || {})
             setHasChanges(false)
         }
     }, [designVariables])
@@ -99,6 +106,28 @@ export function DesignSettingsDropdown({ siteId }: DesignSettingsDropdownProps) 
 
     const handleFontChange = (key: string, value: string) => {
         setFonts(prev => ({ ...prev, [key]: value }))
+        setHasChanges(true)
+    }
+
+    const handleCustomColorChange = (key: string, value: string) => {
+        setCustomColors(prev => ({ ...prev, [key]: value }))
+        setHasChanges(true)
+    }
+
+    const handleAddCustomColor = () => {
+        const name = prompt('Farbname (z.B. warmNeutral, darkGray):')
+        if (name && name.trim()) {
+            setCustomColors(prev => ({ ...prev, [name.trim()]: '#f5f5f0' }))
+            setHasChanges(true)
+        }
+    }
+
+    const handleRemoveCustomColor = (key: string) => {
+        setCustomColors(prev => {
+            const newColors = { ...prev }
+            delete newColors[key]
+            return newColors
+        })
         setHasChanges(true)
     }
 
@@ -159,6 +188,7 @@ export function DesignSettingsDropdown({ siteId }: DesignSettingsDropdownProps) 
                     fontBody: fonts.body,
                     fontMono: designVariables?.typography?.fontMono,
                 },
+                customColors: customColors,
             }
 
             const saved = await updateDesignVariables(siteId, update)
@@ -292,6 +322,48 @@ export function DesignSettingsDropdown({ siteId }: DesignSettingsDropdownProps) 
                                         </div>
                                     ))}
                                 </div>
+
+                                {/* Custom Colors */}
+                                <div className="flex items-center justify-between pt-2">
+                                    <h3 className="text-sm font-semibold text-zinc-800">Weitere Farben</h3>
+                                    <button
+                                        onClick={handleAddCustomColor}
+                                        className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1"
+                                    >
+                                        <Plus className="w-3 h-3" /> Neu
+                                    </button>
+                                </div>
+                                {Object.keys(customColors).length > 0 ? (
+                                    <div className="grid grid-cols-4 gap-3">
+                                        {Object.entries(customColors).map(([name, color]) => (
+                                            <div key={name} className="text-center relative group">
+                                                <label className="block relative cursor-pointer">
+                                                    <div
+                                                        className="w-full aspect-square rounded-lg hover:ring-2 hover:ring-offset-1 hover:ring-blue-400 border border-zinc-200 transition-all"
+                                                        style={{ backgroundColor: color }}
+                                                    />
+                                                    <input
+                                                        type="color"
+                                                        value={color}
+                                                        onChange={(e) => handleCustomColorChange(name, e.target.value)}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                    />
+                                                </label>
+                                                <button
+                                                    onClick={() => handleRemoveCustomColor(name)}
+                                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                                >
+                                                    <X className="w-2.5 h-2.5" />
+                                                </button>
+                                                <span className="text-[10px] text-zinc-500 mt-1 block truncate">{name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-[10px] text-zinc-400 italic py-2">
+                                        Klicke auf "Neu" um weitere Farben hinzuzufügen.
+                                    </p>
+                                )}
                             </div>
                         )}
 

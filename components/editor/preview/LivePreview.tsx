@@ -193,32 +193,62 @@ export function LivePreview() {
       }
     }
 
-    // Auto-inject GSAP if the HTML uses GSAP features but doesn't include the library
-    const needsGsap = (
-      htmlWithComponents.includes('data-reveal') ||
-      htmlWithComponents.includes('data-parallax') ||
-      htmlWithComponents.includes('gsap.') ||
-      htmlWithComponents.includes('ScrollTrigger')
-    )
-    const hasGsap = htmlWithComponents.includes('gsap.min.js')
+    // ========================================
+    // AUTO-INJECT REQUIRED SCRIPTS
+    // Ensures all generated pages work correctly
+    // ========================================
 
-    if (needsGsap && !hasGsap) {
-      // Inject in <head> so GSAP is available before any scripts run
-      const gsapScripts = `
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js"></script>`
+    // Check what's already included
+    const hasTailwind = htmlWithComponents.includes('tailwindcss') || htmlWithComponents.includes('cdn.tailwindcss.com')
+    const hasAlpine = htmlWithComponents.includes('alpinejs') || htmlWithComponents.includes('alpine.js') || htmlWithComponents.includes('Alpine')
+    const hasGsap = htmlWithComponents.includes('gsap.min.js') || htmlWithComponents.includes('gsap@')
+    const hasScrollTrigger = htmlWithComponents.includes('ScrollTrigger.min.js')
 
+    // Build missing head scripts
+    const missingHeadScripts: string[] = []
+    if (!hasTailwind) {
+      missingHeadScripts.push('<script src="https://cdn.tailwindcss.com"></script>')
+    }
+    if (!hasAlpine) {
+      missingHeadScripts.push('<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js"></script>')
+    }
+
+    // Build missing body scripts (GSAP should be at end of body)
+    const missingBodyScripts: string[] = []
+    if (!hasGsap) {
+      missingBodyScripts.push('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js"></script>')
+    }
+    if (!hasScrollTrigger) {
+      missingBodyScripts.push('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js"></script>')
+    }
+
+    // Inject head scripts
+    if (missingHeadScripts.length > 0) {
+      const headScriptsStr = '\n  ' + missingHeadScripts.join('\n  ')
       if (htmlWithComponents.includes('</head>')) {
         htmlWithComponents = htmlWithComponents.replace(
           '</head>',
-          `${gsapScripts}\n</head>`
+          `${headScriptsStr}\n</head>`
         )
       } else if (htmlWithComponents.includes('<body')) {
-        // No head, inject before body
         htmlWithComponents = htmlWithComponents.replace(
           '<body',
-          `${gsapScripts}\n<body`
+          `${headScriptsStr}\n<body`
         )
+      }
+    }
+
+    // Inject body scripts (before </body>)
+    if (missingBodyScripts.length > 0) {
+      const bodyScriptsStr = '\n  ' + missingBodyScripts.join('\n  ')
+      if (htmlWithComponents.includes('</body>')) {
+        htmlWithComponents = htmlWithComponents.replace(
+          '</body>',
+          `${bodyScriptsStr}\n</body>`
+        )
+      } else {
+        // No closing body tag, append at end
+        htmlWithComponents += bodyScriptsStr
       }
     }
 

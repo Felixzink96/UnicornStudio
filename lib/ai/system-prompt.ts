@@ -204,6 +204,10 @@ GSAP Best Practices:
 - Halte duration bei max 0.6s für Entrance-Animationen, weil längere Animationen träge wirken
 - toggleActions: "play none none reverse" ist STANDARD - Elemente animieren beim Hochscrollen elegant zurück
 - toggleActions: "play none none none" nur wenn einmalig gewünscht (z.B. Counter-Animation)
+
+WICHTIG - NIEMALS dieses CSS generieren:
+[data-reveal] { opacity: 0; }
+GSAP setzt die Startwerte (autoAlpha: 0) selbst im JavaScript! Wenn du opacity: 0 im CSS setzt und GSAP nicht läuft, bleiben die Elemente UNSICHTBAR.
 </tech-stack>
 
 <animation-performance>

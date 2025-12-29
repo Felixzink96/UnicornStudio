@@ -197,8 +197,18 @@ Definiere IMMER die Farben in tailwind.config, damit Tailwind alle Varianten gen
 
 Dann funktionieren automatisch: bg-primary, hover:bg-primary, text-primary, hover:text-primary, border-primary, etc.
 
+WICHTIG - NUR DIESE FARBNAMEN VERWENDEN:
+- primary, secondary, accent, background, foreground, muted, border
+- NIEMALS eigene Farbnamen erfinden (z.B. warmNeutral, darkGray, etc.)!
+- Für zusätzliche Farbtöne: Opacity nutzen (bg-primary/10, bg-muted/50, etc.)
+
 NIEMALS Farb-Utility-Klassen (.bg-primary, .text-primary) manuell im <style> definieren!
 Nur CSS Variables (:root) und spezielle Effekte (Gradienten, Animationen) im <style>.
+
+MOBILE MENU - WICHTIG:
+- KEIN x-teleport verwenden! Das funktioniert nicht in WordPress.
+- Mobile Menu muss INNERHALB des <header> Elements sein.
+- Verwende einfaches x-show für die Sichtbarkeit.
 
 GSAP Init-Script:
 gsap.registerPlugin(ScrollTrigger);
@@ -215,7 +225,7 @@ document.querySelectorAll('[data-reveal]').forEach(el => {
   );
 });
 
-// Parallax (optional)
+// Parallax (NUR wenn explizit gewünscht - NICHT standardmäßig verwenden!)
 document.querySelectorAll('[data-parallax]').forEach(el => {
   const speed = parseFloat(el.dataset.parallax) || 0.3;
   gsap.to(el, {
@@ -225,6 +235,11 @@ document.querySelectorAll('[data-parallax]').forEach(el => {
     scrollTrigger: { trigger: el.parentElement || el, start: 'top bottom', end: 'bottom top', scrub: 0.5 }
   });
 });
+
+PARALLAX - WICHTIG:
+- NIEMALS data-parallax auf dem Hero verwenden! Das verursacht ungewollte Transforms.
+- data-parallax NUR verwenden wenn der Benutzer explizit Parallax-Effekte wünscht.
+- Standardmäßig KEINE Parallax-Effekte generieren.
 
 GSAP Best Practices:
 - Verwende autoAlpha statt opacity, weil autoAlpha auch visibility setzt und das "unsichtbar bleiben" Problem verhindert

@@ -2215,31 +2215,36 @@ document.addEventListener('DOMContentLoaded', function() {
         onOpenChange={setGlobalComponentsDialogOpen}
         detectedHeader={detectedHeader}
         detectedFooter={detectedFooter}
-        onSave={async (headerName, footerName) => {
+        onSave={async (headerName, footerName, headerHtml, footerHtml) => {
           if (!siteId) return
 
-          console.log('[GlobalComponents] Starting save...', { headerName, footerName })
+          console.log('[GlobalComponents] Starting save...', {
+            headerName,
+            footerName,
+            hasHeaderHtml: !!headerHtml,
+            hasFooterHtml: !!footerHtml
+          })
 
-          // Save header as global component
-          if (headerName && detectedHeader) {
-            console.log('[GlobalComponents] Saving header...', detectedHeader.html.substring(0, 100))
+          // Save header as global component - use HTML passed directly from dialog
+          if (headerName && headerHtml) {
+            console.log('[GlobalComponents] Saving header...', headerHtml.substring(0, 100))
             const result = await saveGlobalComponent({
               siteId,
               name: headerName,
-              html: detectedHeader.html,
+              html: headerHtml,
               position: 'header',
               setAsDefault: true,
             })
             console.log('[GlobalComponents] Header save result:', result)
           }
 
-          // Save footer as global component
-          if (footerName && detectedFooter) {
-            console.log('[GlobalComponents] Saving footer...', detectedFooter.html.substring(0, 100))
+          // Save footer as global component - use HTML passed directly from dialog
+          if (footerName && footerHtml) {
+            console.log('[GlobalComponents] Saving footer...', footerHtml.substring(0, 100))
             const result = await saveGlobalComponent({
               siteId,
               name: footerName,
-              html: detectedFooter.html,
+              html: footerHtml,
               position: 'footer',
               setAsDefault: true,
             })
@@ -2250,8 +2255,8 @@ document.addEventListener('DOMContentLoaded', function() {
           if (pendingFinalHtml) {
             console.log('[GlobalComponents] Removing header/footer from HTML...')
             const cleanedHtml = removeHeaderFooterFromHtml(pendingFinalHtml, {
-              removeHeader: !!headerName && !!detectedHeader,
-              removeFooter: !!footerName && !!detectedFooter,
+              removeHeader: !!headerName && !!headerHtml,
+              removeFooter: !!footerName && !!footerHtml,
             })
             console.log('[GlobalComponents] Cleaned HTML length:', cleanedHtml.length)
             applyGeneratedHtml(cleanedHtml)

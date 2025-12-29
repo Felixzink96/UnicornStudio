@@ -21,7 +21,9 @@ export interface GlobalComponentsDialogProps {
   detectedFooter: DetectedComponent | null
   onSave: (
     headerName: string | null,
-    footerName: string | null
+    footerName: string | null,
+    headerHtml: string | null,
+    footerHtml: string | null
   ) => Promise<void>
   onSkip: () => void
 }
@@ -74,9 +76,12 @@ export function GlobalComponentsDialog({
   const handleSave = async () => {
     setIsSaving(true)
     try {
+      // Pass HTML directly to avoid stale closure issues
       await onSave(
         saveHeader && detectedHeader ? headerName : null,
-        saveFooter && detectedFooter ? footerName : null
+        saveFooter && detectedFooter ? footerName : null,
+        saveHeader && detectedHeader ? detectedHeader.html : null,
+        saveFooter && detectedFooter ? detectedFooter.html : null
       )
       onOpenChange(false)
     } catch (error) {

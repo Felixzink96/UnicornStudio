@@ -218,6 +218,8 @@ export function LivePreview() {
     const selectionScript = `
     <style>
       ${animationPauseCSS}
+      /* Make data-reveal elements visible in editor (GSAP ScrollTrigger doesn't run) */
+      [data-reveal] { opacity: 1 !important; transform: none !important; }
       * { cursor: default !important; }
       a, button, input, select, textarea { pointer-events: auto !important; }
       .unicorn-hover-outline {

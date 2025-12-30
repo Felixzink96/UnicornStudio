@@ -18,6 +18,8 @@ import postcss from 'postcss'
 import postcssNesting from 'postcss-nesting'
 import postcssCascadeLayers from '@csstools/postcss-cascade-layers'
 import postcssMediaMinmax from 'postcss-media-minmax'
+// JIT Browser Tailwind - generates CSS from HTML content using Tailwind JIT compiler
+import { createTailwindcss, TailwindConfig } from '@mhsdesign/jit-browser-tailwindcss'
 
 interface RouteParams {
   params: Promise<{ siteId: string }>
@@ -375,28 +377,35 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       console.error('[CSS Export] Error loading fonts:', fontError)
     }
 
-    // 10. Compile Tailwind CSS using v4 API with custom theme
+    // 10. Compile Tailwind CSS using JIT Browser library (primary) or v4 API (fallback)
     let tailwindCSS = ''
     let keyframesCSS = ''
     try {
-      tailwindCSS = await compileTailwindCSS(extractedClasses, tailwindConfig || undefined)
+      // PRIMARY: Use JIT Browser library - scans HTML directly for ALL Tailwind classes
+      // This is more reliable than manual class extraction
+      tailwindCSS = await compileTailwindCSSFromHTML(allHtml, tailwindConfig || undefined)
+      console.log('[CSS Export] JIT compilation successful')
+    } catch (jitError) {
+      console.error('[CSS Export] JIT compilation failed, trying Tailwind v4 API:', jitError)
+      try {
+        // FALLBACK: Use Tailwind v4 API with extracted classes
+        tailwindCSS = await compileTailwindCSS(extractedClasses, tailwindConfig || undefined)
 
-      // Flatten CSS Nesting and @layer for browser compatibility
-      tailwindCSS = await flattenCSS(tailwindCSS)
+        // Flatten CSS Nesting and @layer for browser compatibility
+        tailwindCSS = await flattenCSS(tailwindCSS)
 
-      // REMOVE the problematic :not(#\#) reset rules that override our colors
-      // These set border: 0 solid which uses currentColor and breaks our border-border
-      // Also remove any rules that reset colors to currentColor or inherit
-      tailwindCSS = stripTailwindResets(tailwindCSS)
-
-      // Get keyframes separately - they need to be added AFTER Tailwind compilation
-      if (tailwindConfig?.keyframes) {
-        keyframesCSS = buildKeyframesCSS(tailwindConfig.keyframes)
+        // REMOVE the problematic :not(#\#) reset rules that override our colors
+        tailwindCSS = stripTailwindResets(tailwindCSS)
+      } catch (tailwindError) {
+        console.error('[CSS Export] Tailwind v4 also failed:', tailwindError)
+        // Ultimate fallback: basic utility generation
+        tailwindCSS = generateFallbackCSS(extractedClasses)
       }
-    } catch (tailwindError) {
-      console.error('Tailwind compilation error:', tailwindError)
-      // Fallback to basic utility generation if Tailwind compile fails
-      tailwindCSS = generateFallbackCSS(extractedClasses)
+    }
+
+    // Get keyframes separately - they need to be added AFTER Tailwind compilation
+    if (tailwindConfig?.keyframes) {
+      keyframesCSS = buildKeyframesCSS(tailwindConfig.keyframes)
     }
 
     // 11. Build custom utilities (Tailwind v4 @theme doesn't auto-generate these classes)
@@ -575,7 +584,79 @@ function buildBackgroundImageUtilities(backgroundImages: Record<string, string>)
 }
 
 /**
- * Compile Tailwind CSS using v4 API with REAL tailwindcss/index.css and custom theme
+ * Compile Tailwind CSS using JIT Browser library
+ * This is MORE RELIABLE than manual class extraction because:
+ * 1. Uses the same algorithm as Tailwind CDN
+ * 2. Automatically finds ALL classes including arbitrary values
+ * 3. Supports custom config (colors, fonts, backgroundImage)
+ */
+async function compileTailwindCSSFromHTML(htmlContent: string, customConfig?: TailwindCustomConfig): Promise<string> {
+  try {
+    console.log(`[CSS Export] Compiling CSS from ${htmlContent.length} bytes of HTML using JIT`)
+
+    // Build Tailwind config for JIT compiler
+    const jitConfig: TailwindConfig = {
+      corePlugins: {
+        preflight: true, // Include CSS reset
+      },
+      theme: {
+        extend: {
+          // Add custom colors
+          ...(customConfig?.colors && { colors: customConfig.colors }),
+          // Add custom font families
+          ...(customConfig?.fontFamily && { fontFamily: customConfig.fontFamily }),
+          // Add custom background images (e.g., bg-grid-pattern)
+          ...(customConfig?.backgroundImage && { backgroundImage: customConfig.backgroundImage }),
+          // Add custom keyframes
+          ...(customConfig?.keyframes && { keyframes: customConfig.keyframes }),
+          // Add custom animations
+          ...(customConfig?.animation && { animation: customConfig.animation }),
+        },
+      },
+    }
+
+    // Log what we're adding
+    if (customConfig?.colors) {
+      console.log('[CSS Export] Added custom colors:', Object.keys(customConfig.colors))
+    }
+    if (customConfig?.fontFamily) {
+      console.log('[CSS Export] Added custom fonts:', Object.keys(customConfig.fontFamily))
+    }
+    if (customConfig?.backgroundImage) {
+      console.log('[CSS Export] Added custom backgroundImages:', Object.keys(customConfig.backgroundImage))
+    }
+
+    // Create JIT Tailwind instance
+    const tailwindcss = createTailwindcss({
+      tailwindConfig: jitConfig,
+    })
+
+    // Generate CSS from HTML content
+    // The library scans HTML and generates CSS for ALL found Tailwind classes
+    const css = await tailwindcss.generateStylesFromContent(
+      `@tailwind base;
+@tailwind components;
+@tailwind utilities;`,
+      [htmlContent]
+    )
+
+    console.log(`[CSS Export] JIT generated ${css.length} bytes of CSS`)
+
+    // Log some stats
+    const arbitraryMatches = htmlContent.match(/class="[^"]*\[[^\]]+\][^"]*"/g)
+    if (arbitraryMatches) {
+      console.log(`[CSS Export] Found ${arbitraryMatches.length} elements with arbitrary values`)
+    }
+
+    return css
+  } catch (error) {
+    console.error('[CSS Export] JIT compile error:', error)
+    throw error
+  }
+}
+
+/**
+ * Legacy Tailwind v4 compile function (kept as fallback)
  */
 async function compileTailwindCSS(classes: Set<string>, customConfig?: TailwindCustomConfig): Promise<string> {
   try {

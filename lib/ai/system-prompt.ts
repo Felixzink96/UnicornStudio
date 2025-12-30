@@ -425,6 +425,26 @@ Box-Shadow Animation (wenn nötig):
 
 GPU Hint für stark animierte Elemente:
 <div class="will-change-transform">Animiertes Element</div>
+
+HORIZONTALE SCROLL-GALERIEN (Pin & Scroll):
+Bei horizontalen Scroll-Galerien mit ScrollTrigger pin IMMER diese Einstellungen:
+- start: 'top top' (NICHT 'top 30%' oder ähnlich!)
+- anticipatePin: 1 (für smootheres Pinning)
+- scrub: 0.5 oder 1 (für weiches Scrollen)
+
+Beispiel ScrollTrigger für horizontales Scroll:
+gsap.to(container, {
+    x: () => -(container.scrollWidth - window.innerWidth),
+    ease: 'none',
+    scrollTrigger: {
+        trigger: section,
+        start: 'top top',      // WICHTIG: Pinnen wenn Section oben ankommt
+        end: () => '+=' + container.scrollWidth,
+        scrub: 1,
+        pin: true,
+        anticipatePin: 1
+    }
+});
 </animation-performance>
 
 <colors>

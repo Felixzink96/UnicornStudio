@@ -60,73 +60,61 @@ const MINIMAL_TAILWIND_SOURCE = `
 `
 
 /**
- * Extract tailwind.config from HTML script tags
- * AI generates this inline: tailwind.config = { theme: { extend: { ... } } }
+ * Extract tailwind.config backgroundImage from HTML
+ * Directly search for backgroundImage entries in the HTML
  */
 function extractTailwindConfigFromHTML(html: string): TailwindCustomConfig | null {
   if (!html) return null
 
-  // Find the script block containing tailwind.config
-  const scriptMatch = html.match(/<script[^>]*>([\s\S]*?tailwind\.config[\s\S]*?)<\/script>/i)
-  if (!scriptMatch) return null
-
-  const scriptContent = scriptMatch[1]
-
-  // Find where tailwind.config = { starts
-  const startMatch = scriptContent.match(/tailwind\.config\s*=\s*\{/)
-  if (!startMatch || startMatch.index === undefined) return null
-
-  // Extract the object by counting braces
-  const startIndex = startMatch.index + startMatch[0].length - 1 // Position of opening {
-  let braceCount = 0
-  let endIndex = startIndex
-
-  for (let i = startIndex; i < scriptContent.length; i++) {
-    if (scriptContent[i] === '{') braceCount++
-    if (scriptContent[i] === '}') braceCount--
-    if (braceCount === 0) {
-      endIndex = i + 1
-      break
-    }
-  }
-
-  const configStr = scriptContent.substring(startIndex, endIndex)
-
-  try {
-    // Clean the config string for JSON parsing
-    const cleanedConfig = configStr
-      // Remove comments
-      .replace(/\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      // Convert single quotes to double quotes
-      .replace(/'/g, '"')
-      // Add quotes around unquoted keys (but not inside strings)
-      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
-      // Remove trailing commas
-      .replace(/,(\s*[}\]])/g, '$1')
-
-    console.log('[CSS Export] Extracted tailwind.config, length:', configStr.length)
-
-    const config = JSON.parse(cleanedConfig)
-    const extend = config?.theme?.extend || {}
-
-    console.log('[CSS Export] Parsed extend keys:', Object.keys(extend))
-    if (extend.backgroundImage) {
-      console.log('[CSS Export] Found backgroundImage:', Object.keys(extend.backgroundImage))
-    }
-
-    return {
-      colors: extend.colors,
-      fontFamily: extend.fontFamily,
-      keyframes: extend.keyframes,
-      animation: extend.animation,
-      backgroundImage: extend.backgroundImage,
-    }
-  } catch (e) {
-    console.log('[CSS Export] Could not parse tailwind.config from HTML:', e)
-    console.log('[CSS Export] Config string (first 500 chars):', configStr.substring(0, 500))
+  // Check if backgroundImage exists
+  if (!html.includes('backgroundImage')) {
     return null
   }
+
+  const result: TailwindCustomConfig = {}
+  const backgroundImage: Record<string, string> = {}
+
+  // Find the backgroundImage section and extract entries
+  // Pattern: 'name': "value" where value can be complex (urls, gradients)
+  // We look for patterns like: 'grid-pattern': "linear-gradient(...)"
+
+  // Match each entry: 'name': "..."  (handles escaped quotes in value)
+  const entryRegex = /['"]([a-zA-Z0-9_-]+)['"]\s*:\s*"((?:[^"\\]|\\.)*)"/g
+  let match
+
+  // Only search in the backgroundImage section
+  const bgStartIndex = html.indexOf('backgroundImage')
+  if (bgStartIndex === -1) return null
+
+  // Get a chunk of HTML starting from backgroundImage (enough to capture the entries)
+  const searchChunk = html.substring(bgStartIndex, bgStartIndex + 2000)
+
+  while ((match = entryRegex.exec(searchChunk)) !== null) {
+    const name = match[1]
+    let value = match[2]
+
+    // Unescape the value
+    value = value.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+
+    // Skip if this looks like a color or font entry (not backgroundImage)
+    if (['primary', 'secondary', 'accent', 'background', 'foreground', 'muted', 'border', 'heading', 'body', 'mono'].includes(name)) {
+      continue
+    }
+
+    // Only include if it looks like a background value
+    if (value.includes('url(') || value.includes('gradient') || value.includes('linear-') || value.includes('radial-')) {
+      backgroundImage[name] = value
+      console.log(`[CSS Export] Found backgroundImage: ${name} = ${value.substring(0, 50)}...`)
+    }
+  }
+
+  if (Object.keys(backgroundImage).length > 0) {
+    result.backgroundImage = backgroundImage
+    console.log('[CSS Export] Extracted backgroundImages:', Object.keys(backgroundImage))
+    return result
+  }
+
+  return null
 }
 
 /**

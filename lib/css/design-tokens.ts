@@ -260,6 +260,15 @@ ${gradients?.primary?.enabled ? `
 .bg-foreground { background-color: var(--color-neutral-foreground); }
 .bg-border { background-color: var(--color-neutral-border); }
 
+/* Aliases for long class names (AI sometimes uses these) */
+.bg-neutral-background { background-color: var(--color-neutral-background); }
+.bg-neutral-foreground { background-color: var(--color-neutral-foreground); }
+.bg-neutral-muted { background-color: var(--color-neutral-muted); }
+.bg-neutral-border { background-color: var(--color-neutral-border); }
+.bg-brand-primary { background-color: var(--color-brand-primary); }
+.bg-brand-secondary { background-color: var(--color-brand-secondary); }
+.bg-brand-accent { background-color: var(--color-brand-accent); }
+
 /* Background with Opacity */
 .bg-primary\\/5 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.05); }
 .bg-primary\\/10 { background-color: rgba(${hexToRgb(brandPrimary)}, 0.1); }
@@ -478,6 +487,14 @@ ${gradients?.primary?.enabled ? `
 .text-border { color: var(--color-neutral-border); }
 .text-white { color: #ffffff; }
 .text-black { color: #000000; }
+
+/* Text Aliases for long class names */
+.text-neutral-foreground { color: var(--color-neutral-foreground); }
+.text-neutral-background { color: var(--color-neutral-background); }
+.text-neutral-muted { color: var(--color-neutral-muted); }
+.text-brand-primary { color: var(--color-brand-primary); }
+.text-brand-secondary { color: var(--color-brand-secondary); }
+.text-brand-accent { color: var(--color-brand-accent); }
 .text-transparent { color: transparent; }
 .text-current { color: currentColor; }
 .text-inherit { color: inherit; }

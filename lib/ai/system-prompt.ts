@@ -530,6 +530,12 @@ Technische Anforderungen (Alpine.js):
 - @scroll.window für Scroll-Detection wenn gewünscht
 - x-show, x-transition für Menu-Animation
 
+WICHTIG - x-data Platzierung:
+- x-data NIEMALS auf <body> setzen!
+- x-data gehört auf den <header> Tag (oder ein Wrapper-div um den Header)
+- FALSCH: <body x-data="{ scrolled: false }">
+- RICHTIG: <header x-data="{ scrolled: false, mobileOpen: false }">
+
 Mobile Menu - PFLICHT-ANFORDERUNGEN:
 1. CLOSE BUTTON: Immer sichtbar oben rechts (absolut positioniert), mit gutem Kontrast zum Hintergrund
 2. SCROLL LOCK: @click="mobileOpen = true; document.body.style.overflow = 'hidden'" beim Öffnen

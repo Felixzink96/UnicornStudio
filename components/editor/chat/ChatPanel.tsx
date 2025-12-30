@@ -2644,6 +2644,7 @@ function ThinkingDisplay({
 
 /**
  * Save a header/footer as a global component
+ * Includes retry logic for network failures
  */
 async function saveGlobalComponent({
   siteId,
@@ -2658,30 +2659,51 @@ async function saveGlobalComponent({
   position: 'header' | 'footer'
   setAsDefault: boolean
 }): Promise<{ success: boolean; componentId?: string; error?: string }> {
-  try {
-    const supabase = createClient()
+  const maxRetries = 3
+  let lastError: string = ''
 
-    // Use the RPC function to create the component
-    const { data: componentId, error } = await supabase.rpc('create_global_component', {
-      p_site_id: siteId,
-      p_name: name,
-      p_html: html,
-      p_css: undefined,
-      p_js: undefined,
-      p_position: position,
-      p_description: `Automatisch erstellt von AI`,
-      p_category: position,
-      p_set_as_site_default: setAsDefault,
-    })
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[saveGlobalComponent] Attempt ${attempt}/${maxRetries} for ${position}...`)
+      const supabase = createClient()
 
-    if (error) {
-      console.error('Error saving global component:', error)
-      return { success: false, error: error.message }
+      // Use the RPC function to create the component
+      const { data: componentId, error } = await supabase.rpc('create_global_component', {
+        p_site_id: siteId,
+        p_name: name,
+        p_html: html,
+        p_css: undefined,
+        p_js: undefined,
+        p_position: position,
+        p_description: `Automatisch erstellt von AI`,
+        p_category: position,
+        p_set_as_site_default: setAsDefault,
+      })
+
+      if (error) {
+        console.error(`[saveGlobalComponent] Attempt ${attempt} failed:`, error)
+        lastError = error.message
+        // Wait before retry (exponential backoff)
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+          continue
+        }
+        return { success: false, error: error.message }
+      }
+
+      console.log(`[saveGlobalComponent] ${position} saved successfully on attempt ${attempt}`)
+      return { success: true, componentId }
+    } catch (err) {
+      console.error(`[saveGlobalComponent] Attempt ${attempt} error:`, err)
+      lastError = String(err)
+      // Wait before retry (exponential backoff)
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+        continue
+      }
     }
-
-    return { success: true, componentId }
-  } catch (err) {
-    console.error('saveGlobalComponent error:', err)
-    return { success: false, error: String(err) }
   }
+
+  console.error(`[saveGlobalComponent] All ${maxRetries} attempts failed for ${position}`)
+  return { success: false, error: lastError }
 }

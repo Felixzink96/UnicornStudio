@@ -422,9 +422,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // The fallback was causing selector bugs (space before :hover) and duplicate CSS.
 
     // 12. Combine everything
-    // IMPORTANT: Design Tokens CSS must come AFTER Tailwind CSS!
-    // Tailwind v4 uses @layer utilities, and CSS outside @layer always wins.
-    // This allows our hover:bg-primary etc. to override Tailwind's .bg-white
+    // CSS ORDER IS CRITICAL FOR CASCADE!
+    // 1. Custom CSS (animations, page styles) FIRST - lowest priority
+    // 2. Tailwind Utilities AFTER - so .flex wins over .marquee-content
+    // 3. Design Tokens LAST - highest priority for our colors
     const fullCSS = `
 /* ==================================================================
    UNICORN STUDIO - Generated CSS
@@ -444,21 +445,17 @@ ${fontFaceCSS ? `/* ------------------------------------------------------------
 ${fontFaceCSS}
 ` : ''}
 /* ----------------------------------------------------------------
-   TAILWIND UTILITIES (includes custom @theme colors/fonts)
-   Compiled from ${extractedClasses.size} classes found in your content
-   Note: These are in @layer utilities, so Design Tokens below will override
-   ---------------------------------------------------------------- */
-${tailwindCSS}
-
-/* ----------------------------------------------------------------
    CUSTOM KEYFRAMES (from Tailwind config)
+   Must come before utilities that use them
    ---------------------------------------------------------------- */
 ${keyframesCSS}
 
 /* ----------------------------------------------------------------
-   CUSTOM UTILITIES (animations, background-images, etc.)
+   PAGE CUSTOM CSS (extracted from AI-generated pages)
+   Includes: @keyframes, custom utility classes, page-specific styles
+   IMPORTANT: Comes BEFORE Tailwind so utilities like .flex win!
    ---------------------------------------------------------------- */
-${customUtilities}
+${pagesCustomCSS}
 
 /* ----------------------------------------------------------------
    CMS COMPONENTS CSS (custom component styles)
@@ -466,15 +463,21 @@ ${customUtilities}
 ${cmsComponentsCSS}
 
 /* ----------------------------------------------------------------
-   PAGE CUSTOM CSS (extracted from AI-generated pages)
-   Includes: @keyframes, custom utility classes, page-specific styles
-   ---------------------------------------------------------------- */
-${pagesCustomCSS}
-
-/* ----------------------------------------------------------------
    COMPONENT CUSTOM CSS (extracted from Header/Footer)
    ---------------------------------------------------------------- */
 ${componentsExtractedCSS}
+
+/* ----------------------------------------------------------------
+   CUSTOM UTILITIES (animations, background-images, etc.)
+   ---------------------------------------------------------------- */
+${customUtilities}
+
+/* ----------------------------------------------------------------
+   TAILWIND UTILITIES (includes custom @theme colors/fonts)
+   Compiled from ${extractedClasses.size} classes found in your content
+   IMPORTANT: Comes AFTER custom CSS so Tailwind classes win!
+   ---------------------------------------------------------------- */
+${tailwindCSS}
 
 /* ----------------------------------------------------------------
    DESIGN TOKENS (CSS Variables + Utility Classes)

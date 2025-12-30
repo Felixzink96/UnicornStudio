@@ -237,27 +237,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Merge extracted tailwind config with site settings config
     if (extractedTailwindConfig) {
-      const extracted = extractedTailwindConfig // TypeScript knows this is not null now
+      const base: TailwindCustomConfig = tailwindConfig || {}
+      const extracted: TailwindCustomConfig = extractedTailwindConfig
+
       tailwindConfig = {
-        ...(tailwindConfig || {}),
-        ...extracted,
-        // Deep merge backgroundImage
-        backgroundImage: {
-          ...(tailwindConfig?.backgroundImage || {}),
-          ...(extracted.backgroundImage || {}),
-        },
-        // Deep merge keyframes
-        keyframes: {
-          ...(tailwindConfig?.keyframes || {}),
-          ...(extracted.keyframes || {}),
-        },
-        // Deep merge animation
-        animation: {
-          ...(tailwindConfig?.animation || {}),
-          ...(extracted.animation || {}),
-        },
+        colors: extracted.colors || base.colors,
+        fontFamily: extracted.fontFamily || base.fontFamily,
+        backgroundImage: { ...base.backgroundImage, ...extracted.backgroundImage },
+        keyframes: { ...base.keyframes, ...extracted.keyframes },
+        animation: { ...base.animation, ...extracted.animation },
       }
-      console.log('[CSS Export] Merged tailwind config, backgroundImage keys:', Object.keys(tailwindConfig?.backgroundImage || {}))
+      console.log('[CSS Export] Merged tailwind config, backgroundImage keys:', Object.keys(tailwindConfig.backgroundImage || {}))
     }
 
     // 6. CMS Components (including custom CSS)

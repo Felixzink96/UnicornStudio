@@ -218,8 +218,6 @@ export function LivePreview() {
     const selectionScript = `
     <style>
       ${animationPauseCSS}
-      /* Make data-reveal elements visible in editor (GSAP ScrollTrigger doesn't run) */
-      [data-reveal] { opacity: 1 !important; transform: none !important; }
       * { cursor: default !important; }
       a, button, input, select, textarea { pointer-events: auto !important; }
       .unicorn-hover-outline {
@@ -1516,7 +1514,7 @@ export function LivePreview() {
   return (
     <div
       onClick={handleContainerClick}
-      className="h-full w-full bg-zinc-950 flex items-center justify-center overflow-auto relative"
+      className="h-full w-full bg-zinc-950 flex items-center justify-center overflow-hidden relative"
     >
       {/* Wireframe Build Animation nur bei neuer Website ohne Header/Footer */}
       <FullPageWireframe isActive={showWireframe} />

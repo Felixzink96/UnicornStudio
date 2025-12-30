@@ -59,6 +59,74 @@ const MINIMAL_TAILWIND_SOURCE = `
 }
 `
 
+/**
+ * Extract tailwind.config from HTML script tags
+ * AI generates this inline: tailwind.config = { theme: { extend: { ... } } }
+ */
+function extractTailwindConfigFromHTML(html: string): TailwindCustomConfig | null {
+  if (!html) return null
+
+  // Match tailwind.config = { ... }
+  const configRegex = /tailwind\.config\s*=\s*(\{[\s\S]*?\})\s*<\/script>/i
+  const match = html.match(configRegex)
+
+  if (!match) return null
+
+  try {
+    // Clean the config string for JSON parsing
+    let configStr = match[1]
+      // Remove comments
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      // Convert single quotes to double quotes
+      .replace(/'/g, '"')
+      // Add quotes around unquoted keys
+      .replace(/(\w+)(?=\s*:)/g, '"$1"')
+      // Remove trailing commas
+      .replace(/,(\s*[}\]])/g, '$1')
+
+    const config = JSON.parse(configStr)
+    const extend = config?.theme?.extend || {}
+
+    return {
+      colors: extend.colors,
+      fontFamily: extend.fontFamily,
+      keyframes: extend.keyframes,
+      animation: extend.animation,
+      backgroundImage: extend.backgroundImage,
+    }
+  } catch (e) {
+    console.log('[CSS Export] Could not parse tailwind.config from HTML:', e)
+    return null
+  }
+}
+
+/**
+ * Extract CSS from <style> tags in HTML
+ * This captures custom CSS like .bg-grid-pattern that AI generates inline
+ */
+function extractStyleTagsCSS(html: string): string {
+  if (!html) return ''
+
+  const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi
+  let css = ''
+  let match
+
+  while ((match = styleRegex.exec(html)) !== null) {
+    const styleContent = match[1].trim()
+    // Skip Tailwind config scripts and design tokens (these are handled separately)
+    if (styleContent.includes('tailwind.config') ||
+        styleContent.includes('--color-brand-primary') ||
+        styleContent.includes('@import') ||
+        styleContent.includes('@tailwind')) {
+      continue
+    }
+    css += styleContent + '\n\n'
+  }
+
+  return css
+}
+
 function getTailwindCSSContent(): string {
   if (tailwindCSSContent) return tailwindCSSContent
 
@@ -118,7 +186,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     ])
 
     // 4. Get Tailwind config from site settings (saved when page is saved)
-    const tailwindConfig = (siteRes.data?.settings as Record<string, unknown>)?.tailwindConfig as TailwindCustomConfig | undefined
+    let tailwindConfig = (siteRes.data?.settings as Record<string, unknown>)?.tailwindConfig as TailwindCustomConfig | undefined
     if (tailwindConfig) {
       console.log('[CSS Export] Found Tailwind custom config in site settings:', Object.keys(tailwindConfig))
     }
@@ -140,16 +208,56 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       content: unknown
       custom_css?: string | null
     }> | null
+
+    // Also extract tailwind.config from HTML (AI generates this inline)
+    let extractedTailwindConfig: TailwindCustomConfig | null = null
+
     pages?.forEach((page) => {
       if (page.html_content) {
         allHtml += page.html_content
+        // Extract CSS from <style> tags in HTML
+        const extractedCSS = extractStyleTagsCSS(page.html_content)
+        if (extractedCSS) {
+          pagesCustomCSS += `/* Extracted from page HTML */\n${extractedCSS}\n`
+        }
+        // Extract tailwind.config from HTML (e.g. backgroundImage: { 'grid-pattern': '...' })
+        if (!extractedTailwindConfig) {
+          extractedTailwindConfig = extractTailwindConfigFromHTML(page.html_content)
+          if (extractedTailwindConfig) {
+            console.log('[CSS Export] Extracted tailwind.config from HTML:', Object.keys(extractedTailwindConfig))
+          }
+        }
       }
       allHtml += JSON.stringify(page.content || {})
-      // Collect custom CSS extracted from each page
+      // Collect custom CSS field from each page
       if (page.custom_css) {
         pagesCustomCSS += page.custom_css + '\n\n'
       }
     })
+
+    // Merge extracted tailwind config with site settings config
+    if (extractedTailwindConfig) {
+      tailwindConfig = {
+        ...tailwindConfig,
+        ...extractedTailwindConfig,
+        // Deep merge backgroundImage
+        backgroundImage: {
+          ...tailwindConfig?.backgroundImage,
+          ...extractedTailwindConfig.backgroundImage,
+        },
+        // Deep merge keyframes
+        keyframes: {
+          ...tailwindConfig?.keyframes,
+          ...extractedTailwindConfig.keyframes,
+        },
+        // Deep merge animation
+        animation: {
+          ...tailwindConfig?.animation,
+          ...extractedTailwindConfig.animation,
+        },
+      }
+      console.log('[CSS Export] Merged tailwind config, backgroundImage keys:', Object.keys(tailwindConfig?.backgroundImage || {}))
+    }
 
     // 6. CMS Components (including custom CSS)
     const { data: cmsComponents } = await supabase
@@ -189,6 +297,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .eq('id', siteId)
       .single()
 
+    let componentsExtractedCSS = ''
+
     if (siteData?.global_header_id) {
       const { data: headerComp } = await supabase
         .from('components')
@@ -199,6 +309,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       if (headerComp) {
         allHtml += headerComp.html || ''
         allHtml += headerComp.css || ''
+        // Extract CSS from <style> tags in header HTML
+        const extractedCSS = extractStyleTagsCSS(headerComp.html || '')
+        if (extractedCSS) {
+          componentsExtractedCSS += `/* Header CSS */\n${extractedCSS}\n`
+        }
       }
     }
 
@@ -212,6 +327,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       if (footerComp) {
         allHtml += footerComp.html || ''
         allHtml += footerComp.css || ''
+        // Extract CSS from <style> tags in footer HTML
+        const extractedCSS = extractStyleTagsCSS(footerComp.html || '')
+        if (extractedCSS) {
+          componentsExtractedCSS += `/* Footer CSS */\n${extractedCSS}\n`
+        }
       }
     }
 
@@ -331,6 +451,11 @@ ${cmsComponentsCSS}
    Includes: @keyframes, custom utility classes, page-specific styles
    ---------------------------------------------------------------- */
 ${pagesCustomCSS}
+
+/* ----------------------------------------------------------------
+   COMPONENT CUSTOM CSS (extracted from Header/Footer)
+   ---------------------------------------------------------------- */
+${componentsExtractedCSS}
 
 /* ----------------------------------------------------------------
    DESIGN TOKENS (CSS Variables + Utility Classes)

@@ -9,11 +9,22 @@ const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! })
 
 export type DesignArchetype = 'architect' | 'innovator' | 'brutalist' | 'organic'
 
+// All available design styles
+export type DesignStyle =
+  | 'brutalist' | 'organic' | 'craftsman' | 'minimal' | 'luxe' | 'bold'
+  | 'warm' | 'clinical' | 'dynamic' | 'editorial' | 'playful' | 'vintage'
+  | 'corporate' | 'neubrutalist' | 'glassmorphic' | 'dark-elegance' | 'bento'
+  | 'kinetic' | 'swiss' | 'japandi' | 'retro-futurism' | 'memphis'
+  | 'noise-grain' | 'asymmetric' | 'gradient-dream' | 'monoline' | 'split'
+
 export interface SetupSuggestion {
   siteName: string
   siteType: string
 
-  // NEW: Design Archetype
+  // Design Styles (can be multiple for mixed styles)
+  designStyles: DesignStyle[]
+
+  // Base archetype for settings defaults
   archetype: DesignArchetype
 
   pages: {
@@ -162,7 +173,25 @@ Analysiere Branche und Stil. Wähle EINEN Archetyp und bleibe 100% konsistent:
 │ • Effekte: Soft Shadows, Gradient Blobs, KEIN hartes Noise                 │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-⚠️ NIEMALS Archetypen mischen! "Brutalist + Organic" = Design-Chaos.
+═══════════════════════════════════════════════════════════════════════════
+DESIGN-STILE (wähle 1-3 passende Stile für designStyles Array)
+═══════════════════════════════════════════════════════════════════════════
+
+Verfügbare Stile:
+• brutalist, organic, craftsman, minimal, luxe, bold, warm, clinical
+• dynamic, editorial, playful, vintage, corporate, neubrutalist
+• glassmorphic, dark-elegance, bento, kinetic, swiss, japandi
+• retro-futurism, memphis, noise-grain, asymmetric, gradient-dream
+• monoline, split
+
+Beispiele:
+- Architekturbüro: ["minimal", "swiss", "asymmetric"]
+- SaaS Startup: ["glassmorphic", "bento", "gradient-dream"]
+- Handwerker: ["craftsman", "warm"]
+- Kreativagentur: ["neubrutalist", "kinetic", "bold"]
+- Wellness Studio: ["japandi", "organic", "minimal"]
+
+Du KANNST Stile mischen die zusammenpassen!
 
 ═══════════════════════════════════════════════════════════════════════════
 SCHRITT 2: GENERIERE ALLE DESIGN-VARIABLEN
@@ -173,6 +202,8 @@ Das JSON muss folgende Struktur haben:
 {
   "siteName": "Website Name",
   "siteType": "restaurant|portfolio|agency|shop|blog|business|landing|saas|event|medical|education|nonprofit|law|finance|creative|wellness",
+
+  "designStyles": ["stil1", "stil2"],
 
   "archetype": "architect|innovator|brutalist|organic",
 

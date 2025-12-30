@@ -551,14 +551,49 @@ export interface TemplateUpdate extends Partial<Omit<TemplateInsert, 'site_id'>>
 // DESIGN VARIABLES
 // ============================================
 
-// Design Archetype for consistent visual language
-export type DesignArchetype = 'architect' | 'innovator' | 'brutalist' | 'organic'
+// Design Styles - all available visual styles
+export type DesignStyle =
+  | 'architect'      // Legacy
+  | 'innovator'      // Legacy
+  | 'brutalist'      // THE BRUTALIST
+  | 'organic'        // THE ORGANIC
+  | 'craftsman'      // THE CRAFTSMAN
+  | 'minimal'        // THE MINIMAL
+  | 'luxe'           // THE LUXE
+  | 'bold'           // THE BOLD
+  | 'warm'           // THE WARM
+  | 'clinical'       // THE CLINICAL
+  | 'dynamic'        // THE DYNAMIC
+  | 'editorial'      // THE EDITORIAL
+  | 'playful'        // THE PLAYFUL
+  | 'vintage'        // THE VINTAGE
+  | 'corporate'      // THE CORPORATE
+  | 'neubrutalist'   // THE NEUBRUTALIST
+  | 'glassmorphic'   // THE GLASSMORPHIC
+  | 'dark-elegance'  // THE DARK ELEGANCE
+  | 'bento'          // THE BENTO
+  | 'kinetic'        // THE KINETIC
+  | 'swiss'          // THE SWISS
+  | 'japandi'        // THE JAPANDI
+  | 'retro-futurism' // THE RETRO FUTURISM
+  | 'memphis'        // THE MEMPHIS
+  | 'noise-grain'    // THE NOISE & GRAIN
+  | 'asymmetric'     // THE ASYMMETRIC
+  | 'gradient-dream' // THE GRADIENT DREAM
+  | 'monoline'       // THE MONOLINE
+  | 'split'          // THE SPLIT
+
+// Legacy type alias
+export type DesignArchetype = DesignStyle
 
 export interface DesignVariables {
   id: string
   site_id: string
 
-  // Design Archetype (determines overall visual style)
+  // Design Styles (can be multiple for mixed styles)
+  designStyles?: DesignStyle[]
+
+  // Legacy: single archetype (deprecated, use designStyles)
   archetype?: DesignArchetype
 
   colors: {
@@ -720,7 +755,8 @@ export interface DesignVariables {
 
 export interface DesignVariablesUpdate {
   site_id?: string
-  archetype?: DesignArchetype
+  designStyles?: DesignStyle[]
+  archetype?: DesignArchetype // Legacy
   colors?: Partial<DesignVariables['colors']>
   typography?: Partial<DesignVariables['typography']>
   spacing?: Partial<DesignVariables['spacing']>

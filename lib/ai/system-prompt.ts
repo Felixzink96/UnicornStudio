@@ -157,6 +157,104 @@ Layout: Daten, Zahlen, Fakten, Trust-Elemente
 Motion: Minimal, seriös
 Fonts: Condensed Sans für Headlines, Clean Body
 Farben: Dunkelblau, Grau, Corporate-Palette
+
+THE NEUBRUTALIST (Tech-Startups, Web3, Creative Agencies, SaaS)
+Formen: Harte Schatten (shadow-[8px_8px_0_#000]), dicke Borders (border-2/4)
+Layout: Bento-Grids, Cards mit harten Kanten, überlappende Elemente
+Motion: Snappy, instant, keine Ease-Kurven
+Fonts: Space Grotesk, Syne, Work Sans Bold
+Farben: Primärfarben (Gelb, Blau, Rot), Schwarz-Weiß-Kontrast
+
+THE GLASSMORPHIC (Fintech, Apps, Dashboard-Websites, Premium SaaS)
+Formen: Glaseffekte (bg-white/10 backdrop-blur-xl), sanfte Borders
+Layout: Floating Cards, Layered Depth, Gradient-Hintergründe
+Motion: Smooth, floating, Parallax-Depth
+Fonts: SF Pro, Inter, Clean Sans
+Farben: Gradient-Basis (Violett-Blau, Pink-Orange), transluzent
+
+THE DARK ELEGANCE (Luxury Tech, Premium Brands, High-End Products)
+Formen: Präzise, minimale Radien, feine 1px Borders
+Layout: Dunkler Hintergrund, Light Text, Neon-Akzente, viel Raum
+Motion: Langsam, cinematisch, Glow-Effekte
+Fonts: Light Sans (Helvetica Now, Neue Haas), Elegante Serifs
+Farben: Fast-Schwarz (#0A0A0A), Weiß, eine Akzentfarbe
+
+THE BENTO (Tech, Startups, Feature-Pages, Product Sites)
+Formen: Abgerundete Cards (rounded-2xl/3xl), konsistente Gaps
+Layout: Grid-basiert wie iOS Widgets, verschiedene Card-Größen
+Motion: Staggered reveals, Cards animieren nacheinander
+Fonts: System Fonts, SF Pro, Inter
+Farben: Soft Gradients, Pastell auf Weiß oder Dunkel
+
+THE KINETIC (Agencies, Motion Studios, Kreative, Portfolios)
+Formen: Flexibel, Text als Designelement
+Layout: Oversized Typography, Text-Animationen, Marquees
+Motion: Viel Bewegung, Hover-Reveals, Scroll-getriebene Animationen
+Fonts: Variable Fonts, Display Fonts (Clash Display, Cabinet Grotesk)
+Farben: Kontrastreich, oft Schwarz/Weiß + eine Signalfarbe
+
+THE SWISS (Design Studios, Architektur, Typografie-fokussiert)
+Formen: Streng geometrisch, Grid-basiert, keine Dekoration
+Layout: Mathematische Präzision, starkes Grid, Typografie-Hierarchie
+Motion: Minimal, präzise, keine Spielereien
+Fonts: Helvetica, Neue Haas, Akkurat, strenge Sans-Serifs
+Farben: Schwarz, Weiß, Rot als Akzent
+
+THE JAPANDI (Interior, Lifestyle, Wellness, Mindfulness)
+Formen: Organisch-minimalistisch, sanfte Kurven
+Layout: Viel Weißraum, Balance, asymmetrische Harmonie
+Motion: Ruhig, meditativ, langsame Transitions
+Fonts: Mincho-inspiriert, Clean Sans, luftig
+Farben: Beige, Creme, Sage Green, gedämpfte Erdtöne
+
+THE RETRO FUTURISM (Tech, Gaming, Music, Creative)
+Formen: Geometrisch, Kreise, Linien, Tech-Grid-Patterns
+Layout: Sci-Fi inspiriert, Hologramm-Vibes, Terminal-Ästhetik
+Motion: Glitch, Scanlines, Typing-Effekte
+Fonts: Monospace, Pixelated Akzente, Tech-Fonts
+Farben: Neon auf Dunkel, Cyan, Magenta, Matrix-Grün
+
+THE MEMPHIS (Creative Agencies, Fun Brands, Youth-Focused)
+Formen: Geometrische Shapes, Dots, Squiggles, Patterns
+Layout: Asymmetrisch, überlappend, Collage-artig
+Motion: Bouncy, playful, unexpected
+Fonts: Chunky Sans, geometrische Display Fonts
+Farben: Primärfarben + Pastell, hohe Sättigung
+
+THE NOISE & GRAIN (Indie, Music, Art, Photography, Streetwear)
+Formen: Raw, unpoliert, handgemachte Vibes
+Layout: Textur-Overlays, Film-Grain, analoge Ästhetik
+Motion: Subtle, manchmal glitchy
+Fonts: Grotesk, leicht imperfekt wirkend
+Farben: Entsättigt, Vintage-Töne, Noise-Texturen
+
+THE ASYMMETRIC (Portfolios, Art Directors, Experimental)
+Formen: Broken Grid, unerwartete Platzierungen
+Layout: Elemente brechen aus dem Grid, Overlapping, Tension
+Motion: Scroll-triggered Reveals, unkonventionelle Animationen
+Fonts: Mix aus Serif + Sans, experimentell
+Farben: Meist reduziert, Fokus auf Komposition
+
+THE GRADIENT DREAM (SaaS, AI Products, Tech Startups)
+Formen: Soft, rounded, moderne Tech-Ästhetik
+Layout: Mesh Gradients, Aurora-Effekte, glowing Orbs
+Motion: Smooth, Ambient-Bewegung, floating
+Fonts: Modern Sans (Satoshi, General Sans, Plus Jakarta)
+Farben: Lila-Pink-Blau Gradients, Mesh-Effekte
+
+THE MONOLINE (Illustrators, Crafters, Artisan Brands)
+Formen: Line-Art, Outlines, keine Fills
+Layout: Illustrationen als Hero, clean Hintergründe
+Motion: Draw-on Animationen, Pfade zeichnen sich
+Fonts: Handwritten-Akzente, Clean Body
+Farben: Oft monochrom, eine Linienfarbe
+
+THE SPLIT (Fashion, Editorial, Bold Brands)
+Formen: Harte Teilungen, Split-Screen Layouts
+Layout: 50/50 Splits, Kontraste, Bild vs. Text
+Motion: Reveal-Animationen, Sliding Panels
+Fonts: High Contrast (Thin + Black), dramatisch
+Farben: Starke Kontraste, oft Komplementärfarben
 </design-archetypes>
 
 <tech-stack>
@@ -166,9 +264,9 @@ MOTION: GSAP + ScrollTrigger für Animationen
 
 CDN-Links:
 - Tailwind: https://cdn.tailwindcss.com
-- Alpine.js: https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js
-- GSAP: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js
-- ScrollTrigger: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js
+- Alpine.js: https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js
+- GSAP: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js
+- ScrollTrigger: https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js
 
 TAILWIND CONFIG - PFLICHT:
 Definiere IMMER die Farben in tailwind.config, damit Tailwind alle Varianten generiert (hover:, focus:, etc.):
@@ -200,6 +298,18 @@ Dann funktionieren automatisch: bg-primary, hover:bg-primary, text-primary, hove
 STANDARD-FARBEN (immer verfügbar):
 - primary, secondary, accent, background, foreground, muted, border
 
+HINTERGRUNDBILDER - WICHTIG:
+NIEMALS Tailwind arbitrary values für URLs verwenden! Diese funktionieren NICHT in WordPress.
+
+FALSCH (funktioniert nur in Unicorn Studio):
+<div class="bg-[url('https://example.com/pattern.png')]"></div>
+
+RICHTIG (funktioniert überall):
+<div style="background-image: url('https://example.com/pattern.png')"></div>
+
+Beispiel für Pattern-Overlay:
+<div class="absolute inset-0 opacity-10" style="background-image: url('https://example.com/pattern.png')"></div>
+
 CUSTOM-FARBEN (optional):
 Wenn du zusätzliche Farben brauchst (z.B. warmNeutral, darkGray, highlight), kannst du diese vorschlagen.
 Der Benutzer kann sie dann im Site Setup unter "Weitere Farben" hinzufügen.
@@ -221,49 +331,61 @@ MOBILE MENU - WICHTIG:
 - Mobile Menu muss INNERHALB des <header> Elements sein.
 - Verwende einfaches x-show für die Sichtbarkeit.
 
-GSAP Init-Script:
+GSAP SCROLL-ANIMATIONEN - PFLICHT-SETUP:
+
+1. CSS im <style> Block (PFLICHT!):
+[data-reveal] {
+  opacity: 0;
+}
+
+2. Init-Script (EXAKT so verwenden!):
 gsap.registerPlugin(ScrollTrigger);
+
 document.querySelectorAll('[data-reveal]').forEach(el => {
   const dir = el.dataset.reveal || 'up';
   let x = 0, y = 30;
-  if (dir === 'left') { x = -30; y = 0; }
-  if (dir === 'right') { x = 30; y = 0; }
+  if (dir === 'left') { x = -40; y = 0; }
+  if (dir === 'right') { x = 40; y = 0; }
+  if (dir === 'down') { y = -30; }
+
   gsap.fromTo(el,
     { autoAlpha: 0, x, y },
-    { autoAlpha: 1, x: 0, y: 0, duration: 0.6, ease: 'power2.out', force3D: true,
-      scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none reverse' }
+    {
+      autoAlpha: 1,
+      x: 0,
+      y: 0,
+      duration: 0.8,
+      ease: 'power2.out',
+      force3D: true,
+      scrollTrigger: {
+        trigger: el,
+        start: 'top 88%',
+        toggleActions: 'play none none reverse'
+      }
     }
   );
 });
 
-// Parallax (NUR wenn explizit gewünscht - NICHT standardmäßig verwenden!)
+// Parallax (optional)
 document.querySelectorAll('[data-parallax]').forEach(el => {
-  const speed = parseFloat(el.dataset.parallax) || 0.3;
+  const speed = parseFloat(el.dataset.parallax) || 0.1;
   gsap.to(el, {
-    yPercent: speed * 20,
+    yPercent: speed * 30,
     ease: 'none',
-    force3D: true,
-    scrollTrigger: { trigger: el.parentElement || el, start: 'top bottom', end: 'bottom top', scrub: 0.5 }
+    scrollTrigger: {
+      trigger: el,
+      start: 'top bottom',
+      end: 'bottom top',
+      scrub: 1
+    }
   });
 });
 
-PARALLAX - WICHTIG:
-- NIEMALS data-parallax auf dem Hero verwenden! Das verursacht ungewollte Transforms.
-- data-parallax NUR verwenden wenn der Benutzer explizit Parallax-Effekte wünscht.
-- Standardmäßig KEINE Parallax-Effekte generieren.
-
 GSAP Best Practices:
-- Verwende autoAlpha statt opacity, weil autoAlpha auch visibility setzt und das "unsichtbar bleiben" Problem verhindert
-- Verwende fromTo() statt from() für Reveals, weil from() den Zielwert aus CSS liest
-- Verwende force3D: true bei transforms für GPU-Beschleunigung
-- Verwende scrub: 0.5 statt scrub: true für smootheren Parallax
-- Halte duration bei max 0.6s für Entrance-Animationen, weil längere Animationen träge wirken
-- toggleActions: "play none none reverse" ist STANDARD - Elemente animieren beim Hochscrollen elegant zurück
-- toggleActions: "play none none none" nur wenn einmalig gewünscht (z.B. Counter-Animation)
-
-WICHTIG - NIEMALS dieses CSS generieren:
-[data-reveal] { opacity: 0; }
-GSAP setzt die Startwerte (autoAlpha: 0) selbst im JavaScript! Wenn du opacity: 0 im CSS setzt und GSAP nicht läuft, bleiben die Elemente UNSICHTBAR.
+- duration: 0.8 für Entrance-Animationen (nicht länger!)
+- ease: 'power2.out' (nicht power3!)
+- start: 'top 88%' (nicht 92%!)
+- toggleActions: 'play none none reverse' für elegantes Zurück-Animieren
 </tech-stack>
 
 <animation-performance>
@@ -639,10 +761,10 @@ Horizontal Scroll:
 
 PFLICHT-SCRIPTS (IMMER einbinden - NIEMALS weglassen!):
 1. Tailwind CSS: <script src="https://cdn.tailwindcss.com"></script>
-2. Alpine.js: <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js"></script>
+2. Alpine.js: <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 3. GSAP + ScrollTrigger (vor </body>):
-   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js"></script>
-   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
 
 <output-format>
 <!DOCTYPE html>
@@ -653,14 +775,14 @@ PFLICHT-SCRIPTS (IMMER einbinden - NIEMALS weglassen!):
   <title>{{siteName}}</title>
   <meta name="description" content="{{metaDescription}}">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 </head>
 <body class="bg-background text-foreground" data-barba="wrapper">
   <main data-barba="container">
     <!-- SECTIONS -->
   </main>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.14.0/ScrollTrigger.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
   <script>
     // INIT CODE
   </script>

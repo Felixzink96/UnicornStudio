@@ -394,18 +394,11 @@ final class Unicorn_Studio {
             return;
         }
 
-        $css = get_post_meta($post->ID, '_unicorn_studio_css', true);
-
-        // Only output page-specific CSS if it exists
-        // All Tailwind classes (including arbitrary values) are compiled by Tailwind v4
-        // and included in the main styles.css - no duplicate generation needed
-        if (empty($css)) {
-            return;
-        }
-
-        echo "\n<style id=\"unicorn-studio-page-css\">\n";
-        echo $css;
-        echo "\n</style>\n";
+        // REMOVED: Inline page CSS is no longer output here
+        // All page CSS is now included in the compiled styles.css file
+        // This prevents duplicate CSS rules that cause cascade conflicts
+        // (e.g., .marquee-content overriding .flex)
+        return;
     }
 
     /**

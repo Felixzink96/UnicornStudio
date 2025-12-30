@@ -380,10 +380,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // 10. Compile Tailwind CSS using JIT Browser library (primary) or v4 API (fallback)
     let tailwindCSS = ''
     let keyframesCSS = ''
+
+    // IMPORTANT: Remove <style> tags from HTML before JIT compilation
+    // Otherwise JIT will include custom CSS (like .marquee-content) in its output
+    // and it will appear TWICE (once from our extraction, once from JIT)
+    const htmlForJIT = allHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+
     try {
       // PRIMARY: Use JIT Browser library - scans HTML directly for ALL Tailwind classes
       // This is more reliable than manual class extraction
-      tailwindCSS = await compileTailwindCSSFromHTML(allHtml, tailwindConfig || undefined)
+      tailwindCSS = await compileTailwindCSSFromHTML(htmlForJIT, tailwindConfig || undefined)
       console.log('[CSS Export] JIT compilation successful')
     } catch (jitError) {
       console.error('[CSS Export] JIT compilation failed, trying Tailwind v4 API:', jitError)

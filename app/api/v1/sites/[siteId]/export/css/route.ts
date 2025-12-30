@@ -370,7 +370,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // 9. Generate CSS Variables from design tokens (using central function)
     const designVars = designVarsRes.data as DesignVariables | null
+    console.log('[CSS Export] designVars exists:', !!designVars)
     const cssVariables = generateDesignTokensCSS(designVars)
+    console.log('[CSS Export] cssVariables length:', cssVariables.length)
+    console.log('[CSS Export] cssVariables contains hover:bg-primary:', cssVariables.includes('hover\\\\:bg-primary'))
 
     // 9.5. Get stored fonts and generate @font-face CSS
     let fontFaceCSS = ''

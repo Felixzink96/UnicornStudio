@@ -609,6 +609,14 @@ async function compileTailwindCSSFromHTML(htmlContent: string, customConfig?: Ta
         preflight: true, // Include CSS reset
       },
       theme: {
+        // Explicit screens for proper @media query generation
+        screens: {
+          sm: '640px',
+          md: '768px',
+          lg: '1024px',
+          xl: '1280px',
+          '2xl': '1536px',
+        },
         extend: {
           // Add custom colors
           ...(customConfig?.colors && { colors: customConfig.colors }),

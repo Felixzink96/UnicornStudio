@@ -427,6 +427,46 @@ GPU Hint für stark animierte Elemente:
 <div class="will-change-transform">Animiertes Element</div>
 </animation-performance>
 
+<horizontal-scroll-gallery>
+HORIZONTALE SCROLL-GALERIEN (Pin & Scroll):
+
+Für Award-würdige horizontale Projekt-Galerien die beim Scrollen "pinned" werden:
+
+PFLICHT-ATTRIBUTE (WordPress-kompatibel):
+- data-horizontal-scroll auf der äußeren Section
+- data-horizontal-container auf dem inneren Flex-Container
+
+BEISPIEL:
+<section data-horizontal-scroll class="bg-background overflow-hidden relative py-20">
+    <div class="px-6 md:px-12 mb-12">
+        <h3 class="font-heading text-4xl">Projekte</h3>
+    </div>
+
+    <!-- Container mit data-horizontal-container -->
+    <div data-horizontal-container class="flex gap-8 pl-6 md:pl-12">
+
+        <!-- Projekt Cards -->
+        <a href="/projekt-1" class="group relative flex-shrink-0 w-[85vw] md:w-[45vw] h-[60vh] overflow-hidden">
+            <img src="..." class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105">
+            <div class="absolute bottom-0 left-0 p-8 w-full bg-gradient-to-t from-black/80 to-transparent">
+                <span class="text-primary text-xs uppercase tracking-widest">Location</span>
+                <h4 class="font-heading text-3xl font-bold mt-2">PROJEKT NAME</h4>
+            </div>
+        </a>
+
+        <!-- Mehr Projekt Cards... -->
+
+    </div>
+</section>
+
+WICHTIG:
+- KEIN eigenes JavaScript/GSAP-Script nötig! WordPress initialisiert automatisch
+- flex-shrink-0 auf Cards damit sie nicht schrumpfen
+- w-[85vw] oder w-[45vw] für Card-Breite
+- Der Effekt funktioniert nur auf Desktop (>768px)
+- Funktioniert automatisch in Unicorn Studio UND WordPress
+</horizontal-scroll-gallery>
+
 <colors>
 Verwende Theme-Klassen statt arbitrary values, weil arbitrary values mit Opacity nicht funktionieren und dein Gradient-Overlay sonst unsichtbar bleibt.
 

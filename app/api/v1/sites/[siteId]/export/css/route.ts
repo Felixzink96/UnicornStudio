@@ -237,23 +237,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Merge extracted tailwind config with site settings config
     if (extractedTailwindConfig) {
+      const extracted = extractedTailwindConfig // TypeScript knows this is not null now
       tailwindConfig = {
-        ...tailwindConfig,
-        ...extractedTailwindConfig,
+        ...(tailwindConfig || {}),
+        ...extracted,
         // Deep merge backgroundImage
         backgroundImage: {
-          ...tailwindConfig?.backgroundImage,
-          ...extractedTailwindConfig.backgroundImage,
+          ...(tailwindConfig?.backgroundImage || {}),
+          ...(extracted.backgroundImage || {}),
         },
         // Deep merge keyframes
         keyframes: {
-          ...tailwindConfig?.keyframes,
-          ...extractedTailwindConfig.keyframes,
+          ...(tailwindConfig?.keyframes || {}),
+          ...(extracted.keyframes || {}),
         },
         // Deep merge animation
         animation: {
-          ...tailwindConfig?.animation,
-          ...extractedTailwindConfig.animation,
+          ...(tailwindConfig?.animation || {}),
+          ...(extracted.animation || {}),
         },
       }
       console.log('[CSS Export] Merged tailwind config, backgroundImage keys:', Object.keys(tailwindConfig?.backgroundImage || {}))

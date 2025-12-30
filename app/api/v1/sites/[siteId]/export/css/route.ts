@@ -66,27 +66,54 @@ const MINIMAL_TAILWIND_SOURCE = `
 function extractTailwindConfigFromHTML(html: string): TailwindCustomConfig | null {
   if (!html) return null
 
-  // Match tailwind.config = { ... }
-  const configRegex = /tailwind\.config\s*=\s*(\{[\s\S]*?\})\s*<\/script>/i
-  const match = html.match(configRegex)
+  // Find the script block containing tailwind.config
+  const scriptMatch = html.match(/<script[^>]*>([\s\S]*?tailwind\.config[\s\S]*?)<\/script>/i)
+  if (!scriptMatch) return null
 
-  if (!match) return null
+  const scriptContent = scriptMatch[1]
+
+  // Find where tailwind.config = { starts
+  const startMatch = scriptContent.match(/tailwind\.config\s*=\s*\{/)
+  if (!startMatch || startMatch.index === undefined) return null
+
+  // Extract the object by counting braces
+  const startIndex = startMatch.index + startMatch[0].length - 1 // Position of opening {
+  let braceCount = 0
+  let endIndex = startIndex
+
+  for (let i = startIndex; i < scriptContent.length; i++) {
+    if (scriptContent[i] === '{') braceCount++
+    if (scriptContent[i] === '}') braceCount--
+    if (braceCount === 0) {
+      endIndex = i + 1
+      break
+    }
+  }
+
+  const configStr = scriptContent.substring(startIndex, endIndex)
 
   try {
     // Clean the config string for JSON parsing
-    let configStr = match[1]
+    const cleanedConfig = configStr
       // Remove comments
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       // Convert single quotes to double quotes
       .replace(/'/g, '"')
-      // Add quotes around unquoted keys
-      .replace(/(\w+)(?=\s*:)/g, '"$1"')
+      // Add quotes around unquoted keys (but not inside strings)
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
       // Remove trailing commas
       .replace(/,(\s*[}\]])/g, '$1')
 
-    const config = JSON.parse(configStr)
+    console.log('[CSS Export] Extracted tailwind.config, length:', configStr.length)
+
+    const config = JSON.parse(cleanedConfig)
     const extend = config?.theme?.extend || {}
+
+    console.log('[CSS Export] Parsed extend keys:', Object.keys(extend))
+    if (extend.backgroundImage) {
+      console.log('[CSS Export] Found backgroundImage:', Object.keys(extend.backgroundImage))
+    }
 
     return {
       colors: extend.colors,
@@ -97,6 +124,7 @@ function extractTailwindConfigFromHTML(html: string): TailwindCustomConfig | nul
     }
   } catch (e) {
     console.log('[CSS Export] Could not parse tailwind.config from HTML:', e)
+    console.log('[CSS Export] Config string (first 500 chars):', configStr.substring(0, 500))
     return null
   }
 }

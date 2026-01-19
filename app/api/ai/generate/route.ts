@@ -482,61 +482,99 @@ Du kannst MEHRERE Updates in einer Antwort zurueckgeben wenn mehrere Elemente re
     // Add referenced pages as style guide
     // FAILSAFE: Remove header/footer from referenced pages if global components exist
     if (referencedPages && referencedPages.length > 0) {
-      userMessage += `REFERENZIERTE SEITEN (nutze diese als Style-Guide!):\n`
-      for (const page of referencedPages) {
-        let pageHtml = page.html
+      // Check if user is referencing the current page (same content)
+      const isReferencingSamePage = referencedPages.some(p =>
+        existingHtml && p.html && p.html.length > 100 &&
+        existingHtml.includes(p.html.slice(100, 500))
+      )
 
-        // Strip header/footer from referenced pages to prevent AI from copying them
-        if (globalComponents.hasGlobalHeader || globalComponents.hasGlobalFooter) {
-          // Remove <header>...</header> tags
-          if (globalComponents.hasGlobalHeader) {
-            pageHtml = pageHtml.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '<!-- HEADER ENTFERNT - GLOBAL VORHANDEN -->')
-            // Also remove fixed navs at the start that act as headers
-            pageHtml = pageHtml.replace(/(<body[^>]*>\s*)(<nav[^>]*class="[^"]*fixed[^"]*"[^>]*>[\s\S]*?<\/nav>)/gi, '$1<!-- NAV ENTFERNT -->')
+      if (isReferencingSamePage && hasExistingContent) {
+        // User is referencing the current page - they want to MODIFY it, not copy it
+        userMessage += `\n⚠️ WICHTIG: Der User referenziert die AKTUELLE Seite!\n`
+        userMessage += `Das bedeutet: MODIFIZIERE den bestehenden Inhalt, erstelle NICHTS Neues!\n`
+        userMessage += `Behalte ALLE Texte, Überschriften und Inhalte - ändere NUR was der User explizit anfragt!\n\n`
+      } else {
+        userMessage += `REFERENZIERTE SEITEN (als Design-Referenz):\n`
+        for (const page of referencedPages) {
+          let pageHtml = page.html
+
+          // Strip header/footer from referenced pages to prevent AI from copying them
+          if (globalComponents.hasGlobalHeader || globalComponents.hasGlobalFooter) {
+            // Remove <header>...</header> tags
+            if (globalComponents.hasGlobalHeader) {
+              pageHtml = pageHtml.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '<!-- HEADER ENTFERNT - GLOBAL VORHANDEN -->')
+              // Also remove fixed navs at the start that act as headers
+              pageHtml = pageHtml.replace(/(<body[^>]*>\s*)(<nav[^>]*class="[^"]*fixed[^"]*"[^>]*>[\s\S]*?<\/nav>)/gi, '$1<!-- NAV ENTFERNT -->')
+            }
+
+            // Remove <footer>...</footer> tags
+            if (globalComponents.hasGlobalFooter) {
+              pageHtml = pageHtml.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '<!-- FOOTER ENTFERNT - GLOBAL VORHANDEN -->')
+            }
           }
 
-          // Remove <footer>...</footer> tags
-          if (globalComponents.hasGlobalFooter) {
-            pageHtml = pageHtml.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '<!-- FOOTER ENTFERNT - GLOBAL VORHANDEN -->')
-          }
+          userMessage += `\n--- @${page.name} ---\n\`\`\`html\n${pageHtml}\n\`\`\`\n`
         }
-
-        userMessage += `\n--- @${page.name} ---\n\`\`\`html\n${pageHtml}\n\`\`\`\n`
+        userMessage += `\nNutze das Design dieser Seite(n) als Referenz für konsistentes Styling.\n`
+        userMessage += `⚠️ WICHTIG: Header und Footer sind global - generiere NUR Content-Sections!\n\n`
       }
-      userMessage += `\nÜBERNIMM DAS DESIGN DIESER SEITE(N) EXAKT für die neue Seite/Section!\n`
-      userMessage += `⚠️ WICHTIG: Header und Footer sind global und wurden entfernt - generiere NUR Content-Sections!\n\n`
     }
 
     if (hasExistingContent) {
-      userMessage += `⚠️ WICHTIG: DIE SEITE HAT BEREITS INHALT!
+      userMessage += `
+═══════════════════════════════════════════════════════════════
+⚠️ KRITISCH: DIESE SEITE HAT BEREITS FERTIGEN CONTENT!
+═══════════════════════════════════════════════════════════════
 
-BESTEHENDER HTML-CODE:
+BESTEHENDER HTML-CODE DER SEITE:
 \`\`\`html
 ${existingHtml}
 \`\`\`
 
-🚫 VERBOTEN: replace_all oder kompletten HTML-Code mit <!DOCTYPE> ausgeben!
-✅ PFLICHT: Nur OPERATION: add, modify oder delete verwenden!
+═══════════════════════════════════════════════════════════════
+🔴 ABSOLUTE REGELN - KEINE AUSNAHMEN:
+═══════════════════════════════════════════════════════════════
 
-DEINE AUFGABEN:
-1. Analysiere den bestehenden Code und übernimm exakt das Design
-2. Gib NUR den NEUEN/GEÄNDERTEN Teil aus - NICHT die ganze Seite!
-3. Bei Löschungen: Verwende OPERATION: delete mit SELECTOR
+1. JEDEN TEXT EXAKT ÜBERNEHMEN:
+   - Alle Headlines (h1, h2, h3...) → EXAKT kopieren
+   - Alle Paragraphen (p) → EXAKT kopieren
+   - Alle Button-Texte → EXAKT kopieren
+   - Alle Listen-Items → EXAKT kopieren
+   - NICHTS erfinden, NICHTS ändern, NICHTS weglassen!
 
-BEISPIEL FÜR KORREKTEN OUTPUT:
+2. BEI STYLING-ANFRAGEN (Farbe, dunkel, hell, Hintergrund):
+   - NUR CSS-Klassen ändern (bg-*, text-*, etc.)
+   - ALLE Texte 1:1 behalten
+   - Struktur nicht ändern
+
+3. VERBOTEN:
+   ❌ Neue Texte erfinden
+   ❌ Branche/Thema ändern
+   ❌ Headlines umformulieren
+   ❌ Inhalte weglassen
+   ❌ replace_all verwenden
+   ❌ <!DOCTYPE html> ausgeben
+
+4. ERLAUBT:
+   ✅ CSS-Klassen ändern (Farben, Abstände, etc.)
+   ✅ Bilder ändern wenn explizit angefragt
+   ✅ Neue Sections HINZUFÜGEN (nicht ersetzen)
+
+BEISPIEL - User sagt "mache Hero dunkel":
 \`\`\`
-MESSAGE: Neue FAQ Section hinzugefügt
+MESSAGE: Hero Section auf dunklen Hintergrund geändert
 ---
-OPERATION: add
-POSITION: end
+OPERATION: modify
+SELECTOR: #hero
 ---
-<section id="faq" class="py-24 bg-white">
-  ... NUR diese Section ...
+<section id="hero" class="bg-neutral-900 text-white py-24">
+  <!-- EXAKT GLEICHER CONTENT WIE VORHER, NUR KLASSEN GEÄNDERT -->
+  <h1 class="text-white">EXAKT DER GLEICHE TITEL WIE VORHER</h1>
+  <p class="text-neutral-300">EXAKT DER GLEICHE TEXT WIE VORHER</p>
 </section>
 \`\`\`
 
-❌ FALSCH: <!DOCTYPE html>... komplette Seite
-✅ RICHTIG: Nur <section>... neue Section ...</section>`
+═══════════════════════════════════════════════════════════════`
     } else {
       userMessage += `Die Seite ist leer. Verwende OPERATION: replace_all um eine komplette HTML-Seite zu erstellen.`
     }

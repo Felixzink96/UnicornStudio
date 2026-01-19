@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useEditorStore } from '@/stores/editor-store'
+import { createClient } from '@/lib/supabase/client'
 import {
   Type,
   Image as ImageIcon,
@@ -20,6 +21,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Check,
 } from 'lucide-react'
 import { ImagePicker } from '../assets/ImagePicker'
 import {
@@ -39,6 +41,9 @@ export function ElementFloatingBar() {
   const [elementPrompt, setElementPrompt] = useState('')
   const [isModifying, setIsModifying] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
+  const [editedCode, setEditedCode] = useState('')
+  const [isApplyingCode, setIsApplyingCode] = useState(false)
+  const [codeApplySuccess, setCodeApplySuccess] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -47,6 +52,8 @@ export function ElementFloatingBar() {
   const html = useEditorStore((s) => s.html)
   const updateHtml = useEditorStore((s) => s.updateHtml)
   const siteId = useEditorStore((s) => s.siteId)
+  const globalHeader = useEditorStore((s) => s.globalHeader)
+  const globalFooter = useEditorStore((s) => s.globalFooter)
 
   // Close dropdown when clicking outside (check both bar and dropdown refs)
   useEffect(() => {
@@ -62,6 +69,193 @@ export function ElementFloatingBar() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Reset edited code when selected element changes or code dropdown opens
+  useEffect(() => {
+    if (selectedElement?.outerHTML) {
+      setEditedCode(selectedElement.outerHTML)
+      setCodeApplySuccess(false)
+    }
+  }, [selectedElement?.outerHTML, dropdown.active])
+
+  // Helper to detect if element is in header or footer
+  const getGlobalComponentContext = () => {
+    if (!selectedElement?.selector) return null
+
+    // Check if the selector starts with header or footer
+    const selector = selectedElement.selector.toLowerCase()
+    if (selector.startsWith('header') || selector.includes(' header ') || selector.startsWith('header >')) {
+      return globalHeader ? { type: 'header' as const, component: globalHeader } : null
+    }
+    if (selector.startsWith('footer') || selector.includes(' footer ') || selector.startsWith('footer >')) {
+      return globalFooter ? { type: 'footer' as const, component: globalFooter } : null
+    }
+
+    // Also check by looking at the outerHTML structure
+    if (selectedElement.outerHTML) {
+      // If the element itself is a header/footer tag
+      if (selectedElement.outerHTML.trim().startsWith('<header')) {
+        return globalHeader ? { type: 'header' as const, component: globalHeader } : null
+      }
+      if (selectedElement.outerHTML.trim().startsWith('<footer')) {
+        return globalFooter ? { type: 'footer' as const, component: globalFooter } : null
+      }
+    }
+
+    return null
+  }
+
+  // Apply code changes
+  const applyCodeChanges = async () => {
+    if (!selectedElement?.selector || !editedCode.trim() || isApplyingCode) return
+
+    setIsApplyingCode(true)
+    setCodeApplySuccess(false)
+
+    try {
+      const globalContext = getGlobalComponentContext()
+
+      if (globalContext && globalContext.component.id && siteId) {
+        // Element is part of header/footer - update the global component
+        const supabase = createClient()
+
+        // Parse the current global component HTML
+        const componentHtml = globalContext.component.html || ''
+        const doc = new DOMParser().parseFromString(componentHtml, 'text/html')
+
+        // Try to find and replace the element in the component HTML
+        // If the selector is just 'header' or 'footer', replace the entire component
+        if (selectedElement.selector === 'header' || selectedElement.selector === 'footer') {
+          // Replace entire component HTML
+          const { error } = await supabase
+            .from('components')
+            .update({
+              html: editedCode,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', globalContext.component.id)
+
+          if (error) throw error
+
+          // Update the store
+          useEditorStore.setState((state) => ({
+            [globalContext.type === 'header' ? 'globalHeader' : 'globalFooter']: {
+              ...globalContext.component,
+              html: editedCode
+            }
+          }))
+        } else {
+          // Try to find the element within the component
+          // Extract the relative selector (remove header/footer prefix)
+          let relativeSelector = selectedElement.selector
+            .replace(/^header\s*>\s*/i, '')
+            .replace(/^footer\s*>\s*/i, '')
+            .replace(/^header\s+/i, '')
+            .replace(/^footer\s+/i, '')
+
+          // Wrap in header/footer for proper parsing
+          const wrapperTag = globalContext.type === 'header' ? 'header' : 'footer'
+          const wrappedDoc = new DOMParser().parseFromString(
+            `<${wrapperTag}>${componentHtml}</${wrapperTag}>`,
+            'text/html'
+          )
+
+          const targetElement = wrappedDoc.querySelector(relativeSelector) ||
+                               wrappedDoc.querySelector(selectedElement.selector)
+
+          if (targetElement) {
+            // Replace the element's outerHTML
+            targetElement.outerHTML = editedCode
+
+            // Extract the updated content (without wrapper if component doesn't have it)
+            const wrapper = wrappedDoc.querySelector(wrapperTag)
+            const newComponentHtml = wrapper?.innerHTML || editedCode
+
+            const { error } = await supabase
+              .from('components')
+              .update({
+                html: newComponentHtml,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', globalContext.component.id)
+
+            if (error) throw error
+
+            // Update the store
+            useEditorStore.setState((state) => ({
+              [globalContext.type === 'header' ? 'globalHeader' : 'globalFooter']: {
+                ...globalContext.component,
+                html: newComponentHtml
+              }
+            }))
+          } else {
+            // Fallback: replace entire component
+            const { error } = await supabase
+              .from('components')
+              .update({
+                html: editedCode,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', globalContext.component.id)
+
+            if (error) throw error
+
+            useEditorStore.setState((state) => ({
+              [globalContext.type === 'header' ? 'globalHeader' : 'globalFooter']: {
+                ...globalContext.component,
+                html: editedCode
+              }
+            }))
+          }
+        }
+
+        // Also update the page HTML to reflect changes
+        const pageDoc = new DOMParser().parseFromString(html, 'text/html')
+        const pageElement = pageDoc.querySelector(selectedElement.selector)
+        if (pageElement) {
+          pageElement.outerHTML = editedCode
+          let newHtml = '<!DOCTYPE html>\n<html'
+          Array.from(pageDoc.documentElement.attributes).forEach(attr => {
+            newHtml += ` ${attr.name}="${attr.value}"`
+          })
+          newHtml += '>\n' + pageDoc.head.outerHTML + '\n' + pageDoc.body.outerHTML + '\n</html>'
+          updateHtml(newHtml, true)
+        }
+
+        setCodeApplySuccess(true)
+        console.log(`[ElementFloatingBar] Updated ${globalContext.type} component in database`)
+      } else {
+        // Regular page element - just update the page HTML
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+        const element = doc.querySelector(selectedElement.selector)
+
+        if (element) {
+          element.outerHTML = editedCode
+
+          let newHtml = '<!DOCTYPE html>\n<html'
+          Array.from(doc.documentElement.attributes).forEach(attr => {
+            newHtml += ` ${attr.name}="${attr.value}"`
+          })
+          newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+
+          updateHtml(newHtml, true)
+          setCodeApplySuccess(true)
+          console.log('[ElementFloatingBar] Updated page element HTML')
+        }
+      }
+
+      // Clear selection after a short delay to show success state
+      setTimeout(() => {
+        clearSelection()
+        setDropdown({ active: 'none' })
+      }, 500)
+
+    } catch (error) {
+      console.error('[ElementFloatingBar] Error applying code:', error)
+    } finally {
+      setIsApplyingCode(false)
+    }
+  }
 
   if (!selectedElement) return null
 
@@ -130,90 +324,132 @@ export function ElementFloatingBar() {
   }
   const imageAttrs = getImageAttributes()
 
-  // Update image src (for IMG tags)
-  const updateImageSrc = (newSrc: string, newAlt?: string) => {
+  // Helper: Update global component in database
+  const updateGlobalComponent = async (newComponentHtml: string, componentType: 'header' | 'footer') => {
+    const component = componentType === 'header' ? globalHeader : globalFooter
+    if (!component?.id) return false
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('components')
+        .update({
+          html: newComponentHtml,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', component.id)
+
+      if (error) throw error
+
+      // Update store
+      useEditorStore.setState({
+        [componentType === 'header' ? 'globalHeader' : 'globalFooter']: {
+          ...component,
+          html: newComponentHtml
+        }
+      })
+
+      console.log(`[ElementFloatingBar] Updated ${componentType} component in database`)
+      return true
+    } catch (error) {
+      console.error(`[ElementFloatingBar] Error updating ${componentType}:`, error)
+      return false
+    }
+  }
+
+  // Helper: Apply element change to both page HTML and global component if needed
+  const applyElementChange = async (modifyElement: (element: Element) => void) => {
     if (!selectedElement?.selector) return
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    const element = doc.querySelector(selectedElement.selector) as HTMLImageElement
-    if (!element || element.tagName !== 'IMG') return
 
-    element.src = newSrc
-    if (newAlt !== undefined) element.alt = newAlt
+    const globalContext = getGlobalComponentContext()
 
-    let newHtml = '<!DOCTYPE html>\n<html'
-    Array.from(doc.documentElement.attributes).forEach(attr => {
-      newHtml += ` ${attr.name}="${attr.value}"`
+    // Update page HTML (always needed for preview)
+    const pageDoc = new DOMParser().parseFromString(html, 'text/html')
+    const pageElement = pageDoc.querySelector(selectedElement.selector)
+    if (pageElement) {
+      modifyElement(pageElement)
+      let newPageHtml = '<!DOCTYPE html>\n<html'
+      Array.from(pageDoc.documentElement.attributes).forEach(attr => {
+        newPageHtml += ` ${attr.name}="${attr.value}"`
+      })
+      newPageHtml += '>\n' + pageDoc.head.outerHTML + '\n' + pageDoc.body.outerHTML + '\n</html>'
+      updateHtml(newPageHtml, true)
+    }
+
+    // If element is in global component, also update the database
+    if (globalContext && globalContext.component.id) {
+      const componentHtml = globalContext.component.html || ''
+      const wrapperTag = globalContext.type
+
+      // Parse component HTML with wrapper
+      const compDoc = new DOMParser().parseFromString(
+        `<${wrapperTag}>${componentHtml}</${wrapperTag}>`,
+        'text/html'
+      )
+
+      // Find element in component - try relative selector first
+      let relativeSelector = selectedElement.selector
+        .replace(/^header\s*>\s*/i, '')
+        .replace(/^footer\s*>\s*/i, '')
+        .replace(/^header\s+/i, '')
+        .replace(/^footer\s+/i, '')
+
+      const compElement = compDoc.querySelector(relativeSelector) ||
+                          compDoc.querySelector(selectedElement.selector)
+
+      if (compElement) {
+        modifyElement(compElement)
+        const wrapper = compDoc.querySelector(wrapperTag)
+        const newComponentHtml = wrapper?.innerHTML || componentHtml
+        await updateGlobalComponent(newComponentHtml, globalContext.type)
+      }
+    }
+  }
+
+  // Update image src (for IMG tags)
+  const updateImageSrc = async (newSrc: string, newAlt?: string) => {
+    await applyElementChange((element) => {
+      if (element.tagName === 'IMG') {
+        (element as HTMLImageElement).src = newSrc
+        if (newAlt !== undefined) (element as HTMLImageElement).alt = newAlt
+      }
     })
-    newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
-    updateHtml(newHtml, true)
   }
 
   // Update background image (for containers with background-image)
-  const updateBackgroundImage = (newSrc: string, ariaLabel?: string) => {
-    if (!selectedElement?.selector) return
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    const element = doc.querySelector(selectedElement.selector) as HTMLElement
-    if (!element) return
-
-    // Remove old Tailwind background URL classes (if any)
-    const classes = (element.className || '').split(' ')
-    const filteredClasses = classes.filter(c => !c.startsWith('bg-[url('))
-    element.className = filteredClasses.join(' ')
-
-    // Use inline style for background-image (safer than dynamic Tailwind classes)
-    element.style.backgroundImage = `url('${newSrc}')`
-
-    // Set ARIA-Label for accessibility
-    if (ariaLabel) {
-      element.setAttribute('aria-label', ariaLabel)
-      element.setAttribute('role', 'img')
-    }
-
-    // Reconstruct and save HTML
-    let newHtml = '<!DOCTYPE html>\n<html'
-    Array.from(doc.documentElement.attributes).forEach(attr => {
-      newHtml += ` ${attr.name}="${attr.value}"`
+  const updateBackgroundImage = async (newSrc: string, ariaLabel?: string) => {
+    await applyElementChange((element) => {
+      const el = element as HTMLElement
+      // Remove old Tailwind background URL classes
+      const classes = (el.className || '').split(' ')
+      const filteredClasses = classes.filter(c => !c.startsWith('bg-[url('))
+      el.className = filteredClasses.join(' ')
+      // Use inline style
+      el.style.backgroundImage = `url('${newSrc}')`
+      if (ariaLabel) {
+        el.setAttribute('aria-label', ariaLabel)
+        el.setAttribute('role', 'img')
+      }
     })
-    newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
-    updateHtml(newHtml, true)
   }
 
   // Update child image (for containers with img child)
-  const updateChildImage = (newSrc: string, newAlt?: string) => {
-    if (!selectedElement?.selector) return
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    const container = doc.querySelector(selectedElement.selector)
-    const childImg = container?.querySelector('img') as HTMLImageElement
-    if (!childImg) return
-
-    childImg.src = newSrc
-    if (newAlt !== undefined) childImg.alt = newAlt
-
-    let newHtml = '<!DOCTYPE html>\n<html'
-    Array.from(doc.documentElement.attributes).forEach(attr => {
-      newHtml += ` ${attr.name}="${attr.value}"`
+  const updateChildImage = async (newSrc: string, newAlt?: string) => {
+    await applyElementChange((element) => {
+      const childImg = element.querySelector('img') as HTMLImageElement
+      if (childImg) {
+        childImg.src = newSrc
+        if (newAlt !== undefined) childImg.alt = newAlt
+      }
     })
-    newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
-    updateHtml(newHtml, true)
   }
 
   // Update element classes (for style editors)
-  const updateElementClasses = (newClasses: string) => {
-    if (!selectedElement?.selector) return
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    const element = doc.querySelector(selectedElement.selector)
-    if (!element) return
-
-    // Clean and set new classes (keep unicorn-selected class)
-    const cleanClasses = newClasses.replace(/unicorn-selected|unicorn-hover-outline/g, '').trim()
-    element.setAttribute('class', `${cleanClasses} unicorn-selected`)
-
-    let newHtml = '<!DOCTYPE html>\n<html'
-    Array.from(doc.documentElement.attributes).forEach(attr => {
-      newHtml += ` ${attr.name}="${attr.value}"`
+  const updateElementClasses = async (newClasses: string) => {
+    await applyElementChange((element) => {
+      const cleanClasses = newClasses.replace(/unicorn-selected|unicorn-hover-outline/g, '').trim()
+      element.setAttribute('class', `${cleanClasses} unicorn-selected`)
     })
-    newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
-    updateHtml(newHtml, true)
   }
 
   // Copy element
@@ -222,20 +458,52 @@ export function ElementFloatingBar() {
   }
 
   // Delete element
-  const deleteElement = () => {
+  const deleteElement = async () => {
     if (!selectedElement?.selector) return
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    const element = doc.querySelector(selectedElement.selector)
-    if (element) {
-      element.remove()
-      let newHtml = '<!DOCTYPE html>\n<html'
-      Array.from(doc.documentElement.attributes).forEach(attr => {
-        newHtml += ` ${attr.name}="${attr.value}"`
+
+    const globalContext = getGlobalComponentContext()
+
+    // Update page HTML
+    const pageDoc = new DOMParser().parseFromString(html, 'text/html')
+    const pageElement = pageDoc.querySelector(selectedElement.selector)
+    if (pageElement) {
+      pageElement.remove()
+      let newPageHtml = '<!DOCTYPE html>\n<html'
+      Array.from(pageDoc.documentElement.attributes).forEach(attr => {
+        newPageHtml += ` ${attr.name}="${attr.value}"`
       })
-      newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
-      updateHtml(newHtml, true)
-      clearSelection()
+      newPageHtml += '>\n' + pageDoc.head.outerHTML + '\n' + pageDoc.body.outerHTML + '\n</html>'
+      updateHtml(newPageHtml, true)
     }
+
+    // If element is in global component, also update database
+    if (globalContext && globalContext.component.id) {
+      const componentHtml = globalContext.component.html || ''
+      const wrapperTag = globalContext.type
+
+      const compDoc = new DOMParser().parseFromString(
+        `<${wrapperTag}>${componentHtml}</${wrapperTag}>`,
+        'text/html'
+      )
+
+      let relativeSelector = selectedElement.selector
+        .replace(/^header\s*>\s*/i, '')
+        .replace(/^footer\s*>\s*/i, '')
+        .replace(/^header\s+/i, '')
+        .replace(/^footer\s+/i, '')
+
+      const compElement = compDoc.querySelector(relativeSelector) ||
+                          compDoc.querySelector(selectedElement.selector)
+
+      if (compElement) {
+        compElement.remove()
+        const wrapper = compDoc.querySelector(wrapperTag)
+        const newComponentHtml = wrapper?.innerHTML || ''
+        await updateGlobalComponent(newComponentHtml, globalContext.type)
+      }
+    }
+
+    clearSelection()
   }
 
   // Handle AI prompt
@@ -554,11 +822,18 @@ export function ElementFloatingBar() {
             </div>
           )}
 
-          {/* Code Dropdown */}
+          {/* Code Dropdown - Editable */}
           {dropdown.active === 'code' && (
             <div className="p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">HTML</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">HTML</span>
+                  {getGlobalComponentContext() && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
+                      {getGlobalComponentContext()?.type === 'header' ? 'Header' : 'Footer'}
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={copyElement}
                   className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1"
@@ -567,9 +842,36 @@ export function ElementFloatingBar() {
                   Kopieren
                 </button>
               </div>
-              <pre className="bg-zinc-900 text-zinc-300 p-3 text-[10px] rounded-lg overflow-auto max-h-48">
-                <code>{selectedElement.outerHTML}</code>
-              </pre>
+              <textarea
+                value={editedCode}
+                onChange={(e) => setEditedCode(e.target.value)}
+                className="w-full bg-zinc-900 text-zinc-300 p-3 text-[10px] font-mono rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px] max-h-[240px]"
+                spellCheck={false}
+                rows={8}
+              />
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-zinc-500">
+                  {editedCode !== selectedElement.outerHTML ? 'Geändert' : 'Keine Änderungen'}
+                </span>
+                <button
+                  onClick={applyCodeChanges}
+                  disabled={isApplyingCode || editedCode === selectedElement.outerHTML || !editedCode.trim()}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                    codeApplySuccess
+                      ? 'bg-green-500 text-white'
+                      : 'bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed'
+                  }`}
+                >
+                  {isApplyingCode ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : codeApplySuccess ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <Check className="h-3 w-3" />
+                  )}
+                  {codeApplySuccess ? 'Übernommen' : 'Übernehmen'}
+                </button>
+              </div>
             </div>
           )}
         </div>

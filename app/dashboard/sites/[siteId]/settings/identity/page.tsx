@@ -120,7 +120,7 @@ export default function SiteIdentityPage() {
 
     try {
       const supabase = createClient()
-      await supabase
+      const { error } = await supabase
         .from('sites')
         .update({
           logo_url: identity.logo_url,
@@ -131,9 +131,16 @@ export default function SiteIdentityPage() {
         })
         .eq('id', siteId)
 
+      if (error) {
+        console.error('Error saving site identity:', error)
+        alert(`Fehler beim Speichern: ${error.message}`)
+        return
+      }
+
       setHasChanges(false)
     } catch (error) {
       console.error('Error saving site identity:', error)
+      alert('Fehler beim Speichern. Bitte versuche es erneut.')
     } finally {
       setSaving(false)
     }

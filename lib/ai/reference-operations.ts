@@ -502,3 +502,95 @@ export function groupUpdatesByType(updates: ReferenceUpdate[]): Record<Reference
 
   return grouped
 }
+
+/**
+ * Stellt sicher dass das Logo im Header HTML vorhanden ist
+ * Falls nicht, wird es automatisch injiziert
+ */
+export function ensureLogoInHeader(
+  html: string,
+  logoUrl: string,
+  siteName?: string
+): { html: string; wasInjected: boolean } {
+  // Prüfe ob die Logo-URL bereits im HTML vorhanden ist
+  if (html.includes(logoUrl)) {
+    return { html, wasInjected: false }
+  }
+
+  // Logo wurde nicht gefunden - injiziere es
+  console.log('[Logo-Validation] Logo nicht gefunden, wird injiziert:', logoUrl)
+
+  const logoHtml = `<a href="/" class="flex items-center">
+  <img src="${logoUrl}" alt="${siteName || 'Logo'}" class="h-8 w-auto">
+</a>`
+
+  // Strategie 1: Ersetze Placeholder-Logos
+  const placeholderPatterns = [
+    /<img[^>]*src=["'](?:\/logo\.(?:png|svg|webp)|logo\.(?:png|svg|webp)|https?:\/\/(?:placeholder|via\.placeholder|placehold)[^"']*)[^>]*>/gi,
+    /<img[^>]*alt=["'](?:Logo|Site Logo|Company Logo)[^"']*[^>]*src=["'](?!(?:https?:)?\/\/[a-z0-9-]+\.supabase)[^"']+[^>]*>/gi,
+  ]
+
+  let modifiedHtml = html
+  let replaced = false
+
+  for (const pattern of placeholderPatterns) {
+    if (pattern.test(modifiedHtml)) {
+      modifiedHtml = modifiedHtml.replace(pattern, `<img src="${logoUrl}" alt="${siteName || 'Logo'}" class="h-8 w-auto">`)
+      replaced = true
+      break
+    }
+  }
+
+  if (replaced) {
+    return { html: modifiedHtml, wasInjected: true }
+  }
+
+  // Strategie 2: Finde einen Link zur Startseite ohne Logo und füge das Logo hinzu
+  const homeLinkPattern = /<a[^>]*href=["']\/["'][^>]*>\s*(?:<span[^>]*>)?([^<]+)(?:<\/span>)?\s*<\/a>/i
+  const homeLinkMatch = modifiedHtml.match(homeLinkPattern)
+
+  if (homeLinkMatch && homeLinkMatch[1] && !homeLinkMatch[0].includes('<img')) {
+    const originalLink = homeLinkMatch[0]
+    const linkText = homeLinkMatch[1].trim()
+
+    // Ersetze den Text-Link durch Logo + Text
+    const newLink = `<a href="/" class="flex items-center gap-2">
+  <img src="${logoUrl}" alt="${siteName || 'Logo'}" class="h-8 w-auto">
+  <span class="font-semibold">${linkText}</span>
+</a>`
+    modifiedHtml = modifiedHtml.replace(originalLink, newLink)
+    return { html: modifiedHtml, wasInjected: true }
+  }
+
+  // Strategie 3: Finde den Header und füge das Logo am Anfang des ersten flex/nav Containers ein
+  const headerMatch = modifiedHtml.match(/<header[^>]*>([\s\S]*?)<\/header>/i)
+
+  if (headerMatch) {
+    const headerContent = headerMatch[1]
+
+    // Suche nach dem ersten Container im Header (div mit flex oder nav)
+    const containerPattern = /(<(?:div|nav)[^>]*class=["'][^"']*(?:flex|container)[^"']*["'][^>]*>)/i
+    const containerMatch = headerContent.match(containerPattern)
+
+    if (containerMatch) {
+      const originalContainer = containerMatch[1]
+      const newHeaderContent = headerContent.replace(
+        originalContainer,
+        `${originalContainer}\n${logoHtml}`
+      )
+      modifiedHtml = modifiedHtml.replace(headerContent, newHeaderContent)
+      return { html: modifiedHtml, wasInjected: true }
+    }
+
+    // Fallback: Füge direkt nach <header> ein
+    modifiedHtml = modifiedHtml.replace(
+      /<header([^>]*)>/i,
+      `<header$1>\n<div class="flex items-center">${logoHtml}</div>`
+    )
+    return { html: modifiedHtml, wasInjected: true }
+  }
+
+  // Keine geeignete Stelle gefunden - gib original zurück
+  console.log('[Logo-Validation] Konnte keine geeignete Stelle für Logo-Injection finden')
+  return { html, wasInjected: false }
+}

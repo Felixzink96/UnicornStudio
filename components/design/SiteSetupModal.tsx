@@ -1044,7 +1044,7 @@ export function SiteSetupModal({
               {/* Info Box */}
               <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700">
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  <span className="font-medium text-zinc-900 dark:text-zinc-100">Header-Design:</span> Die AI wählt automatisch einen passenden Header-Stil basierend auf dem gewählten Design-Archetyp ({archetype}).
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">Header-Design:</span> Die AI erstellt einen passenden Header-Stil basierend auf {designStyles.length > 0 ? `den Design-Stilen: ${designStyles.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')}` : 'deinen Einstellungen'}.
                 </p>
               </div>
 

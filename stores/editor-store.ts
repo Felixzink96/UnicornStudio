@@ -424,6 +424,8 @@ export const useEditorStore = create<EditorStateWithMenus & EditorActions>()(
           siteName: site.name,
           siteType: (site.settings as Record<string, unknown>)?.type as string,
           industry: (site.settings as Record<string, unknown>)?.industry as string,
+          logoUrl: site.logo_url,
+          logoDarkUrl: site.logo_dark_url,
           colors: (site.settings as Record<string, unknown>)?.colors as SiteContext['colors'],
           fonts: (site.settings as Record<string, unknown>)?.fonts as SiteContext['fonts'],
           style: (site.settings as Record<string, unknown>)?.style as string,
@@ -582,6 +584,8 @@ export const useEditorStore = create<EditorStateWithMenus & EditorActions>()(
           settings: Record<string, unknown> | null
           global_header_id: string | null
           global_footer_id: string | null
+          logo_url: string | null
+          logo_dark_url: string | null
         } | null
         page: {
           id: string
@@ -656,6 +660,8 @@ export const useEditorStore = create<EditorStateWithMenus & EditorActions>()(
           siteName: site.name,
           siteType: (site.settings as Record<string, unknown>)?.type as string,
           industry: (site.settings as Record<string, unknown>)?.industry as string,
+          logoUrl: site.logo_url,
+          logoDarkUrl: site.logo_dark_url,
           colors: (site.settings as Record<string, unknown>)?.colors as SiteContext['colors'],
           fonts: (site.settings as Record<string, unknown>)?.fonts as SiteContext['fonts'],
           style: (site.settings as Record<string, unknown>)?.style as string,

@@ -14,6 +14,7 @@ import type {
   EntryUpdate,
   PageUpdate,
 } from '@/lib/ai/reference-operations'
+import { ensureLogoInHeader } from '@/lib/ai/reference-operations'
 
 export interface ExecuteResult {
   success: boolean
@@ -100,10 +101,35 @@ async function executeComponentUpdate(
 ): Promise<ExecuteResult> {
   const supabase = createClient()
 
+  // Logo-Validierung für Header
+  let finalHtml = update.html
+
+  if (update.componentType === 'header') {
+    // Lade Logo-URL von der Site
+    const { data: site } = await supabase
+      .from('sites')
+      .select('logo_url, name')
+      .eq('id', siteId)
+      .single()
+
+    if (site?.logo_url) {
+      const { html: validatedHtml, wasInjected } = ensureLogoInHeader(
+        update.html,
+        site.logo_url,
+        site.name
+      )
+      finalHtml = validatedHtml
+
+      if (wasInjected) {
+        console.log('[Logo-Validation] Logo wurde automatisch in Header eingefügt')
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('components')
     .update({
-      html: update.html,
+      html: finalHtml,
       updated_at: new Date().toISOString(),
     })
     .eq('id', update.id)

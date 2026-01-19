@@ -13,6 +13,7 @@ import {
 } from '@/lib/ai/html-operations'
 import {
   parseReferenceUpdates,
+  ensureLogoInHeader,
   type ReferenceUpdate,
   type ParseResult,
 } from '@/lib/ai/reference-operations'
@@ -330,43 +331,45 @@ export function ChatPanel() {
     const headerMenuItems = setupData.headerSettings.menuItems.map(m => m.name).join(', ')
     const footerMenuItems = setupData.footerSettings.menuItems.map(m => m.name).join(', ')
 
-
-    // Archetyp-spezifische Beschreibungen
-    const archetypeDescriptions: Record<string, string> = {
-      architect: `ARCHITECT-STIL (Seriös, Premium):
-- Formen: ECKIG! Nutze rounded-none oder rounded-sm. Keine runden Elemente!
-- Layout: Asymmetrische Grids, feine Linien (border-[0.5px]), viel Weißraum
-- Typo: GROSS und elegant. Serif für Headlines, Sans für Body
-- Motion: LANGSAM (700-1000ms), elegant, KEINE bouncy Effekte
-- Borders: Feine, dezente Linien statt Schatten
-- Gesamteindruck: Wie eine Premium-Anwaltskanzlei oder Luxus-Bank`,
-
-      innovator: `INNOVATOR-STIL (Modern, Tech):
-- Formen: RUND! Nutze rounded-2xl, rounded-3xl. Weiche, freundliche Ecken
-- Layout: Glassmorphism, weiche Schatten, schwebende Cards
-- Typo: Modern Geometric Sans (wie Inter, Space Grotesk)
-- Motion: SCHNELL (200-400ms), snappy, micro-interactions
-- Effekte: Blur-Backgrounds, Gradient Blobs, subtiles Noise, Glow auf CTAs
-- Gesamteindruck: Wie ein modernes SaaS-Produkt oder Tech-Startup`,
-
-      brutalist: `BRUTALIST-STIL (Bold, Künstlerisch):
-- Formen: EXTREM! Entweder komplett eckig (rounded-none) ODER komplett rund (rounded-full). Kein Mittelweg!
-- Layout: RIESIGE Typografie (text-8xl+), dicke Borders (border-4), Marquee-Text
-- Typo: Monospace oder Bold Display Fonts (Bebas Neue, Anton)
-- Motion: HART und schnell (100-200ms), "in your face"
-- Effekte: Scan-Lines, starke Kontraste, KEINE weichen Blurs
-- Gesamteindruck: Wie eine Kunst-Galerie oder Mode-Agentur`,
-
-      organic: `ORGANIC-STIL (Soft, Natürlich):
-- Formen: SEHR WEICH! Nutze rounded-[40px], rounded-full, Blob-Shapes
-- Layout: Überlappende Bilder, natürliche Anordnung, asymmetrisch aber soft
-- Typo: Rounded Sans (Nunito, Quicksand), evtl. Handschrift-Akzente
-- Motion: BOUNCY (ease-out mit Überschwung), elastisch, verspielt
-- Effekte: Soft Shadows, Gradient Blobs, natürliche Farben
-- Gesamteindruck: Wie ein Wellness-Spa oder Bio-Food-Brand`,
+    // Design-Stil Beschreibungen
+    const styleDescriptions: Record<string, string> = {
+      'minimal': 'Reduziert, viel Weißraum, klare Linien, dezent, fokussiert',
+      'swiss': 'Grid-basiert, typografisch stark, asymmetrisch, präzise, sachlich',
+      'editorial': 'Magazin-Look, große Bilder, elegante Typografie, storytelling',
+      'brutalist': 'Roh, unpoliert, große Schriften, starke Kontraste, experimentell',
+      'organic': 'Weiche Formen, natürliche Kurven, sanfte Übergänge, blob-shapes',
+      'craftsman': 'Handwerklich, warm, authentisch, natürliche Materialien',
+      'luxe': 'Premium, elegant, sophisticated, dezente Animationen, hochwertig',
+      'bold': 'Mutig, große Statements, kontrastreich, auffällig',
+      'warm': 'Einladend, gemütlich, warme Farbtöne, freundlich',
+      'clinical': 'Sauber, professionell, medizinisch/technisch, vertrauenswürdig',
+      'dynamic': 'Bewegung, Energie, schräge Winkel, action-orientiert',
+      'playful': 'Verspielt, bunt, interaktiv, fun, lebendig',
+      'vintage': 'Retro, nostalgisch, klassisch, zeitlos',
+      'corporate': 'Business, seriös, professionell, vertrauenswürdig',
+      'neubrutalist': 'Modern brutalist, dicke Rahmen, harte Schatten, bold colors',
+      'glassmorphic': 'Glas-Effekte, Blur, Transparenz, futuristisch',
+      'dark-elegance': 'Dunkle Basis, elegante Akzente, sophisticated, premium',
+      'bento': 'Grid-Boxen, asymmetrische Karten, modern dashboard look',
+      'kinetic': 'Viel Bewegung, scroll-animations, interaktiv, dynamisch',
+      'japandi': 'Japanisch-skandinavisch, minimalistisch, natürlich, zen',
+      'retro-futurism': 'Sci-Fi Retro, Neon, Chrome, 80er Zukunftsvision',
+      'memphis': '80er Design, geometrische Formen, bunt, patterns',
+      'noise-grain': 'Film-Körnung, Texturen, analog-feel, künstlerisch',
+      'asymmetric': 'Ungleichmäßige Layouts, kreativ, unerwartet',
+      'gradient-dream': 'Fließende Farbverläufe, weiche Übergänge, modern',
+      'monoline': 'Einzelne Linien, Outline-Style, illustrativ',
+      'split': 'Geteilte Layouts, Kontraste, zweigeteilt',
     }
 
-    const archetypeDesc = archetypeDescriptions[setupData.archetype] || archetypeDescriptions.innovator
+    // Generiere Stil-Beschreibung basierend auf ausgewählten Stilen
+    const selectedStyles = setupData.designStyles || []
+    const styleDescription = selectedStyles.length > 0
+      ? selectedStyles.map(style => {
+          const desc = styleDescriptions[style] || style
+          return `- ${style.toUpperCase()}: ${desc}`
+        }).join('\n')
+      : '- MODERN: Clean, zeitgemäß, professionell'
 
     return `${originalPrompt}
 
@@ -376,37 +379,43 @@ WEBSITE SETUP (vom User konfiguriert)
 
 Website-Name: ${setupData.siteName}
 Website-Typ: ${setupData.siteType}
-Design-Archetyp: ${setupData.archetype.toUpperCase()}
 
 SEITEN die verlinkt werden müssen:
 ${selectedPages.map(p => `- "${p.name}" -> href="/${p.slug}"`).join('\n')}
 
 ═══════════════════════════════════════════════════════════════════════════
-DESIGN-ARCHETYP: ${setupData.archetype.toUpperCase()}
+DESIGN-STILE (WICHTIG - KOMBINIERE DIESE!)
 ═══════════════════════════════════════════════════════════════════════════
 
-${archetypeDesc}
+${styleDescription}
 
-BORDER-RADIUS (für diesen Archetyp):
+KOMBINIERE diese Stile zu einem einzigartigen Design! Die Stile ergänzen sich:
+${selectedStyles.length > 1 ? `Zum Beispiel: ${selectedStyles[0]} als Basis-Ästhetik mit ${selectedStyles.slice(1).join(' und ')} Elementen.` : 'Halte dich an diesen Stil.'}
+
+═══════════════════════════════════════════════════════════════════════════
+DESIGN-EINSTELLUNGEN
+═══════════════════════════════════════════════════════════════════════════
+
+BORDER-RADIUS:
 - Default: ${setupData.radii.default}
 - Buttons: ${setupData.radii.button}
 - Cards: ${setupData.radii.card}
 - Inputs: ${setupData.radii.input}
 
-MOTION (für diesen Archetyp):
+MOTION:
 - Stil: ${setupData.motion.style}
 - Geschwindigkeit: fast=${setupData.motion.duration.fast}, normal=${setupData.motion.duration.slow}
 - Easing: ${setupData.motion.easing}
 - Hover-Scale: ${setupData.motion.hoverScale}
 
-LAYOUT (für diesen Archetyp):
+LAYOUT:
 - Stil: ${setupData.layout.style}
 - Max-Width: ${setupData.layout.maxWidth}
 - Section-Spacing: ${setupData.layout.sectionSpacing}
 - Hero-Stil: ${setupData.layout.heroStyle}
 ${setupData.layout.useOverlaps ? '- Overlapping Elemente erlaubt' : '- Keine Overlaps'}
 
-EFFEKTE (für diesen Archetyp):
+EFFEKTE:
 ${setupData.effects.useNoise ? '- Noise-Textur im Hintergrund' : ''}
 ${setupData.effects.useBlur ? '- Blur/Glassmorphism erlaubt' : ''}
 ${setupData.effects.useGradientBlobs ? '- Gradient Blobs als Dekoration' : ''}
@@ -417,7 +426,7 @@ ${setupData.effects.borderStyle !== 'none' ? `- Border-Stil: ${setupData.effects
 HEADER ANFORDERUNGEN
 ═══════════════════════════════════════════════════════════════════════════
 
-- DESIGN FREI WÄHLEN! Wähle einen kreativen Header-Stil passend zum ${setupData.archetype.toUpperCase()}-Archetyp
+- Wähle einen kreativen Header-Stil passend zu den Design-Stilen oben
 - Navigation-Links: ${headerMenuItems}
 - Links müssen zu den echten Seiten verlinken (siehe oben)
 ${setupData.headerSettings.showCta ? `- CTA-Button: "${setupData.headerSettings.ctaText}" verlinkt zu "/${setupData.headerSettings.ctaPage}"` : '- Kein CTA-Button'}
@@ -460,7 +469,7 @@ ${setupData.tokens.fonts.mono ? `- style="font-family: var(--font-mono)" (${setu
 WICHTIGE REGELN
 ═══════════════════════════════════════════════════════════════════════════
 
-1. HALTE DICH STRIKT AN DEN ${setupData.archetype.toUpperCase()}-ARCHETYP!
+1. KOMBINIERE die Design-Stile zu einem einzigartigen Look!
 2. KEINE EMOJIS! Verwende IMMER inline SVG Icons.
 3. Nutze GSAP-kompatible Animationen: data-reveal="up|down|left|right", data-parallax="0.5"
 4. Generiere die KOMPLETTE Seite mit Header, Main Content und Footer.
@@ -785,86 +794,127 @@ WICHTIGE REGELN
                     }
 
                     case 'replace_section': {
-                      // Section komplett ersetzen
+                      // Section komplett ersetzen (DOM-basiert für robuste Ersetzung)
                       const sectionId = args.section_id
                       const newHtml = args.html
                       console.log('[Function Call] replace_section - ID:', sectionId)
 
-                      // Finde und ersetze die Section
-                      const sectionRegex = new RegExp(
-                        `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
-                        'gi'
-                      )
-                      finalHtml = currentHtml.replace(sectionRegex, newHtml)
+                      // Parse with DOMParser for robust replacement
+                      const doc = new DOMParser().parseFromString(currentHtml, 'text/html')
+                      const targetElement = doc.getElementById(sectionId)
 
-                      if (finalHtml === currentHtml) {
-                        console.warn('[Function Call] Section not found, trying broader match')
-                        // Fallback: Suche nach id="sectionId" im Element
-                        const broadRegex = new RegExp(
-                          `<[^>]+id=["']${sectionId}["'][^>]*>[\\s\\S]*?(?=<(?:section|footer|header|main|article)[^>]*>|<\\/body>)`,
+                      if (targetElement) {
+                        targetElement.outerHTML = newHtml
+                        finalHtml = '<!DOCTYPE html>\n<html'
+                        Array.from(doc.documentElement.attributes).forEach(attr => {
+                          finalHtml += ` ${attr.name}="${attr.value}"`
+                        })
+                        finalHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+                        console.log('[Function Call] replace_section - Success via DOM')
+                      } else {
+                        console.warn('[Function Call] Section not found via DOM, trying regex fallback')
+                        // Fallback: regex approach
+                        const sectionRegex = new RegExp(
+                          `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
                           'gi'
                         )
-                        finalHtml = currentHtml.replace(broadRegex, newHtml)
+                        finalHtml = currentHtml.replace(sectionRegex, newHtml)
                       }
                       break
                     }
 
                     case 'modify_section': {
-                      // Section modifizieren (gleiche Logik wie replace)
+                      // Section modifizieren (DOM-basiert)
                       const sectionId = args.section_id
                       const newHtml = args.html
                       console.log('[Function Call] modify_section - ID:', sectionId)
 
-                      const sectionRegex = new RegExp(
-                        `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
-                        'gi'
-                      )
-                      finalHtml = currentHtml.replace(sectionRegex, newHtml)
-                      break
-                    }
+                      const doc = new DOMParser().parseFromString(currentHtml, 'text/html')
+                      const targetElement = doc.getElementById(sectionId)
 
-                    case 'add_section': {
-                      // Neue Section hinzufügen
-                      const position = args.position || 'end'
-                      const newHtml = args.html
-                      console.log('[Function Call] add_section - Position:', position)
-
-                      if (position === 'end') {
-                        // Vor </body> einfügen
-                        finalHtml = currentHtml.replace(/<\/body>/i, `${newHtml}\n</body>`)
-                      } else if (position === 'start') {
-                        // Nach <body> einfügen
-                        finalHtml = currentHtml.replace(/(<body[^>]*>)/i, `$1\n${newHtml}`)
-                      } else if (position.startsWith('after_')) {
-                        // Nach bestimmter Section
-                        const targetId = position.replace('after_', '')
-                        const targetRegex = new RegExp(
-                          `(<(section|div|article)[^>]*id=["']${targetId}["'][^>]*>[\\s\\S]*?<\\/\\2>)`,
+                      if (targetElement) {
+                        targetElement.outerHTML = newHtml
+                        finalHtml = '<!DOCTYPE html>\n<html'
+                        Array.from(doc.documentElement.attributes).forEach(attr => {
+                          finalHtml += ` ${attr.name}="${attr.value}"`
+                        })
+                        finalHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+                        console.log('[Function Call] modify_section - Success via DOM')
+                      } else {
+                        // Fallback
+                        const sectionRegex = new RegExp(
+                          `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
                           'gi'
                         )
-                        finalHtml = currentHtml.replace(targetRegex, `$1\n${newHtml}`)
-                      } else if (position.startsWith('before_')) {
-                        // Vor bestimmter Section
-                        const targetId = position.replace('before_', '')
-                        const targetRegex = new RegExp(
-                          `(<(section|div|article)[^>]*id=["']${targetId}["'][^>]*>)`,
-                          'gi'
-                        )
-                        finalHtml = currentHtml.replace(targetRegex, `${newHtml}\n$1`)
+                        finalHtml = currentHtml.replace(sectionRegex, newHtml)
                       }
                       break
                     }
 
+                    case 'add_section': {
+                      // Neue Section hinzufügen (DOM-basiert)
+                      const position = args.position || 'end'
+                      const newHtml = args.html
+                      console.log('[Function Call] add_section - Position:', position)
+
+                      const doc = new DOMParser().parseFromString(currentHtml, 'text/html')
+                      const template = doc.createElement('template')
+                      template.innerHTML = newHtml
+
+                      if (position === 'end') {
+                        // Vor </body> einfügen
+                        doc.body.appendChild(template.content)
+                      } else if (position === 'start') {
+                        // Nach <body> als erstes einfügen
+                        doc.body.insertBefore(template.content, doc.body.firstChild)
+                      } else if (position.startsWith('after_')) {
+                        // Nach bestimmter Section
+                        const targetId = position.replace('after_', '')
+                        const targetElement = doc.getElementById(targetId)
+                        if (targetElement && targetElement.parentNode) {
+                          targetElement.parentNode.insertBefore(template.content, targetElement.nextSibling)
+                        }
+                      } else if (position.startsWith('before_')) {
+                        // Vor bestimmter Section
+                        const targetId = position.replace('before_', '')
+                        const targetElement = doc.getElementById(targetId)
+                        if (targetElement && targetElement.parentNode) {
+                          targetElement.parentNode.insertBefore(template.content, targetElement)
+                        }
+                      }
+
+                      finalHtml = '<!DOCTYPE html>\n<html'
+                      Array.from(doc.documentElement.attributes).forEach(attr => {
+                        finalHtml += ` ${attr.name}="${attr.value}"`
+                      })
+                      finalHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+                      break
+                    }
+
                     case 'delete_section': {
-                      // Section löschen
+                      // Section löschen (DOM-basiert)
                       const sectionId = args.section_id
                       console.log('[Function Call] delete_section - ID:', sectionId)
 
-                      const sectionRegex = new RegExp(
-                        `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>\\s*`,
-                        'gi'
-                      )
-                      finalHtml = currentHtml.replace(sectionRegex, '')
+                      const doc = new DOMParser().parseFromString(currentHtml, 'text/html')
+                      const targetElement = doc.getElementById(sectionId)
+
+                      if (targetElement) {
+                        targetElement.remove()
+                        finalHtml = '<!DOCTYPE html>\n<html'
+                        Array.from(doc.documentElement.attributes).forEach(attr => {
+                          finalHtml += ` ${attr.name}="${attr.value}"`
+                        })
+                        finalHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+                        console.log('[Function Call] delete_section - Success via DOM')
+                      } else {
+                        // Fallback
+                        const sectionRegex = new RegExp(
+                          `<(section|div|article)[^>]*id=["']${sectionId}["'][^>]*>[\\s\\S]*?<\\/\\1>\\s*`,
+                          'gi'
+                        )
+                        finalHtml = currentHtml.replace(sectionRegex, '')
+                      }
                       break
                     }
 
@@ -2229,7 +2279,22 @@ document.addEventListener('DOMContentLoaded', function() {
           if (headerName && headerHtml) {
             // Fix mobile menu: extract from header and make it a sibling
             // This prevents CSS stacking context issues
-            const fixedHeaderHtml = fixMobileMenuInHeader(headerHtml)
+            let fixedHeaderHtml = fixMobileMenuInHeader(headerHtml)
+
+            // Logo-Validierung: Stelle sicher dass das Logo verwendet wird
+            const currentSiteContext = useEditorStore.getState().siteContext
+            if (currentSiteContext?.logoUrl) {
+              const { html: validatedHtml, wasInjected } = ensureLogoInHeader(
+                fixedHeaderHtml,
+                currentSiteContext.logoUrl,
+                currentSiteContext.siteName
+              )
+              fixedHeaderHtml = validatedHtml
+              if (wasInjected) {
+                console.log('[GlobalComponents] Logo wurde automatisch in Header eingefügt')
+              }
+            }
+
             console.log('[GlobalComponents] Saving header (mobile menu fixed)...', fixedHeaderHtml.substring(0, 100))
             const result = await saveGlobalComponent({
               siteId,
@@ -2445,9 +2510,31 @@ document.addEventListener('DOMContentLoaded', function() {
               }
             }
 
-            // Site Identity updaten (Logo, Tagline, Default robots.txt)
-            const siteUpdate: { logo_url?: string; tagline?: string; robots_txt?: string; name?: string } = {}
-            if (logoUrl) siteUpdate.logo_url = logoUrl
+            // Site Identity updaten - Logo separat speichern für Robustheit
+            // Logo zuerst speichern (wichtig für AI)
+            if (logoUrl) {
+              const { error: logoError } = await supabase
+                .from('sites')
+                .update({ logo_url: logoUrl })
+                .eq('id', siteId)
+
+              if (logoError) {
+                console.error('Logo save failed:', logoError.message)
+              } else {
+                console.log('Logo saved successfully:', logoUrl)
+
+                // Store aktualisieren damit AI das Logo sofort hat
+                const currentContext = useEditorStore.getState().siteContext
+                if (currentContext) {
+                  useEditorStore.setState({
+                    siteContext: { ...currentContext, logoUrl }
+                  })
+                }
+              }
+            }
+
+            // Restliche Site-Daten updaten (optional - kann fehlschlagen ohne Logo zu blockieren)
+            const siteUpdate: { tagline?: string; robots_txt?: string; name?: string } = {}
             if (data.tagline) siteUpdate.tagline = data.tagline
             if (data.siteName) siteUpdate.name = data.siteName
 
@@ -2463,7 +2550,12 @@ Disallow: /wp-admin/
 Disallow: /wp-includes/`
 
             if (Object.keys(siteUpdate).length > 0) {
-              await supabase.from('sites').update(siteUpdate).eq('id', siteId)
+              const { error: updateError } = await supabase.from('sites').update(siteUpdate).eq('id', siteId)
+              if (updateError) {
+                console.error('Site metadata update failed (non-critical):', updateError.message)
+              } else {
+                console.log('Site metadata updated:', siteUpdate)
+              }
             }
 
             // 2. Seiten erstellen

@@ -24,6 +24,7 @@ import type { ChatMessage as ChatMessageType } from '@/types/editor'
 import type { DesignVariables } from '@/types/cms'
 import { removeHeaderFooterFromHtml, extractGlobalComponents, injectCSSVariables } from '@/lib/ai/html-operations'
 import type { ReferenceUpdate, ComponentUpdate, MenuUpdate } from '@/lib/ai/reference-operations'
+import { ensureLogoInHeader } from '@/lib/ai/reference-operations'
 import { executeMenuOperation } from '@/lib/ai/menu-operations'
 import { createClient } from '@/lib/supabase/client'
 
@@ -45,6 +46,7 @@ export function ChatMessage({ message, onOpenSetup }: ChatMessageProps) {
   const designVariables = useEditorStore((s) => s.designVariables)
   const globalHeader = useEditorStore((s) => s.globalHeader)
   const globalFooter = useEditorStore((s) => s.globalFooter)
+  const siteContext = useEditorStore((s) => s.siteContext)
 
   // Generate CSS variables from design tokens for preview
   const designTokensCSS = useMemo(() => {
@@ -188,10 +190,27 @@ export function ChatMessage({ message, onOpenSetup }: ChatMessageProps) {
             const componentUpdate = update as ComponentUpdate
             console.log('Applying COMPONENT_UPDATE:', componentUpdate.id)
 
+            // Logo-Validierung für Header: Stelle sicher dass das Logo verwendet wird
+            let finalHtml = componentUpdate.html
+            const currentSiteContext = useEditorStore.getState().siteContext
+
+            if (componentUpdate.componentType === 'header' && currentSiteContext?.logoUrl) {
+              const { html: validatedHtml, wasInjected } = ensureLogoInHeader(
+                componentUpdate.html,
+                currentSiteContext.logoUrl,
+                currentSiteContext.siteName
+              )
+              finalHtml = validatedHtml
+
+              if (wasInjected) {
+                console.log('[Logo-Validation] Logo wurde automatisch in Header eingefügt')
+              }
+            }
+
             const { error } = await supabase
               .from('components')
               .update({
-                html: componentUpdate.html,
+                html: finalHtml,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', componentUpdate.id)
@@ -208,22 +227,49 @@ export function ChatMessage({ message, onOpenSetup }: ChatMessageProps) {
           }
 
           case 'section': {
-            // Update section in current page HTML
+            // Update section in current page HTML using DOM parsing (safer than regex)
             const sectionUpdate = update as { type: 'section'; id: string; selector: string; html: string }
-            console.log('Applying SECTION_UPDATE:', sectionUpdate.selector)
+            console.log('Applying SECTION_UPDATE:', sectionUpdate.selector, 'ID:', sectionUpdate.id)
 
-            // Replace section in current HTML
             const currentHtml = useEditorStore.getState().html
-            const selectorRegex = new RegExp(
-              `<(section|div|article)[^>]*id=["']${sectionUpdate.id}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
-              'gi'
-            )
-            const newHtml = currentHtml.replace(selectorRegex, sectionUpdate.html)
+            const doc = new DOMParser().parseFromString(currentHtml, 'text/html')
 
-            if (newHtml !== currentHtml) {
+            // Find element by ID
+            const targetElement = doc.getElementById(sectionUpdate.id)
+
+            if (targetElement) {
+              console.log('Found target element:', targetElement.tagName, 'id:', sectionUpdate.id)
+
+              // Replace the element's outerHTML with the new HTML
+              targetElement.outerHTML = sectionUpdate.html
+
+              // Reconstruct the full HTML document
+              let newHtml = '<!DOCTYPE html>\n<html'
+              Array.from(doc.documentElement.attributes).forEach(attr => {
+                newHtml += ` ${attr.name}="${attr.value}"`
+              })
+              newHtml += '>\n' + doc.head.outerHTML + '\n' + doc.body.outerHTML + '\n</html>'
+
               applyGeneratedHtml(newHtml)
               await new Promise(resolve => setTimeout(resolve, 50))
               await save()
+              console.log('SECTION_UPDATE applied successfully')
+            } else {
+              console.error('SECTION_UPDATE: Element not found with ID:', sectionUpdate.id)
+              // Fallback: try regex approach for elements without proper ID
+              const selectorRegex = new RegExp(
+                `<(section|div|article)[^>]*id=["']${sectionUpdate.id}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
+                'gi'
+              )
+              const newHtml = currentHtml.replace(selectorRegex, sectionUpdate.html)
+              if (newHtml !== currentHtml) {
+                applyGeneratedHtml(newHtml)
+                await new Promise(resolve => setTimeout(resolve, 50))
+                await save()
+                console.log('SECTION_UPDATE applied via fallback regex')
+              } else {
+                console.error('SECTION_UPDATE: Fallback regex also failed')
+              }
             }
             break
           }

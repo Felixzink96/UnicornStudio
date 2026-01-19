@@ -75,6 +75,8 @@ export interface SiteContext {
   siteName: string
   siteType?: string
   industry?: string
+  logoUrl?: string | null
+  logoDarkUrl?: string | null
   colors?: {
     primary?: string
     secondary?: string

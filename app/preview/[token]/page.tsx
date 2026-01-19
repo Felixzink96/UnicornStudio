@@ -7,6 +7,8 @@ import { Monitor, Tablet, Smartphone, Lock, Eye, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MacBookMockup, IPadMockup, IPhoneMockup } from '@/components/preview/mockups'
+import { injectMenusIntoHtml } from '@/lib/menus/render-menu'
+import type { MenuWithItems, MenuItem } from '@/types/menu'
 
 interface ShareLink {
   id: string
@@ -86,6 +88,9 @@ export default function PreviewPage() {
   // Global Components (Header/Footer)
   const [globalHeader, setGlobalHeader] = useState<GlobalComponent | null>(null)
   const [globalFooter, setGlobalFooter] = useState<GlobalComponent | null>(null)
+
+  // Menus
+  const [menus, setMenus] = useState<MenuWithItems[]>([])
 
   // Password protection
   const [needsPassword, setNeedsPassword] = useState(false)
@@ -271,6 +276,59 @@ export default function PreviewPage() {
           if (header) setGlobalHeader(header)
           if (footer) setGlobalFooter(footer)
         }
+      }
+
+      // Load menus with items - menus table exists but types not generated
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: menusData } = await (supabase as any)
+        .from('menus')
+        .select(`
+          id, name, slug, position,
+          menu_items (
+            id,
+            label,
+            link_type,
+            page_id,
+            external_url,
+            anchor,
+            position,
+            parent_id,
+            target,
+            css_classes,
+            pages (slug)
+          )
+        `)
+        .eq('site_id', link.site_id)
+
+      if (menusData) {
+        // Transform to MenuWithItems format
+        const transformedMenus: MenuWithItems[] = menusData.map((menu: any) => {
+          const items: MenuItem[] = (menu.menu_items || [])
+            .sort((a: any, b: any) => a.position - b.position)
+            .map((item: any) => ({
+              id: item.id,
+              menuId: menu.id,
+              label: item.label,
+              linkType: item.link_type,
+              pageId: item.page_id,
+              pageSlug: item.pages?.slug || null,
+              externalUrl: item.external_url,
+              anchor: item.anchor,
+              position: item.position,
+              parentId: item.parent_id,
+              target: item.target,
+              cssClasses: item.css_classes,
+            }))
+          return {
+            id: menu.id,
+            siteId: link.site_id,
+            name: menu.name,
+            slug: menu.slug,
+            position: menu.position,
+            items,
+          }
+        })
+        setMenus(transformedMenus)
       }
 
       // Load pages
@@ -585,16 +643,16 @@ export default function PreviewPage() {
     const combinedJs = [headerJs, footerJs].filter(Boolean).join('\n')
 
     // If page already has full HTML structure, inject header/footer
+    let fullHtml: string
     if (pageContent.includes('<body')) {
-      return pageContent
+      fullHtml = pageContent
         .replace(/<body[^>]*>/, `$&\n${headerHtml}`)
         .replace(/<\/body>/, `${footerHtml}\n</body>`)
         .replace(/<\/head>/, `<style>${combinedCss}</style>\n</head>`)
         .replace(/<\/body>/, `${cleanupScript}\n${linkHandlerScript}\n<script>${combinedJs}</script>\n</body>`)
-    }
-
-    // Otherwise wrap in full HTML
-    return `<!DOCTYPE html>
+    } else {
+      // Otherwise wrap in full HTML
+      fullHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -610,7 +668,18 @@ export default function PreviewPage() {
   <script>${combinedJs}</script>
 </body>
 </html>`
-  }, [globalHeader, globalFooter])
+    }
+
+    // Inject menus - replace {{menu:slug}} and {{MENU:SLUG}} placeholders
+    if (menus && menus.length > 0) {
+      fullHtml = injectMenusIntoHtml(fullHtml, menus, {
+        containerClass: 'flex items-center gap-6',
+        linkClass: 'text-sm transition-colors hover:opacity-80',
+      })
+    }
+
+    return fullHtml
+  }, [globalHeader, globalFooter, menus])
 
   // Submit comment
   const handleCommentSubmit = async () => {

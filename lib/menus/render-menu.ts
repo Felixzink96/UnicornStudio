@@ -155,8 +155,8 @@ export function injectMenusIntoHtml(
 ): string {
   let result = html
 
-  // Ersetze {{menu:slug}} Platzhalter (slug kann Bindestriche enthalten!)
-  const menuRegex = /\{\{menu:([\w-]+)\}\}/g
+  // Ersetze {{menu:slug}} Platzhalter (case-insensitive, slug kann Bindestriche enthalten!)
+  const menuRegex = /\{\{menu:([\w-]+)\}\}/gi
   let match
 
   while ((match = menuRegex.exec(html)) !== null) {
